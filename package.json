@@ -1,0 +1,13 @@
+{
+  "name": "levexp",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:api": "npm run dev -w @levex/api",
+    "start:api": "npm run start -w @levex/api",
+    "test": "vitest run",
+    "typecheck": "tsc -p apps/api && tsc -p packages/domain"
+  },
+  "devDependencies": { "typescript": "^5.6.0", "tsx": "^4.19.0", "vitest": "^2.1.0", "@types/node": "^22.0.0" }
+}
