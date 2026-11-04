@@ -1,4 +1,4 @@
-// Только типы. Логика будет добавляться итеративно.
+// Доменные типы + чистые функции прогрессии.
 
 export type LifeSphereId =
   | "health" | "mind" | "career" | "finance" | "relationships"
@@ -17,17 +17,28 @@ export interface Player {
   progression: Progression;
 }
 
-export type GoalStatus = "active" | "done" | "abandoned";
+export type GoalStatus = "open" | "done";
 
 export interface Goal {
   id: string;
-  playerId: string;
-  sphereId: LifeSphereId;
   title: string;
-  description?: string;
+  sphere?: LifeSphereId;
   xpReward: number;
   status: GoalStatus;
-  parentGoalId?: string;
+  // future: playerId, description, parentGoalId, deadline
+}
+
+/** v1 progress of the single (implicit) player. */
+export interface PlayerProgress {
+  xp: number;
+  level: number;
+}
+
+export const XP_PER_LEVEL = 100;
+
+/** Level formula v1: level = floor(xp / 100) + 1  (0–99 XP → 1, 100–199 → 2, ...). */
+export function levelForXp(xp: number): number {
+  return Math.floor(Math.max(0, xp) / XP_PER_LEVEL) + 1;
 }
 
 export interface Progression {
