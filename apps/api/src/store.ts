@@ -5,14 +5,15 @@ import {
   getLifeSphere,
   levelForXp,
   progressFromProgression,
+  xpForGoal,
+  xpGrantedForGoal,
   ARTIFACT_IMAGE_URL_MAX_LENGTH,
   ARTIFACT_TITLE_MAX_LENGTH,
   AVATAR_URL_MAX_LENGTH,
   DEFAULT_ARTIFACT_SPHERE,
   NICKNAME_MAX_LENGTH,
   TITLE_MAX_LENGTH,
-  XP_REWARD_DEFAULT,
-  XP_REWARD_MAX,
+  XP_REWARD_STANDARD,
   type Artifact,
   type Goal,
   type LifeSphereId,
@@ -25,8 +26,8 @@ import {
 export const DEFAULT_DATA_FILE = "./data/levexp.json";
 export const DEFAULT_PLAYER_NICKNAME = "Player";
 
-const DEMO_GOALS: Array<{ title: string; sphere: LifeSphereId; xpReward?: number }> = [
-  { title: "Morning walk 20 min", sphere: "health", xpReward: 15 },
+const DEMO_GOALS: Array<{ title: string; sphere: LifeSphereId }> = [
+  { title: "Morning walk 20 min", sphere: "health" },
   { title: "Read 10 pages", sphere: "mind" },
 ];
 
@@ -41,14 +42,6 @@ export class InvalidGoalUpdate extends Error {
   constructor(message: string) {
     super(message);
     this.name = "InvalidGoalUpdate";
-  }
-}
-
-/** A reward edit was sent for a goal that is already done. */
-export class GoalAlreadyDone extends Error {
-  constructor() {
-    super("goal is already done");
-    this.name = "GoalAlreadyDone";
   }
 }
 
@@ -101,6 +94,13 @@ interface StoreFile {
   room: Room;
 }
 
+interface MemoryState {
+  player: Player;
+  goals: Map<string, Goal>;
+  artifacts: Map<string, Artifact>;
+  room: Room;
+}
+
 // Single player, goals, and the virtual room. Null dataFile means in-memory (tests).
 // A path is loaded on startup and rewritten after each mutation.
 let dataFile: string | null = null;
@@ -123,24 +123,43 @@ export function openStore(filePath: string | null): void {
     throw storeError(filePath, "path is a directory");
   }
   if (!existsSync(filePath)) {
+    const previous = dataFile;
     dataFile = filePath;
-    seedMemory(true);
-    writeState();
+    try {
+      commitState(freshState(true));
+    } catch (err) {
+      dataFile = previous;
+      throw err;
+    }
     return;
   }
   const loaded = readState(filePath);
+  const previous = dataFile;
+  if (loaded.seededPlayer) {
+    dataFile = filePath;
+    try {
+      commitState({
+        player: loaded.player,
+        goals: loaded.goals,
+        artifacts: loaded.artifacts,
+        room: loaded.room,
+      });
+    } catch (err) {
+      dataFile = previous;
+      throw err;
+    }
+    return;
+  }
   dataFile = filePath;
   player = loaded.player;
   goals = loaded.goals;
   artifacts = loaded.artifacts;
   room = loaded.room;
-  if (loaded.seededPlayer) writeState();
 }
 
 /** Replace memory with a new player and, when `seed` is true, the demo goals. Persists when a file is open. */
 export function resetStore(seed = true): void {
-  seedMemory(seed);
-  writeState();
+  commitState(freshState(seed));
 }
 
 export const listGoals = (): Goal[] => [...goals.values()];
@@ -179,31 +198,20 @@ export function updatePlayer(patch: PlayerUpdate): PlayerView {
   return getPlayer();
 }
 
-export function createGoal(input: { title: string; sphere?: LifeSphereId; xpReward?: number }): Goal {
-  const goal = addGoal(input);
-  writeState();
+export function createGoal(input: { title: string; sphere?: LifeSphereId }): Goal {
+  const next = cloneState();
+  const goal = makeGoal(input);
+  next.goals.set(goal.id, goal);
+  commitState(next);
   return goal;
 }
 
 /**
- * Sets `xpReward` on an open goal. Returns undefined when the id is missing.
- * Throws {@link GoalAlreadyDone} when the goal is already done, and
- * {@link InvalidGoalUpdate} when the reward is outside 1..{@link XP_REWARD_MAX}.
- */
-export function updateGoal(id: string, xpReward: number): Goal | undefined {
-  const goal = goals.get(id);
-  if (!goal) return undefined;
-  if (goal.status !== "open") throw new GoalAlreadyDone();
-  assertXpReward(xpReward);
-  goal.xpReward = xpReward;
-  writeState();
-  return goal;
-}
-
-/**
- * Marks a goal done. XP is awarded only on the first completion.
- * `artifactId` links a room photo to this goal when the goal's sphere is creativity.
- * Returns undefined if the goal is not found. Linking is checked before any XP is granted.
+ * Marks a goal done. XP is awarded only on the first completion, from the stored
+ * reward clamped by {@link xpGrantedForGoal}. A linked creativity photo raises a
+ * still-standard reward before that clamp. `artifactId` links a room photo when
+ * the goal's sphere is creativity. Returns undefined if the goal is not found.
+ * Linking is checked before any XP is granted. Memory changes only after the file write.
  */
 export function completeGoal(
   id: string,
@@ -213,17 +221,29 @@ export function completeGoal(
   if (!goal) return undefined;
   const artifact = artifactId === undefined ? undefined : requireLinkableArtifact(goal, artifactId);
   const awarded = goal.status !== "done";
+  const willLink = artifact !== undefined && artifact.goalId !== goal.id;
+  if (!awarded && !willLink) {
+    return { goal, progress: getProgress(), awarded: false };
+  }
+
+  const next = cloneState();
+  const nextGoal = next.goals.get(id)!;
   if (awarded) {
-    goal.status = "done";
-    grantXp(goal.xpReward, goal.sphere);
+    const photoLinked = willLink || hasLinkedPhoto(next.artifacts, id);
+    const amount = xpGrantedForGoal({
+      sphere: nextGoal.sphere,
+      xpReward: nextGoal.xpReward,
+      photoLinked,
+    });
+    nextGoal.xpReward = amount;
+    nextGoal.status = "done";
+    next.player = playerWithXp(next.player, amount, nextGoal.sphere);
   }
-  let linked = false;
-  if (artifact && artifact.goalId !== goal.id) {
-    artifact.goalId = goal.id;
-    linked = true;
+  if (willLink && artifact) {
+    next.artifacts.get(artifact.id)!.goalId = nextGoal.id;
   }
-  if (awarded || linked) writeState();
-  return { goal, progress: getProgress(), awarded };
+  commitState(next);
+  return { goal: goals.get(id)!, progress: getProgress(), awarded };
 }
 
 export const listArtifacts = (): Artifact[] => [...artifacts.values()];
@@ -241,25 +261,35 @@ export function getRoom(): RoomView {
 /** Creates a photo and appends it to the room. `goalId` may point at a creativity goal. */
 export function createArtifact(input: ArtifactInput): Artifact {
   if (input.kind !== "photo") throw new InvalidArtifact("kind must be photo");
+  const title = artifactText(input.title, "title", ARTIFACT_TITLE_MAX_LENGTH);
+  const imageUrl = input.imageUrl === undefined
+    ? undefined
+    : artifactText(input.imageUrl, "imageUrl", ARTIFACT_IMAGE_URL_MAX_LENGTH);
+
+  const next = cloneState();
+  const linkedGoal = input.goalId === undefined ? undefined : next.goals.get(input.goalId);
+  if (input.goalId !== undefined) {
+    if (!linkedGoal) throw new InvalidArtifact("goal not found");
+    if (linkedGoal.sphere !== "creativity") throw new InvalidArtifact("goal must be a creativity goal");
+  }
   const artifact: Artifact = {
     id: randomUUID(),
-    title: artifactText(input.title, "title", ARTIFACT_TITLE_MAX_LENGTH),
+    title,
     kind: "photo",
     sphere: DEFAULT_ARTIFACT_SPHERE,
     createdAt: new Date().toISOString(),
   };
-  if (input.imageUrl !== undefined) {
-    artifact.imageUrl = artifactText(input.imageUrl, "imageUrl", ARTIFACT_IMAGE_URL_MAX_LENGTH);
+  if (imageUrl !== undefined) artifact.imageUrl = imageUrl;
+  if (linkedGoal) {
+    artifact.goalId = linkedGoal.id;
+    // Only the server standard reward grows. Legacy amounts stay put until completion clamps them.
+    if (linkedGoal.status === "open" && linkedGoal.xpReward === XP_REWARD_STANDARD) {
+      linkedGoal.xpReward = xpForGoal({ sphere: "creativity", photoLinked: true });
+    }
   }
-  if (input.goalId !== undefined) {
-    const goal = goals.get(input.goalId);
-    if (!goal) throw new InvalidArtifact("goal not found");
-    if (goal.sphere !== "creativity") throw new InvalidArtifact("goal must be a creativity goal");
-    artifact.goalId = goal.id;
-  }
-  artifacts.set(artifact.id, artifact);
-  room.placements.push({ artifactId: artifact.id });
-  writeState();
+  next.artifacts.set(artifact.id, artifact);
+  next.room.placements.push({ artifactId: artifact.id });
+  commitState(next);
   return artifact;
 }
 
@@ -272,29 +302,73 @@ function makePlayer(): Player {
   };
 }
 
-function seedMemory(seedGoals: boolean): void {
-  goals = new Map();
-  artifacts = new Map();
-  room = { placements: [] };
-  player = makePlayer();
+function freshState(seedGoals: boolean): MemoryState {
+  const next: MemoryState = {
+    player: makePlayer(),
+    goals: new Map(),
+    artifacts: new Map(),
+    room: { placements: [] },
+  };
   if (seedGoals) {
-    for (const demo of DEMO_GOALS) addGoal(demo);
+    for (const demo of DEMO_GOALS) {
+      const goal = makeGoal(demo);
+      next.goals.set(goal.id, goal);
+    }
   }
+  return next;
 }
 
-function addGoal(input: { title: string; sphere?: LifeSphereId; xpReward?: number }): Goal {
-  const xpReward = input.xpReward ?? XP_REWARD_DEFAULT;
-  assertXpReward(xpReward);
-  const goal: Goal = { id: randomUUID(), title: input.title, xpReward, status: "open" };
+function makeGoal(input: { title: string; sphere?: LifeSphereId }): Goal {
+  const goal: Goal = {
+    id: randomUUID(),
+    title: input.title,
+    xpReward: xpForGoal({ sphere: input.sphere }),
+    status: "open",
+  };
   if (input.sphere) goal.sphere = input.sphere;
-  goals.set(goal.id, goal);
   return goal;
 }
 
-function assertXpReward(xpReward: number): void {
-  if (!Number.isInteger(xpReward) || xpReward < 1 || xpReward > XP_REWARD_MAX) {
-    throw new InvalidGoalUpdate(`xpReward must be an integer from 1 to ${XP_REWARD_MAX}`);
+function cloneState(): MemoryState {
+  return {
+    player: {
+      ...player,
+      progression: {
+        totalXp: player.progression.totalXp,
+        level: player.progression.level,
+        xpBySphere: { ...player.progression.xpBySphere },
+      },
+    },
+    goals: new Map([...goals].map(([id, goal]) => [id, { ...goal }])),
+    artifacts: new Map([...artifacts].map(([id, artifact]) => [id, { ...artifact }])),
+    room: { placements: room.placements.map((placement) => ({ ...placement })) },
+  };
+}
+
+/** Write `next` first. Memory is replaced only after that write returns. */
+function commitState(next: MemoryState): void {
+  writeState(snapshotFrom(next));
+  player = next.player;
+  goals = next.goals;
+  artifacts = next.artifacts;
+  room = next.room;
+}
+
+function hasLinkedPhoto(artifactMap: Map<string, Artifact>, goalId: string): boolean {
+  for (const artifact of artifactMap.values()) {
+    if (artifact.goalId === goalId) return true;
   }
+  return false;
+}
+
+function playerWithXp(current: Player, amount: number, sphere?: LifeSphereId): Player {
+  const xpBySphere = { ...current.progression.xpBySphere };
+  if (sphere) xpBySphere[sphere] = (xpBySphere[sphere] ?? 0) + amount;
+  const totalXp = current.progression.totalXp + amount;
+  return {
+    ...current,
+    progression: { totalXp, level: levelForXp(totalXp), xpBySphere },
+  };
 }
 
 function requireLinkableArtifact(goal: Goal, artifactId: string): Artifact {
@@ -311,13 +385,6 @@ function artifactText(value: string, label: string, max: number): string {
     throw new InvalidArtifact(`${label} must be 1-${max} characters`);
   }
   return text;
-}
-
-function grantXp(amount: number, sphere?: LifeSphereId): void {
-  const xpBySphere = { ...player.progression.xpBySphere };
-  if (sphere) xpBySphere[sphere] = (xpBySphere[sphere] ?? 0) + amount;
-  const totalXp = player.progression.totalXp + amount;
-  player.progression = { totalXp, level: levelForXp(totalXp), xpBySphere };
 }
 
 function trimmed(value: string, label: string, max: number): string {
@@ -345,22 +412,38 @@ function storedPlayer(): Player {
 }
 
 function snapshot(): StoreFile {
+  return snapshotFrom({ player, goals, artifacts, room });
+}
+
+function snapshotFrom(state: MemoryState): StoreFile {
+  const progression: Progression = {
+    totalXp: state.player.progression.totalXp,
+    level: levelForXp(state.player.progression.totalXp),
+    xpBySphere: { ...state.player.progression.xpBySphere },
+  };
   return {
     version: 1,
-    player: storedPlayer(),
-    goals: [...goals.values()].map((goal) => ({ ...goal })),
-    artifacts: [...artifacts.values()].map((artifact) => ({ ...artifact })),
-    room: { placements: room.placements.map((placement) => ({ ...placement })) },
+    player: {
+      id: state.player.id,
+      nickname: state.player.nickname,
+      createdAt: state.player.createdAt,
+      ...(state.player.title !== undefined ? { title: state.player.title } : {}),
+      ...(state.player.avatarUrl !== undefined ? { avatarUrl: state.player.avatarUrl } : {}),
+      progression,
+    },
+    goals: [...state.goals.values()].map((goal) => ({ ...goal })),
+    artifacts: [...state.artifacts.values()].map((artifact) => ({ ...artifact })),
+    room: { placements: state.room.placements.map((placement) => ({ ...placement })) },
   };
 }
 
-function writeState(): void {
-  if (!dataFile) return;
-  const file = dataFile;
+type StoreWriter = (file: string, contents: string) => void;
+
+function atomicWrite(file: string, contents: string): void {
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
   try {
-    writeFileSync(tmp, `${JSON.stringify(snapshot(), null, 2)}\n`, "utf8");
+    writeFileSync(tmp, contents, "utf8");
     renameSync(tmp, file);
   } catch (err) {
     try {
@@ -370,6 +453,18 @@ function writeState(): void {
     }
     throw err;
   }
+}
+
+let storeWriter: StoreWriter = atomicWrite;
+
+/** Tests replace the writer to simulate a failed save. Pass null to restore the atomic write. */
+export function setStoreWriterForTests(writer: StoreWriter | null): void {
+  storeWriter = writer ?? atomicWrite;
+}
+
+function writeState(fileSnapshot?: StoreFile): void {
+  if (!dataFile) return;
+  storeWriter(dataFile, `${JSON.stringify(fileSnapshot ?? snapshot(), null, 2)}\n`);
 }
 
 function storeError(file: string, detail: string): Error {

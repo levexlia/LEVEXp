@@ -37,39 +37,39 @@ describe("life spheres", () => {
   it("credits xpBySphere for the goal sphere once, and leaves unsphered goals out of the map", async () => {
     const a = app();
     const health = (await a.inject({
-      method: "POST", url: "/goals", payload: { title: "Run", sphere: "health", xpReward: 40 },
+      method: "POST", url: "/goals", payload: { title: "Run", sphere: "health" },
     })).json();
     const mind = (await a.inject({
-      method: "POST", url: "/goals", payload: { title: "Read", sphere: "mind", xpReward: 25 },
+      method: "POST", url: "/goals", payload: { title: "Read", sphere: "mind" },
     })).json();
     const plain = (await a.inject({
-      method: "POST", url: "/goals", payload: { title: "Misc", xpReward: 10 },
+      method: "POST", url: "/goals", payload: { title: "Misc" },
     })).json();
 
     const first = await a.inject({ method: "POST", url: `/goals/${health.id}/complete` });
-    expect(first.json().progress).toEqual({ xp: 40, level: 1, xpBySphere: { health: 40 } });
+    expect(first.json().progress).toEqual({ xp: 10, level: 1, xpBySphere: { health: 10 } });
 
     await a.inject({ method: "POST", url: `/goals/${health.id}/complete` });
     await a.inject({ method: "POST", url: `/goals/${mind.id}/complete` });
     await a.inject({ method: "POST", url: `/goals/${plain.id}/complete` });
 
     expect((await a.inject({ method: "GET", url: "/progress" })).json()).toEqual({
-      xp: 75,
+      xp: 30,
       level: 1,
-      xpBySphere: { health: 40, mind: 25 },
+      xpBySphere: { health: 10, mind: 10 },
     });
   });
 
   it("sums rewards inside one sphere", async () => {
     const a = app();
     const first = (await a.inject({
-      method: "POST", url: "/goals", payload: { title: "Budget", sphere: "finance", xpReward: 50 },
+      method: "POST", url: "/goals", payload: { title: "Budget", sphere: "finance" },
     })).json();
     const second = (await a.inject({
-      method: "POST", url: "/goals", payload: { title: "Invoice", sphere: "finance", xpReward: 50 },
+      method: "POST", url: "/goals", payload: { title: "Invoice", sphere: "finance" },
     })).json();
     await a.inject({ method: "POST", url: `/goals/${first.id}/complete` });
     const done = await a.inject({ method: "POST", url: `/goals/${second.id}/complete` });
-    expect(done.json().progress).toEqual({ xp: 100, level: 2, xpBySphere: { finance: 100 } });
+    expect(done.json().progress).toEqual({ xp: 20, level: 1, xpBySphere: { finance: 20 } });
   });
 });

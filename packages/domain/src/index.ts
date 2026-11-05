@@ -40,13 +40,64 @@ export const TITLE_MAX_LENGTH = 64;
 export const AVATAR_URL_MAX_LENGTH = 2048;
 
 /**
- * XP pays the player for doing an activity. It is encouragement, not proof of mastery.
- * Future skills are a separate track and are not derived from `xpReward`.
- * One goal accepts at most {@link XP_REWARD_MAX}; a player's total can grow past that
- * by completing more goals.
+ * Activity XP pays the player for doing something. It is encouragement, not proof of mastery.
+ * Future skills are a separate track: they are not derived from `xpReward` or {@link xpForGoal},
+ * and this slice does not implement them.
+ * The server assigns each new goal's reward. A player's total can grow past
+ * {@link XP_REWARD_MAX} by completing more goals.
  */
 export const XP_REWARD_MAX = 50;
-export const XP_REWARD_DEFAULT = 10;
+/** Activity XP for a goal with no completion bonus. */
+export const XP_REWARD_STANDARD = 10;
+/** Same value as {@link XP_REWARD_STANDARD}. */
+export const XP_REWARD_DEFAULT = XP_REWARD_STANDARD;
+/**
+ * Extra activity XP when a creativity goal has a linked photo.
+ * Applied by {@link xpForGoal}; not a skill and not a client input.
+ */
+export const XP_CREATIVITY_PHOTO_BONUS = 5;
+
+export interface GoalXpInput {
+  sphere?: LifeSphereId;
+  /** True when a photo artifact is linked to the goal. */
+  photoLinked?: boolean;
+}
+
+/**
+ * Server rule table for activity XP on a newly assigned reward. Pure.
+ *
+ * - standard goal (any sphere, or none): {@link XP_REWARD_STANDARD}
+ * - creativity goal with a linked photo: standard + {@link XP_CREATIVITY_PHOTO_BONUS}
+ *
+ * The result is always an integer from 1 to {@link XP_REWARD_MAX}.
+ * Skills and mastery are not part of this table.
+ */
+export function xpForGoal(input: GoalXpInput = {}): number {
+  let xp = XP_REWARD_STANDARD;
+  if (input.sphere === "creativity" && input.photoLinked) {
+    xp += XP_CREATIVITY_PHOTO_BONUS;
+  }
+  if (xp < 1) return 1;
+  if (xp > XP_REWARD_MAX) return XP_REWARD_MAX;
+  return xp;
+}
+
+/**
+ * Activity XP granted the first time a stored goal is completed.
+ * Legacy rows are not recomputed with {@link xpForGoal}: a stored reward is granted
+ * as saved, except a value above {@link XP_REWARD_MAX} is clamped to that maximum.
+ * A creativity goal that still has the standard reward and a linked photo is the
+ * one case that moves up to the photo-bonus row before the clamp.
+ */
+export function xpGrantedForGoal(input: GoalXpInput & { xpReward: number }): number {
+  let xp = input.xpReward;
+  if (input.photoLinked && input.sphere === "creativity" && xp === XP_REWARD_STANDARD) {
+    xp = xpForGoal({ sphere: "creativity", photoLinked: true });
+  }
+  if (!Number.isFinite(xp)) return 0;
+  if (xp > XP_REWARD_MAX) return XP_REWARD_MAX;
+  return xp;
+}
 
 export const ARTIFACT_TITLE_MAX_LENGTH = 200;
 export const ARTIFACT_IMAGE_URL_MAX_LENGTH = 2048;
@@ -74,7 +125,11 @@ export interface Goal {
   id: string;
   title: string;
   sphere?: LifeSphereId;
-  /** Activity XP, capped at {@link XP_REWARD_MAX} on create and patch. Not a mastery score. */
+  /**
+   * Activity XP granted once on the first completion. The server sets it
+   * ({@link xpForGoal}); the client does not. Not a mastery score.
+   * A legacy value above {@link XP_REWARD_MAX} is clamped by {@link xpGrantedForGoal}.
+   */
   xpReward: number;
   status: GoalStatus;
   // future: playerId, description, parentGoalId, deadline, skills

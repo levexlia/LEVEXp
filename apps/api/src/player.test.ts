@@ -120,17 +120,17 @@ describe("player profile", () => {
     const { id } = (await a.inject({
       method: "POST",
       url: "/goals",
-      payload: { title: "Run", sphere: "health", xpReward: 50 },
+      payload: { title: "Run", sphere: "health" },
     })).json();
     await a.inject({ method: "POST", url: `/goals/${id}/complete` });
     await a.inject({ method: "PATCH", url: "/player", payload: { nickname: "Rin" } });
 
     const progress = (await a.inject({ method: "GET", url: "/progress" })).json();
     const player = (await a.inject({ method: "GET", url: "/player" })).json();
-    expect(progress).toEqual({ xp: 50, level: 1, xpBySphere: { health: 50 } });
+    expect(progress).toEqual({ xp: 10, level: 1, xpBySphere: { health: 10 } });
     expect(player.nickname).toBe("Rin");
     expect(player.progress).toEqual(progress);
-    expect(player.progression).toEqual({ level: 1, totalXp: 50, xpBySphere: { health: 50 } });
+    expect(player.progression).toEqual({ level: 1, totalXp: 10, xpBySphere: { health: 10 } });
   });
 });
 
@@ -169,6 +169,7 @@ describe("JSON persistence", () => {
     const titles = listGoals().map((goal) => goal.title).sort();
     const ids = listGoals().map((goal) => goal.id).sort();
     expect(titles).toEqual(["Morning walk 20 min", "Read 10 pages"]);
+    expect(listGoals().every((goal) => goal.xpReward === 10)).toBe(true);
     expect(existsSync(file)).toBe(true);
 
     openStore(null);
@@ -190,7 +191,7 @@ describe("JSON persistence", () => {
     const created = (await a.inject({
       method: "POST",
       url: "/goals",
-      payload: { title: "Walk", sphere: "health", xpReward: 30 },
+      payload: { title: "Walk", sphere: "health" },
     })).json();
     await a.inject({ method: "POST", url: `/goals/${created.id}/complete` });
     const saved = (await a.inject({
@@ -206,10 +207,10 @@ describe("JSON persistence", () => {
       nickname: "Rin",
       title: "Walker",
       avatarUrl: "https://example.com/rin.png",
-      progression: { level: 1, totalXp: 30, xpBySphere: { health: 30 } },
+      progression: { level: 1, totalXp: 10, xpBySphere: { health: 10 } },
     });
     expect(onDisk.goals).toEqual([
-      expect.objectContaining({ id: created.id, title: "Walk", status: "done", sphere: "health", xpReward: 30 }),
+      expect.objectContaining({ id: created.id, title: "Walk", status: "done", sphere: "health", xpReward: 10 }),
     ]);
 
     openStore(null);
@@ -221,9 +222,9 @@ describe("JSON persistence", () => {
     const b = buildApp({ logger: false });
     expect((await b.inject({ method: "GET", url: "/goals" })).json()).toHaveLength(1);
     expect((await b.inject({ method: "GET", url: "/progress" })).json()).toEqual({
-      xp: 30,
+      xp: 10,
       level: 1,
-      xpBySphere: { health: 30 },
+      xpBySphere: { health: 10 },
     });
     const player = (await b.inject({ method: "GET", url: "/player" })).json();
     expect(player).toMatchObject({
@@ -233,12 +234,12 @@ describe("JSON persistence", () => {
       avatarUrl: "https://example.com/rin.png",
       createdAt: saved.createdAt,
     });
-    expect(player.progress).toEqual({ xp: 30, level: 1, xpBySphere: { health: 30 } });
+    expect(player.progress).toEqual({ xp: 10, level: 1, xpBySphere: { health: 10 } });
     expect(player.progression.totalXp).toBe(player.progress.xp);
     expect((await b.inject({ method: "GET", url: "/spheres" })).json()).toHaveLength(LIFE_SPHERE_IDS.length);
 
     const again = await b.inject({ method: "POST", url: `/goals/${created.id}/complete` });
-    expect(again.json().progress).toEqual({ xp: 30, level: 1, xpBySphere: { health: 30 } });
+    expect(again.json().progress).toEqual({ xp: 10, level: 1, xpBySphere: { health: 10 } });
   });
 
   it("seeds a player into a file that already has goals", () => {
