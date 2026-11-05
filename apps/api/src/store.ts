@@ -5,14 +5,21 @@ import {
   getLifeSphere,
   levelForXp,
   progressFromProgression,
+  ARTIFACT_IMAGE_URL_MAX_LENGTH,
+  ARTIFACT_TITLE_MAX_LENGTH,
   AVATAR_URL_MAX_LENGTH,
+  DEFAULT_ARTIFACT_SPHERE,
   NICKNAME_MAX_LENGTH,
   TITLE_MAX_LENGTH,
+  XP_REWARD_DEFAULT,
+  XP_REWARD_MAX,
+  type Artifact,
   type Goal,
   type LifeSphereId,
   type Player,
   type PlayerProgress,
   type Progression,
+  type Room,
 } from "@levex/domain";
 
 export const DEFAULT_DATA_FILE = "./data/levexp.json";
@@ -30,6 +37,42 @@ export class InvalidPlayerUpdate extends Error {
   }
 }
 
+export class InvalidGoalUpdate extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidGoalUpdate";
+  }
+}
+
+/** A reward edit was sent for a goal that is already done. */
+export class GoalAlreadyDone extends Error {
+  constructor() {
+    super("goal is already done");
+    this.name = "GoalAlreadyDone";
+  }
+}
+
+export class InvalidArtifact extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidArtifact";
+  }
+}
+
+export class ArtifactNotFound extends Error {
+  constructor() {
+    super("artifact not found");
+    this.name = "ArtifactNotFound";
+  }
+}
+
+export class ArtifactAlreadyLinked extends Error {
+  constructor() {
+    super("artifact is linked to another goal");
+    this.name = "ArtifactAlreadyLinked";
+  }
+}
+
 export interface PlayerUpdate {
   nickname?: string;
   title?: string | null;
@@ -38,16 +81,32 @@ export interface PlayerUpdate {
 
 export type PlayerView = Player & { progress: PlayerProgress };
 
+export interface ArtifactInput {
+  title: string;
+  kind: string;
+  imageUrl?: string;
+  goalId?: string;
+}
+
+/** Room plus the artifact for each placement, joined at read time. */
+export interface RoomView {
+  placements: Array<{ artifactId: string; artifact: Artifact }>;
+}
+
 interface StoreFile {
   version: 1;
   player: Player;
   goals: Goal[];
+  artifacts: Artifact[];
+  room: Room;
 }
 
-// Single player + goals. Null dataFile means in-memory (tests). A path is loaded on
-// startup and rewritten after each mutation.
+// Single player, goals, and the virtual room. Null dataFile means in-memory (tests).
+// A path is loaded on startup and rewritten after each mutation.
 let dataFile: string | null = null;
 let goals = new Map<string, Goal>();
+let artifacts = new Map<string, Artifact>();
+let room: Room = { placements: [] };
 let player: Player = makePlayer();
 
 export function currentDataFile(): string | null {
@@ -73,6 +132,8 @@ export function openStore(filePath: string | null): void {
   dataFile = filePath;
   player = loaded.player;
   goals = loaded.goals;
+  artifacts = loaded.artifacts;
+  room = loaded.room;
   if (loaded.seededPlayer) writeState();
 }
 
@@ -115,17 +176,82 @@ export function createGoal(input: { title: string; sphere?: LifeSphereId; xpRewa
   return goal;
 }
 
-/** Marks goal done; XP awarded only on the first completion. Returns undefined if not found. */
-export function completeGoal(id: string): { goal: Goal; progress: PlayerProgress; awarded: boolean } | undefined {
+/**
+ * Sets `xpReward` on an open goal. Returns undefined when the id is missing.
+ * Throws {@link GoalAlreadyDone} when the goal is already done, and
+ * {@link InvalidGoalUpdate} when the reward is outside 1..{@link XP_REWARD_MAX}.
+ */
+export function updateGoal(id: string, xpReward: number): Goal | undefined {
   const goal = goals.get(id);
   if (!goal) return undefined;
+  if (goal.status !== "open") throw new GoalAlreadyDone();
+  assertXpReward(xpReward);
+  goal.xpReward = xpReward;
+  writeState();
+  return goal;
+}
+
+/**
+ * Marks a goal done. XP is awarded only on the first completion.
+ * `artifactId` links a room photo to this goal when the goal's sphere is creativity.
+ * Returns undefined if the goal is not found. Linking is checked before any XP is granted.
+ */
+export function completeGoal(
+  id: string,
+  artifactId?: string,
+): { goal: Goal; progress: PlayerProgress; awarded: boolean } | undefined {
+  const goal = goals.get(id);
+  if (!goal) return undefined;
+  const artifact = artifactId === undefined ? undefined : requireLinkableArtifact(goal, artifactId);
   const awarded = goal.status !== "done";
   if (awarded) {
     goal.status = "done";
     grantXp(goal.xpReward, goal.sphere);
-    writeState();
   }
+  let linked = false;
+  if (artifact && artifact.goalId !== goal.id) {
+    artifact.goalId = goal.id;
+    linked = true;
+  }
+  if (awarded || linked) writeState();
   return { goal, progress: getProgress(), awarded };
+}
+
+export const listArtifacts = (): Artifact[] => [...artifacts.values()];
+
+export function getRoom(): RoomView {
+  return {
+    placements: room.placements.map((placement) => {
+      const artifact = artifacts.get(placement.artifactId);
+      if (!artifact) throw new Error(`missing artifact ${placement.artifactId}`);
+      return { artifactId: artifact.id, artifact };
+    }),
+  };
+}
+
+/** Creates a photo and appends it to the room. `goalId` may point at a creativity goal. */
+export function createArtifact(input: ArtifactInput): Artifact {
+  if (input.kind !== "photo") throw new InvalidArtifact("kind must be photo");
+  const artifact: Artifact = {
+    id: randomUUID(),
+    title: artifactText(input.title, "title", ARTIFACT_TITLE_MAX_LENGTH),
+    kind: "photo",
+    sphere: DEFAULT_ARTIFACT_SPHERE,
+    createdAt: new Date().toISOString(),
+  };
+  if (input.imageUrl !== undefined) {
+    artifact.imageUrl = artifactText(input.imageUrl, "imageUrl", ARTIFACT_IMAGE_URL_MAX_LENGTH);
+  }
+  if (input.goalId !== undefined) {
+    const goal = goals.get(input.goalId);
+    if (!goal) throw new InvalidArtifact("goal not found");
+    if (goal.sphere !== "creativity") throw new InvalidArtifact("goal must be a creativity goal");
+    artifact.goalId = goal.id;
+  }
+  artifacts.set(artifact.id, artifact);
+  room.placements.push({ artifactId: artifact.id });
+  writeState();
+  return artifact;
 }
 
 function makePlayer(): Player {
@@ -139,6 +265,8 @@ function makePlayer(): Player {
 
 function seedMemory(seedGoals: boolean): void {
   goals = new Map();
+  artifacts = new Map();
+  room = { placements: [] };
   player = makePlayer();
   if (seedGoals) {
     for (const demo of DEMO_GOALS) addGoal(demo);
@@ -146,15 +274,34 @@ function seedMemory(seedGoals: boolean): void {
 }
 
 function addGoal(input: { title: string; sphere?: LifeSphereId; xpReward?: number }): Goal {
-  const goal: Goal = {
-    id: randomUUID(),
-    title: input.title,
-    xpReward: input.xpReward ?? 10,
-    status: "open",
-  };
+  const xpReward = input.xpReward ?? XP_REWARD_DEFAULT;
+  assertXpReward(xpReward);
+  const goal: Goal = { id: randomUUID(), title: input.title, xpReward, status: "open" };
   if (input.sphere) goal.sphere = input.sphere;
   goals.set(goal.id, goal);
   return goal;
+}
+
+function assertXpReward(xpReward: number): void {
+  if (!Number.isInteger(xpReward) || xpReward < 1 || xpReward > XP_REWARD_MAX) {
+    throw new InvalidGoalUpdate(`xpReward must be an integer from 1 to ${XP_REWARD_MAX}`);
+  }
+}
+
+function requireLinkableArtifact(goal: Goal, artifactId: string): Artifact {
+  const artifact = artifacts.get(artifactId);
+  if (!artifact) throw new ArtifactNotFound();
+  if (goal.sphere !== "creativity") throw new InvalidGoalUpdate("only a creativity goal can link an artifact");
+  if (artifact.goalId !== undefined && artifact.goalId !== goal.id) throw new ArtifactAlreadyLinked();
+  return artifact;
+}
+
+function artifactText(value: string, label: string, max: number): string {
+  const text = value.trim();
+  if (text.length < 1 || text.length > max) {
+    throw new InvalidArtifact(`${label} must be 1-${max} characters`);
+  }
+  return text;
 }
 
 function grantXp(amount: number, sphere?: LifeSphereId): void {
@@ -193,6 +340,8 @@ function snapshot(): StoreFile {
     version: 1,
     player: storedPlayer(),
     goals: [...goals.values()].map((goal) => ({ ...goal })),
+    artifacts: [...artifacts.values()].map((artifact) => ({ ...artifact })),
+    room: { placements: room.placements.map((placement) => ({ ...placement })) },
   };
 }
 
@@ -218,7 +367,13 @@ function storeError(file: string, detail: string): Error {
   return new Error(`Invalid store file ${file}: ${detail}`);
 }
 
-function readState(file: string): { player: Player; goals: Map<string, Goal>; seededPlayer: boolean } {
+function readState(file: string): {
+  player: Player;
+  goals: Map<string, Goal>;
+  artifacts: Map<string, Artifact>;
+  room: Room;
+  seededPlayer: boolean;
+} {
   const raw = readFileSync(file, "utf8");
   let parsed: unknown;
   try {
@@ -242,10 +397,25 @@ function readState(file: string): { player: Player; goals: Map<string, Goal>; se
     loadedGoals.set(goal.id, goal);
   });
 
+  const loadedArtifacts = parseArtifacts(file, data.artifacts, loadedGoals);
+  const loadedRoom = parseRoom(file, data.room, loadedArtifacts);
+
   if (data.player == null) {
-    return { player: makePlayer(), goals: loadedGoals, seededPlayer: true };
+    return {
+      player: makePlayer(),
+      goals: loadedGoals,
+      artifacts: loadedArtifacts,
+      room: loadedRoom,
+      seededPlayer: true,
+    };
   }
-  return { player: parsePlayer(file, data.player), goals: loadedGoals, seededPlayer: false };
+  return {
+    player: parsePlayer(file, data.player),
+    goals: loadedGoals,
+    artifacts: loadedArtifacts,
+    room: loadedRoom,
+    seededPlayer: false,
+  };
 }
 
 function parsePlayer(file: string, value: unknown): Player {
@@ -325,6 +495,95 @@ function parseGoal(file: string, value: unknown, index: number): Goal {
     goal.sphere = raw.sphere as LifeSphereId;
   }
   return goal;
+}
+
+function parseArtifacts(
+  file: string,
+  value: unknown,
+  loadedGoals: Map<string, Goal>,
+): Map<string, Artifact> {
+  if (value === undefined) return new Map();
+  if (!Array.isArray(value)) throw storeError(file, "artifacts must be an array");
+  const loaded = new Map<string, Artifact>();
+  value.forEach((entry, index) => {
+    const artifact = parseArtifact(file, entry, index, loadedGoals);
+    if (loaded.has(artifact.id)) throw storeError(file, `duplicate artifact id ${artifact.id}`);
+    loaded.set(artifact.id, artifact);
+  });
+  return loaded;
+}
+
+function parseArtifact(
+  file: string,
+  value: unknown,
+  index: number,
+  loadedGoals: Map<string, Goal>,
+): Artifact {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw storeError(file, `invalid artifact at ${index}`);
+  }
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.id !== "string" || raw.id.length === 0) throw storeError(file, `artifact ${index} missing id`);
+  if (typeof raw.title !== "string" || raw.title.trim().length === 0) {
+    throw storeError(file, `artifact ${index} missing title`);
+  }
+  if (raw.kind !== "photo") throw storeError(file, `artifact ${index} has invalid kind`);
+  if (typeof raw.createdAt !== "string" || raw.createdAt.length === 0) {
+    throw storeError(file, `artifact ${index} missing createdAt`);
+  }
+  const sphere = raw.sphere === undefined ? DEFAULT_ARTIFACT_SPHERE : raw.sphere;
+  if (typeof sphere !== "string" || !getLifeSphere(sphere)) {
+    throw storeError(file, `artifact ${index} has invalid sphere`);
+  }
+  const artifact: Artifact = {
+    id: raw.id,
+    title: raw.title,
+    kind: "photo",
+    sphere: sphere as LifeSphereId,
+    createdAt: raw.createdAt,
+  };
+  if (raw.imageUrl !== undefined) {
+    if (typeof raw.imageUrl !== "string" || raw.imageUrl.trim().length === 0) {
+      throw storeError(file, `artifact ${index} has invalid imageUrl`);
+    }
+    artifact.imageUrl = raw.imageUrl;
+  }
+  if (raw.goalId !== undefined) {
+    if (typeof raw.goalId !== "string" || !loadedGoals.has(raw.goalId)) {
+      throw storeError(file, `artifact ${index} has invalid goalId`);
+    }
+    const goal = loadedGoals.get(raw.goalId);
+    if (!goal || goal.sphere !== "creativity") {
+      throw storeError(file, `artifact ${index} goal is not creativity`);
+    }
+    artifact.goalId = raw.goalId;
+  }
+  return artifact;
+}
+
+function parseRoom(file: string, value: unknown, loadedArtifacts: Map<string, Artifact>): Room {
+  if (value === undefined) {
+    if (loadedArtifacts.size > 0) throw storeError(file, "every artifact must be placed in the room");
+    return { placements: [] };
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw storeError(file, "invalid room");
+  const raw = value as Record<string, unknown>;
+  if (!Array.isArray(raw.placements)) throw storeError(file, "room.placements must be an array");
+  const seen = new Set<string>();
+  const placements = raw.placements.map((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw storeError(file, `invalid placement at ${index}`);
+    }
+    const placement = entry as Record<string, unknown>;
+    if (typeof placement.artifactId !== "string" || !loadedArtifacts.has(placement.artifactId)) {
+      throw storeError(file, `placement ${index} has invalid artifactId`);
+    }
+    if (seen.has(placement.artifactId)) throw storeError(file, `duplicate placement ${placement.artifactId}`);
+    seen.add(placement.artifactId);
+    return { artifactId: placement.artifactId };
+  });
+  if (seen.size !== loadedArtifacts.size) throw storeError(file, "every artifact must be placed in the room");
+  return { placements };
 }
 
 function boot(): void {

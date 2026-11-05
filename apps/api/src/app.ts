@@ -1,20 +1,34 @@
 import Fastify from "fastify";
 import {
+  ARTIFACT_IMAGE_URL_MAX_LENGTH,
+  ARTIFACT_KINDS,
+  ARTIFACT_TITLE_MAX_LENGTH,
   AVATAR_URL_MAX_LENGTH,
   getLifeSphere,
   LIFE_SPHERE_IDS,
   listLifeSpheres,
   NICKNAME_MAX_LENGTH,
   TITLE_MAX_LENGTH,
+  XP_REWARD_MAX,
 } from "@levex/domain";
 import {
+  ArtifactAlreadyLinked,
+  ArtifactNotFound,
   completeGoal,
+  createArtifact,
   createGoal,
   getPlayer,
   getProgress,
+  getRoom,
+  GoalAlreadyDone,
+  InvalidArtifact,
+  InvalidGoalUpdate,
   InvalidPlayerUpdate,
+  listArtifacts,
   listGoals,
+  updateGoal,
   updatePlayer,
+  type ArtifactInput,
 } from "./store.js";
 
 export function buildApp(opts: { logger?: boolean } = {}) {
@@ -44,20 +58,83 @@ export function buildApp(opts: { logger?: boolean } = {}) {
         properties: {
           title: { type: "string", minLength: 1, maxLength: 200 },
           sphere: { type: "string", enum: [...LIFE_SPHERE_IDS] },
-          xpReward: { type: "integer", minimum: 1, maximum: 10000 },
+          xpReward: { type: "integer", minimum: 1, maximum: XP_REWARD_MAX },
         },
       },
     },
   }, async (req, reply) => {
-    const goal = createGoal(req.body as Parameters<typeof createGoal>[0]);
-    return reply.code(201).send(goal);
+    try {
+      const goal = createGoal(req.body as Parameters<typeof createGoal>[0]);
+      return reply.code(201).send(goal);
+    } catch (err) {
+      if (err instanceof InvalidGoalUpdate) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.patch<{ Params: { id: string } }>("/goals/:id", {
+    schema: {
+      body: {
+        type: "object",
+        additionalProperties: false,
+        required: ["xpReward"],
+        properties: {
+          xpReward: { type: "integer", minimum: 1, maximum: XP_REWARD_MAX },
+        },
+      },
+    },
+  }, async (req, reply) => {
+    try {
+      const goal = updateGoal(req.params.id, (req.body as { xpReward: number }).xpReward);
+      if (!goal) return reply.code(404).send({ error: "goal not found" });
+      return goal;
+    } catch (err) {
+      if (err instanceof GoalAlreadyDone) return reply.code(409).send({ error: err.message });
+      if (err instanceof InvalidGoalUpdate) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
   });
 
   app.post<{ Params: { id: string } }>("/goals/:id/complete", async (req, reply) => {
-    const result = completeGoal(req.params.id);
-    if (!result) return reply.code(404).send({ error: "goal not found" });
-    return { goal: result.goal, progress: result.progress };
+    try {
+      const result = completeGoal(req.params.id, readArtifactId(req.body));
+      if (!result) return reply.code(404).send({ error: "goal not found" });
+      return { goal: result.goal, progress: result.progress };
+    } catch (err) {
+      if (err instanceof ArtifactNotFound) return reply.code(400).send({ error: err.message });
+      if (err instanceof ArtifactAlreadyLinked) return reply.code(409).send({ error: err.message });
+      if (err instanceof InvalidGoalUpdate) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
   });
+
+  app.get("/artifacts", async () => listArtifacts());
+
+  app.post("/artifacts", {
+    schema: {
+      body: {
+        type: "object",
+        required: ["title", "kind"],
+        additionalProperties: false,
+        properties: {
+          title: { type: "string", minLength: 1, maxLength: ARTIFACT_TITLE_MAX_LENGTH },
+          kind: { type: "string", enum: [...ARTIFACT_KINDS] },
+          imageUrl: { type: "string", minLength: 1, maxLength: ARTIFACT_IMAGE_URL_MAX_LENGTH },
+          goalId: { type: "string", minLength: 1 },
+        },
+      },
+    },
+  }, async (req, reply) => {
+    try {
+      const artifact = createArtifact(req.body as ArtifactInput);
+      return reply.code(201).send(artifact);
+    } catch (err) {
+      if (err instanceof InvalidArtifact) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.get("/room", async () => getRoom());
 
   app.get("/progress", async () => getProgress());
 
@@ -96,4 +173,21 @@ export function buildApp(opts: { logger?: boolean } = {}) {
   });
 
   return app;
+}
+
+/** Completion body is optional. A missing body awards XP only; `{ artifactId }` also links a photo. */
+function readArtifactId(body: unknown): string | undefined {
+  if (body == null || body === "") return undefined;
+  if (typeof body !== "object" || Array.isArray(body)) {
+    throw new InvalidGoalUpdate("body must be an object");
+  }
+  const record = body as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
+    if (key !== "artifactId") throw new InvalidGoalUpdate("unknown field");
+  }
+  if (record.artifactId === undefined) return undefined;
+  if (typeof record.artifactId !== "string" || record.artifactId.trim().length < 1) {
+    throw new InvalidGoalUpdate("artifactId must be a non-empty string");
+  }
+  return record.artifactId;
 }

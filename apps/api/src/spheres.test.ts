@@ -63,10 +63,10 @@ describe("life spheres", () => {
   it("sums rewards inside one sphere", async () => {
     const a = app();
     const first = (await a.inject({
-      method: "POST", url: "/goals", payload: { title: "Budget", sphere: "finance", xpReward: 30 },
+      method: "POST", url: "/goals", payload: { title: "Budget", sphere: "finance", xpReward: 50 },
     })).json();
     const second = (await a.inject({
-      method: "POST", url: "/goals", payload: { title: "Invoice", sphere: "finance", xpReward: 70 },
+      method: "POST", url: "/goals", payload: { title: "Invoice", sphere: "finance", xpReward: 50 },
     })).json();
     await a.inject({ method: "POST", url: `/goals/${first.id}/complete` });
     const done = await a.inject({ method: "POST", url: `/goals/${second.id}/complete` });
