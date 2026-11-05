@@ -40,6 +40,8 @@ packages/domain  — типы: Player, LifeSphere, Goal, Artifact, Room, Progres
 
 ## Запуск
 
+Node.js 22 (LTS) или новее — то же требование в поле `engines` файла `package.json`. GitHub Actions на push и pull request в `main` ставит Node.js 22 и запускает `npm ci`, `npm run typecheck`, `npm test`.
+
 ```bash
 cp .env.example .env
 npm install
