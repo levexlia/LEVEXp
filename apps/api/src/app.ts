@@ -1,11 +1,18 @@
 import Fastify from "fastify";
+import { getLifeSphere, LIFE_SPHERE_IDS, listLifeSpheres } from "@levex/domain";
 import { completeGoal, createGoal, getProgress, listGoals } from "./store.js";
-
-const SPHERES = ["health", "mind", "career", "finance", "relationships", "creativity", "spirit", "community"];
 
 export function buildApp(opts: { logger?: boolean } = {}) {
   const app = Fastify({ logger: opts.logger ?? true });
   app.get("/health", async () => ({ status: "ok", service: "levex-api" }));
+
+  app.get("/spheres", async () => listLifeSpheres());
+
+  app.get<{ Params: { id: string } }>("/spheres/:id", async (req, reply) => {
+    const sphere = getLifeSphere(req.params.id);
+    if (!sphere) return reply.code(404).send({ error: "sphere not found" });
+    return sphere;
+  });
 
   app.get("/goals", async () => listGoals());
 
@@ -17,7 +24,7 @@ export function buildApp(opts: { logger?: boolean } = {}) {
         additionalProperties: false,
         properties: {
           title: { type: "string", minLength: 1, maxLength: 200 },
-          sphere: { type: "string", enum: SPHERES },
+          sphere: { type: "string", enum: [...LIFE_SPHERE_IDS] },
           xpReward: { type: "integer", minimum: 1, maximum: 10000 },
         },
       },

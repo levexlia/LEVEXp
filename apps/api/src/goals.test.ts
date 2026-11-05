@@ -26,10 +26,10 @@ describe("goals + XP", () => {
     const { id } = (await a.inject({ method: "POST", url: "/goals", payload: { title: "Big", xpReward: 120 } })).json();
     const first = await a.inject({ method: "POST", url: `/goals/${id}/complete` });
     expect(first.json().goal.status).toBe("done");
-    expect(first.json().progress).toEqual({ xp: 120, level: 2 });
+    expect(first.json().progress).toEqual({ xp: 120, level: 2, xpBySphere: {} });
     const second = await a.inject({ method: "POST", url: `/goals/${id}/complete` });
-    expect(second.json().progress).toEqual({ xp: 120, level: 2 });
-    expect((await a.inject({ method: "GET", url: "/progress" })).json()).toEqual({ xp: 120, level: 2 });
+    expect(second.json().progress).toEqual({ xp: 120, level: 2, xpBySphere: {} });
+    expect((await a.inject({ method: "GET", url: "/progress" })).json()).toEqual({ xp: 120, level: 2, xpBySphere: {} });
   });
 
   it("404 for unknown goal", async () => {
