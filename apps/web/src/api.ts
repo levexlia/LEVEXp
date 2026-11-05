@@ -57,6 +57,7 @@ const KNOWN: Record<string, string> = {
   "goal not found": "Цель не найдена",
   "artifact not found": "Фото не найдено",
   "goal must be a creativity goal": "Фото можно привязать только к цели творчества",
+  "imageUrl must be an http(s) URL or an /uploads file": "Нужна ссылка http(s) или адрес загруженного файла",
 };
 
 export async function loadRoom(): Promise<RoomData> {

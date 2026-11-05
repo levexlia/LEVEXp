@@ -177,6 +177,27 @@ describe("photo room", () => {
     })).statusCode).toBe(400);
     expect((await a.inject({ method: "GET", url: "/artifacts" })).json()).toHaveLength(2);
   });
+
+  it("rejects an image address that is not safe to render", async () => {
+    const a = app();
+    for (const imageUrl of [
+      "javascript:alert(1)",
+      "data:text/html,hi",
+      "//evil.example/a.png",
+      "/uploads/not-a-uuid.png",
+      "https://user:pass@example.com/a.png",
+    ]) {
+      const rejected = await a.inject({
+        method: "POST",
+        url: "/artifacts",
+        payload: { title: "Nope", kind: "photo", imageUrl },
+      });
+      expect(rejected.statusCode).toBe(400);
+      expect(rejected.json().error).toMatch(/imageUrl/);
+    }
+    expect((await a.inject({ method: "GET", url: "/artifacts" })).json()).toHaveLength(0);
+    expect((await a.inject({ method: "GET", url: "/room" })).json().placements).toHaveLength(0);
+  });
 });
 
 describe("room persistence", () => {

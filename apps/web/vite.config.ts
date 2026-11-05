@@ -9,6 +9,11 @@ const proxyPaths = ["/health", "/player", "/goals", "/artifacts", "/room", "/pro
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // Match the repo's ES2022 baseline. The pinned esbuild cannot downlevel
+    // destructuring to Vite's older default browser target.
+    target: "es2022",
+  },
   server: {
     host: "127.0.0.1",
     port: 5173,
