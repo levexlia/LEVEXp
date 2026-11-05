@@ -35,10 +35,19 @@ export function getLifeSphere(id: string): LifeSphere | undefined {
   return sphere ? { ...sphere } : undefined;
 }
 
+export const NICKNAME_MAX_LENGTH = 32;
+export const TITLE_MAX_LENGTH = 64;
+export const AVATAR_URL_MAX_LENGTH = 2048;
+
 export interface Player {
   id: string;
   nickname: string;
   createdAt: string; // ISO
+  /** Optional display title. Omitted when unset. */
+  title?: string;
+  /** Optional avatar URL. Omitted when unset. */
+  avatarUrl?: string;
+  /** Stored progress. `totalXp` is the `xp` returned by the progress API. */
   progression: Progression;
 }
 
@@ -53,7 +62,7 @@ export interface Goal {
   // future: playerId, description, parentGoalId, deadline
 }
 
-/** v1 progress of the single (implicit) player. */
+/** Progress view of the single v1 player. `xp` mirrors `Progression.totalXp`. */
 export interface PlayerProgress {
   xp: number;
   level: number;
@@ -72,4 +81,13 @@ export interface Progression {
   level: number;
   totalXp: number;
   xpBySphere: Partial<Record<LifeSphereId, number>>;
+}
+
+/** Map stored progression to the public progress shape. Level always follows `levelForXp`. */
+export function progressFromProgression(progression: Progression): PlayerProgress {
+  return {
+    xp: progression.totalXp,
+    level: levelForXp(progression.totalXp),
+    xpBySphere: { ...progression.xpBySphere },
+  };
 }
