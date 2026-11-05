@@ -19,6 +19,8 @@ describe("goals + XP", () => {
   it("rejects invalid body", async () => {
     const res = await app().inject({ method: "POST", url: "/goals", payload: { xpReward: 5 } });
     expect(res.statusCode).toBe(400);
+    const extra = await app().inject({ method: "POST", url: "/goals", payload: { title: "X", note: "nope" } });
+    expect(extra.statusCode).toBe(400);
   });
 
   it("completing awards XP exactly once", async () => {

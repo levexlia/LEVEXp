@@ -1,9 +1,28 @@
 import Fastify from "fastify";
-import { getLifeSphere, LIFE_SPHERE_IDS, listLifeSpheres } from "@levex/domain";
-import { completeGoal, createGoal, getProgress, listGoals } from "./store.js";
+import {
+  AVATAR_URL_MAX_LENGTH,
+  getLifeSphere,
+  LIFE_SPHERE_IDS,
+  listLifeSpheres,
+  NICKNAME_MAX_LENGTH,
+  TITLE_MAX_LENGTH,
+} from "@levex/domain";
+import {
+  completeGoal,
+  createGoal,
+  getPlayer,
+  getProgress,
+  InvalidPlayerUpdate,
+  listGoals,
+  updatePlayer,
+} from "./store.js";
 
 export function buildApp(opts: { logger?: boolean } = {}) {
-  const app = Fastify({ logger: opts.logger ?? true });
+  const app = Fastify({
+    logger: opts.logger ?? true,
+    // Default Ajv removes unknown fields. Reject them so additionalProperties: false means 400.
+    ajv: { customOptions: { removeAdditional: false } },
+  });
   app.get("/health", async () => ({ status: "ok", service: "levex-api" }));
 
   app.get("/spheres", async () => listLifeSpheres());
@@ -41,5 +60,40 @@ export function buildApp(opts: { logger?: boolean } = {}) {
   });
 
   app.get("/progress", async () => getProgress());
+
+  app.get("/player", async () => getPlayer());
+
+  app.patch("/player", {
+    schema: {
+      body: {
+        type: "object",
+        additionalProperties: false,
+        minProperties: 1,
+        properties: {
+          nickname: { type: "string", minLength: 1, maxLength: NICKNAME_MAX_LENGTH },
+          title: {
+            anyOf: [
+              { type: "string", minLength: 1, maxLength: TITLE_MAX_LENGTH },
+              { type: "null" },
+            ],
+          },
+          avatarUrl: {
+            anyOf: [
+              { type: "string", minLength: 1, maxLength: AVATAR_URL_MAX_LENGTH },
+              { type: "null" },
+            ],
+          },
+        },
+      },
+    },
+  }, async (req, reply) => {
+    try {
+      return updatePlayer(req.body as Parameters<typeof updatePlayer>[0]);
+    } catch (err) {
+      if (err instanceof InvalidPlayerUpdate) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
+  });
+
   return app;
 }
