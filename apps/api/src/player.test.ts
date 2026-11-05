@@ -73,6 +73,19 @@ describe("player profile", () => {
     expect(cleared.json().id).toBe(before.id);
   });
 
+  it("does not keep earlier fields when a later field fails validation", async () => {
+    const a = app();
+    const before = (await a.inject({ method: "GET", url: "/player" })).json();
+    const patched = await a.inject({
+      method: "PATCH",
+      url: "/player",
+      payload: { nickname: "ValidName", title: "   " },
+    });
+    expect(patched.statusCode).toBe(400);
+    expect(patched.json()).toEqual({ error: `title must be 1-${TITLE_MAX_LENGTH} characters` });
+    expect((await a.inject({ method: "GET", url: "/player" })).json().nickname).toBe(before.nickname);
+  });
+
   it("rejects empty, overlong, blank, and unknown fields", async () => {
     const a = app();
     expect((await a.inject({ method: "PATCH", url: "/player", payload: {} })).statusCode).toBe(400);
