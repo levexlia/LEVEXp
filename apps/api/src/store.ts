@@ -155,16 +155,25 @@ export function getPlayer(): PlayerView {
 }
 
 export function updatePlayer(patch: PlayerUpdate): PlayerView {
-  if (patch.nickname !== undefined) {
-    player.nickname = trimmed(patch.nickname, "nickname", NICKNAME_MAX_LENGTH);
+  // Validate every provided field before mutating. A later failure must not leave earlier fields applied.
+  const nickname = patch.nickname === undefined
+    ? undefined
+    : trimmed(patch.nickname, "nickname", NICKNAME_MAX_LENGTH);
+  const title = patch.title === undefined
+    ? undefined
+    : patch.title === null ? null : trimmed(patch.title, "title", TITLE_MAX_LENGTH);
+  const avatarUrl = patch.avatarUrl === undefined
+    ? undefined
+    : patch.avatarUrl === null ? null : trimmed(patch.avatarUrl, "avatarUrl", AVATAR_URL_MAX_LENGTH);
+
+  if (nickname !== undefined) player.nickname = nickname;
+  if (title !== undefined) {
+    if (title === null) delete player.title;
+    else player.title = title;
   }
-  if (patch.title !== undefined) {
-    if (patch.title === null) delete player.title;
-    else player.title = trimmed(patch.title, "title", TITLE_MAX_LENGTH);
-  }
-  if (patch.avatarUrl !== undefined) {
-    if (patch.avatarUrl === null) delete player.avatarUrl;
-    else player.avatarUrl = trimmed(patch.avatarUrl, "avatarUrl", AVATAR_URL_MAX_LENGTH);
+  if (avatarUrl !== undefined) {
+    if (avatarUrl === null) delete player.avatarUrl;
+    else player.avatarUrl = avatarUrl;
   }
   writeState();
   return getPlayer();
