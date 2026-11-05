@@ -1,3 +1,5 @@
+import { createReadStream } from "node:fs";
+import multipart from "@fastify/multipart";
 import Fastify from "fastify";
 import {
   ARTIFACT_IMAGE_URL_MAX_LENGTH,
@@ -27,14 +29,57 @@ import {
   updatePlayer,
   type ArtifactInput,
 } from "./store.js";
+import {
+  defaultUploadsDir,
+  InvalidUpload,
+  resolveUpload,
+  saveImageUpload,
+  UPLOAD_MAX_BYTES,
+} from "./uploads.js";
 
-export function buildApp(opts: { logger?: boolean } = {}) {
+export function buildApp(opts: { logger?: boolean; uploadsDir?: string; maxUploadBytes?: number } = {}) {
   const app = Fastify({
     logger: opts.logger ?? true,
     // Default Ajv removes unknown fields. Reject them so additionalProperties: false means 400.
     ajv: { customOptions: { removeAdditional: false } },
   });
+  const maxUploadBytes = opts.maxUploadBytes ?? UPLOAD_MAX_BYTES;
+  // fastify-plugin: the multipart parser is visible to the routes on this instance.
+  app.register(multipart, {
+    limits: { fileSize: maxUploadBytes, files: 1 },
+  });
+
+  const uploadsDir = (): string => opts.uploadsDir ?? defaultUploadsDir();
+
   app.get("/health", async () => ({ status: "ok", service: "levex-api" }));
+
+  app.post("/uploads", async (req, reply) => {
+    try {
+      const part = await req.file();
+      if (!part) return reply.code(400).send({ error: "file is required" });
+      const bytes = await part.toBuffer();
+      if (part.file.truncated || bytes.length > maxUploadBytes) {
+        return reply.code(400).send({ error: "file is too large" });
+      }
+      const saved = saveImageUpload(uploadsDir(), bytes);
+      return reply.code(201).send({ url: saved.url });
+    } catch (err) {
+      const message = uploadError(err);
+      if (message) return reply.code(400).send({ error: message });
+      throw err;
+    }
+  });
+
+  app.get<{ Params: { name: string } }>("/uploads/:name", async (req, reply) => {
+    const found = resolveUpload(uploadsDir(), req.params.name);
+    if (found === "bad-name") return reply.code(400).send({ error: "invalid upload name" });
+    if (found === "missing") return reply.code(404).send({ error: "upload not found" });
+    return reply
+      .header("x-content-type-options", "nosniff")
+      .header("cache-control", "public, max-age=31536000, immutable")
+      .type(found.mediaType)
+      .send(createReadStream(found.filePath));
+  });
 
   app.get("/spheres", async () => listLifeSpheres());
 
@@ -151,6 +196,17 @@ export function buildApp(opts: { logger?: boolean } = {}) {
   });
 
   return app;
+}
+
+function uploadError(err: unknown): string | null {
+  if (err instanceof InvalidUpload) return err.message;
+  if (!err || typeof err !== "object" || !("code" in err)) return null;
+  const code = String((err as { code: unknown }).code);
+  if (code === "FST_REQ_FILE_TOO_LARGE") return "file is too large";
+  if (code === "FST_INVALID_MULTIPART_CONTENT_TYPE" || code === "FST_INVALID_MULTIPART_CONTENT_LENGTH") {
+    return "expected multipart file";
+  }
+  return null;
 }
 
 function bodyHasXpReward(body: unknown): boolean {
