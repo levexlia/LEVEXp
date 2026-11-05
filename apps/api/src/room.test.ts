@@ -17,7 +17,7 @@ describe("photo room", () => {
     const goal = (await a.inject({
       method: "POST",
       url: "/goals",
-      payload: { title: "Sketch the window", sphere: "creativity", xpReward: 20 },
+      payload: { title: "Sketch the window", sphere: "creativity" },
     })).json();
 
     const created = await a.inject({
@@ -49,20 +49,47 @@ describe("photo room", () => {
       { artifactId: created.json().id, artifact: created.json() },
     ]);
 
+    const linkedGoal = (await a.inject({ method: "GET", url: "/goals" })).json().find(
+      (item: { id: string }) => item.id === goal.id,
+    );
+    expect(linkedGoal.xpReward).toBe(15);
+
     const done = await a.inject({ method: "POST", url: `/goals/${goal.id}/complete` });
     expect(done.statusCode).toBe(200);
     expect(done.json().goal.status).toBe("done");
-    expect(done.json().progress).toEqual({ xp: 20, level: 1, xpBySphere: { creativity: 20 } });
+    expect(done.json().goal.xpReward).toBe(15);
+    expect(done.json().progress).toEqual({ xp: 15, level: 1, xpBySphere: { creativity: 15 } });
 
     const again = await a.inject({ method: "POST", url: `/goals/${goal.id}/complete` });
     expect(again.json().progress).toEqual(done.json().progress);
     expect((await a.inject({ method: "GET", url: "/room" })).json().placements).toHaveLength(1);
   });
 
+  it("does not add the photo bonus after the creativity goal is already done", async () => {
+    const a = app();
+    const goal = (await a.inject({
+      method: "POST", url: "/goals", payload: { title: "Hum", sphere: "creativity" },
+    })).json();
+    expect(goal.xpReward).toBe(10);
+    const done = await a.inject({ method: "POST", url: `/goals/${goal.id}/complete` });
+    expect(done.json().progress).toEqual({ xp: 10, level: 1, xpBySphere: { creativity: 10 } });
+
+    const photo = await a.inject({
+      method: "POST",
+      url: "/artifacts",
+      payload: { title: "Late", kind: "photo", goalId: goal.id },
+    });
+    expect(photo.statusCode).toBe(201);
+    expect((await a.inject({ method: "GET", url: "/progress" })).json().xp).toBe(10);
+    expect((await a.inject({ method: "GET", url: "/goals" })).json().find(
+      (item: { id: string }) => item.id === goal.id,
+    ).xpReward).toBe(10);
+  });
+
   it("can attach an existing photo when the creativity goal is completed", async () => {
     const a = app();
     const goal = (await a.inject({
-      method: "POST", url: "/goals", payload: { title: "Paint", sphere: "creativity", xpReward: 15 },
+      method: "POST", url: "/goals", payload: { title: "Paint", sphere: "creativity" },
     })).json();
     const other = (await a.inject({
       method: "POST", url: "/goals", payload: { title: "Another", sphere: "creativity" },
@@ -82,6 +109,7 @@ describe("photo room", () => {
       payload: { artifactId: photo.id },
     });
     expect(done.statusCode).toBe(200);
+    expect(done.json().goal.xpReward).toBe(15);
     expect(done.json().progress.xp).toBe(15);
 
     const room = (await a.inject({ method: "GET", url: "/room" })).json();
@@ -104,7 +132,7 @@ describe("photo room", () => {
   it("keeps placement order and rejects a photo that is not for a creativity goal", async () => {
     const a = app();
     const health = (await a.inject({
-      method: "POST", url: "/goals", payload: { title: "Run", sphere: "health", xpReward: 10 },
+      method: "POST", url: "/goals", payload: { title: "Run", sphere: "health" },
     })).json();
     const first = (await a.inject({
       method: "POST", url: "/artifacts", payload: { title: "One", kind: "photo" },
@@ -179,7 +207,7 @@ describe("room persistence", () => {
     const goal = (await a.inject({
       method: "POST",
       url: "/goals",
-      payload: { title: "Sketch", sphere: "creativity", xpReward: 25 },
+      payload: { title: "Sketch", sphere: "creativity" },
     })).json();
     const artifact = (await a.inject({
       method: "POST",
@@ -200,7 +228,7 @@ describe("room persistence", () => {
       }),
     ]);
     expect(onDisk.room).toEqual({ placements: [{ artifactId: artifact.id }] });
-    expect(onDisk.player.progression).toMatchObject({ totalXp: 25, xpBySphere: { creativity: 25 } });
+    expect(onDisk.player.progression).toMatchObject({ totalXp: 15, xpBySphere: { creativity: 15 } });
 
     openStore(null);
     resetStore(false);
@@ -220,12 +248,12 @@ describe("room persistence", () => {
     });
     expect((await b.inject({ method: "GET", url: "/artifacts" })).json()).toHaveLength(1);
     expect((await b.inject({ method: "GET", url: "/progress" })).json()).toEqual({
-      xp: 25,
+      xp: 15,
       level: 1,
-      xpBySphere: { creativity: 25 },
+      xpBySphere: { creativity: 15 },
     });
     const again = await b.inject({ method: "POST", url: `/goals/${goal.id}/complete` });
-    expect(again.json().progress.xp).toBe(25);
+    expect(again.json().progress.xp).toBe(15);
   });
 
   it("reads a file from before the room existed as an empty room", () => {

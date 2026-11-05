@@ -9,7 +9,6 @@ import {
   listLifeSpheres,
   NICKNAME_MAX_LENGTH,
   TITLE_MAX_LENGTH,
-  XP_REWARD_MAX,
 } from "@levex/domain";
 import {
   ArtifactAlreadyLinked,
@@ -20,13 +19,11 @@ import {
   getPlayer,
   getProgress,
   getRoom,
-  GoalAlreadyDone,
   InvalidArtifact,
   InvalidGoalUpdate,
   InvalidPlayerUpdate,
   listArtifacts,
   listGoals,
-  updateGoal,
   updatePlayer,
   type ArtifactInput,
 } from "./store.js";
@@ -50,6 +47,11 @@ export function buildApp(opts: { logger?: boolean } = {}) {
   app.get("/goals", async () => listGoals());
 
   app.post("/goals", {
+    preValidation: async (req, reply) => {
+      if (bodyHasXpReward(req.body)) {
+        return reply.code(400).send({ error: "xpReward is set by the server" });
+      }
+    },
     schema: {
       body: {
         type: "object",
@@ -58,7 +60,6 @@ export function buildApp(opts: { logger?: boolean } = {}) {
         properties: {
           title: { type: "string", minLength: 1, maxLength: 200 },
           sphere: { type: "string", enum: [...LIFE_SPHERE_IDS] },
-          xpReward: { type: "integer", minimum: 1, maximum: XP_REWARD_MAX },
         },
       },
     },
@@ -67,29 +68,6 @@ export function buildApp(opts: { logger?: boolean } = {}) {
       const goal = createGoal(req.body as Parameters<typeof createGoal>[0]);
       return reply.code(201).send(goal);
     } catch (err) {
-      if (err instanceof InvalidGoalUpdate) return reply.code(400).send({ error: err.message });
-      throw err;
-    }
-  });
-
-  app.patch<{ Params: { id: string } }>("/goals/:id", {
-    schema: {
-      body: {
-        type: "object",
-        additionalProperties: false,
-        required: ["xpReward"],
-        properties: {
-          xpReward: { type: "integer", minimum: 1, maximum: XP_REWARD_MAX },
-        },
-      },
-    },
-  }, async (req, reply) => {
-    try {
-      const goal = updateGoal(req.params.id, (req.body as { xpReward: number }).xpReward);
-      if (!goal) return reply.code(404).send({ error: "goal not found" });
-      return goal;
-    } catch (err) {
-      if (err instanceof GoalAlreadyDone) return reply.code(409).send({ error: err.message });
       if (err instanceof InvalidGoalUpdate) return reply.code(400).send({ error: err.message });
       throw err;
     }
@@ -173,6 +151,11 @@ export function buildApp(opts: { logger?: boolean } = {}) {
   });
 
   return app;
+}
+
+function bodyHasXpReward(body: unknown): boolean {
+  return !!body && typeof body === "object" && !Array.isArray(body)
+    && Object.prototype.hasOwnProperty.call(body, "xpReward");
 }
 
 /** Completion body is optional. A missing body awards XP only; `{ artifactId }` also links a photo. */
