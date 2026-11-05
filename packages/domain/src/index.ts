@@ -39,6 +39,23 @@ export const NICKNAME_MAX_LENGTH = 32;
 export const TITLE_MAX_LENGTH = 64;
 export const AVATAR_URL_MAX_LENGTH = 2048;
 
+/**
+ * XP pays the player for doing an activity. It is encouragement, not proof of mastery.
+ * Future skills are a separate track and are not derived from `xpReward`.
+ * One goal accepts at most {@link XP_REWARD_MAX}; a player's total can grow past that
+ * by completing more goals.
+ */
+export const XP_REWARD_MAX = 50;
+export const XP_REWARD_DEFAULT = 10;
+
+export const ARTIFACT_TITLE_MAX_LENGTH = 200;
+export const ARTIFACT_IMAGE_URL_MAX_LENGTH = 2048;
+/** Kinds a room can hold in v0. Only photos for now. */
+export const ARTIFACT_KINDS = ["photo"] as const;
+export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];
+/** Artifacts created by the API land in this sphere unless a later version says otherwise. */
+export const DEFAULT_ARTIFACT_SPHERE: LifeSphereId = "creativity";
+
 export interface Player {
   id: string;
   nickname: string;
@@ -57,9 +74,33 @@ export interface Goal {
   id: string;
   title: string;
   sphere?: LifeSphereId;
+  /** Activity XP, capped at {@link XP_REWARD_MAX} on create and patch. Not a mastery score. */
   xpReward: number;
   status: GoalStatus;
-  // future: playerId, description, parentGoalId, deadline
+  // future: playerId, description, parentGoalId, deadline, skills
+}
+
+/** A photo (or, later, another kind) the player keeps in the virtual room. */
+export interface Artifact {
+  id: string;
+  title: string;
+  kind: ArtifactKind;
+  /** Optional address of the image. Omitted when unset. */
+  imageUrl?: string;
+  sphere: LifeSphereId;
+  createdAt: string; // ISO
+  /** Creativity goal this photo is attached to. Omitted when unset. */
+  goalId?: string;
+}
+
+/** One artifact standing in the room. Order in `Room.placements` is placement order. */
+export interface Placement {
+  artifactId: string;
+}
+
+/** The single player's virtual room. */
+export interface Room {
+  placements: Placement[];
 }
 
 /** Progress view of the single v1 player. `xp` mirrors `Progression.totalXp`. */

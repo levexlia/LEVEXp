@@ -107,17 +107,17 @@ describe("player profile", () => {
     const { id } = (await a.inject({
       method: "POST",
       url: "/goals",
-      payload: { title: "Run", sphere: "health", xpReward: 120 },
+      payload: { title: "Run", sphere: "health", xpReward: 50 },
     })).json();
     await a.inject({ method: "POST", url: `/goals/${id}/complete` });
     await a.inject({ method: "PATCH", url: "/player", payload: { nickname: "Rin" } });
 
     const progress = (await a.inject({ method: "GET", url: "/progress" })).json();
     const player = (await a.inject({ method: "GET", url: "/player" })).json();
-    expect(progress).toEqual({ xp: 120, level: 2, xpBySphere: { health: 120 } });
+    expect(progress).toEqual({ xp: 50, level: 1, xpBySphere: { health: 50 } });
     expect(player.nickname).toBe("Rin");
     expect(player.progress).toEqual(progress);
-    expect(player.progression).toEqual({ level: 2, totalXp: 120, xpBySphere: { health: 120 } });
+    expect(player.progression).toEqual({ level: 1, totalXp: 50, xpBySphere: { health: 50 } });
   });
 });
 
