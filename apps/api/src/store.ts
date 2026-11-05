@@ -4,10 +4,12 @@ import { levelForXp, type Goal, type LifeSphereId, type PlayerProgress } from "@
 // v1: in-memory, single implicit player. Lost on restart.
 const goals = new Map<string, Goal>();
 let xp = 0;
+let xpBySphere: Partial<Record<LifeSphereId, number>> = {};
 
 export function resetStore(seed = true) {
   goals.clear();
   xp = 0;
+  xpBySphere = {};
   if (seed) {
     createGoal({ title: "Morning walk 20 min", sphere: "health", xpReward: 15 });
     createGoal({ title: "Read 10 pages", sphere: "mind" });
@@ -15,7 +17,7 @@ export function resetStore(seed = true) {
 }
 
 export const listGoals = (): Goal[] => [...goals.values()];
-export const getProgress = (): PlayerProgress => ({ xp, level: levelForXp(xp) });
+export const getProgress = (): PlayerProgress => ({ xp, level: levelForXp(xp), xpBySphere: { ...xpBySphere } });
 
 export function createGoal(input: { title: string; sphere?: LifeSphereId; xpReward?: number }): Goal {
   const goal: Goal = { id: randomUUID(), title: input.title, xpReward: input.xpReward ?? 10, status: "open" };
@@ -32,6 +34,7 @@ export function completeGoal(id: string): { goal: Goal; progress: PlayerProgress
   if (awarded) {
     goal.status = "done";
     xp += goal.xpReward;
+    if (goal.sphere) xpBySphere[goal.sphere] = (xpBySphere[goal.sphere] ?? 0) + goal.xpReward;
   }
   return { goal, progress: getProgress(), awarded };
 }

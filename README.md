@@ -4,7 +4,7 @@
 
 ## Статус v1
 
-Полное видение есть; строим итеративно. Сейчас: API с целями и XP (in-memory) и доменные типы. Модули ниже — дорожная карта, не готовый продукт.
+Полное видение есть; строим итеративно. Сейчас: API с целями, сферами жизни и XP (in-memory) и доменные типы. Модули ниже — дорожная карта, не готовый продукт.
 
 ## Дорожная карта модулей
 
@@ -35,7 +35,7 @@
 
 ```
 apps/api         — Fastify API (TypeScript, tsx)
-packages/domain  — типы: Player, LifeSphere, Goal, Progression
+packages/domain  — типы: Player, LifeSphere, Goal, Progression; каталог сфер
 ```
 
 ## Запуск
@@ -59,9 +59,9 @@ npm test
 | GET | `/goals` | список целей |
 | POST | `/goals` | `{ title, sphere?, xpReward? }` (xpReward по умолчанию 10) → 201 + цель |
 | POST | `/goals/:id/complete` | отметить выполненной, XP начисляется один раз → `{ goal, progress }` (404 если нет) |
-| GET | `/progress` | `{ xp, level }` |
+| GET | `/progress` | `{ xp, level, xpBySphere }` |
 
-`sphere`: health, mind, career, finance, relationships, creativity, spirit, community.
+`sphere` — id из каталога сфер (см. ниже). Цель без сферы увеличивает только общий `xp`.
 
 ```bash
 curl localhost:3000/goals
@@ -69,6 +69,33 @@ curl -X POST localhost:3000/goals -H 'content-type: application/json' \
   -d '{"title":"Пробежка 5 км","sphere":"health","xpReward":50}'
 curl -X POST localhost:3000/goals/<id>/complete
 curl localhost:3000/progress
+```
+
+## API v1: Сферы жизни
+
+Каталог фиксированный: `LIFE_SPHERES` в `packages/domain`. Он не хранится в памяти игрока и не меняется между рестартами. Порядок `GET /spheres` — порядок каталога. `id` стабильный, `name` и `description` — текст для интерфейса.
+
+| id | name |
+|---|---|
+| health | Здоровье |
+| mind | Разум |
+| career | Карьера |
+| finance | Финансы |
+| relationships | Отношения |
+| creativity | Творчество |
+| spirit | Дух |
+| community | Сообщество |
+
+| Метод | Путь | Описание |
+|---|---|---|
+| GET | `/spheres` | каталог сфер |
+| GET | `/spheres/:id` | одна сфера (404 `{ error: "sphere not found" }`, если id нет в каталоге) |
+
+`progress.xpBySphere` — объект `{ [sphereId]: number }` только для сфер, по которым уже начислен опыт. При первом выполнении цели с `sphere` в эту сферу добавляется её `xpReward` (повторное выполнение не начисляет). Сумма значений `xpBySphere` может быть меньше общего `xp`, если часть целей была без сферы. Нулевые сферы в объект не входят: для полного списка соедините каталог с этой картой.
+
+```bash
+curl localhost:3000/spheres
+curl localhost:3000/spheres/health
 ```
 
 Проект пока на компьютере ассистента (`/workspace/LEVEXp`). На GitHub перенесём, когда будет доступ.
