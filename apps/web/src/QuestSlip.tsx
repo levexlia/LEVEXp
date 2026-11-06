@@ -52,6 +52,7 @@ export function QuestSlip({
 
   return (
     <section className="slip" aria-labelledby="quest-title">
+      {mode !== "loading" ? <p className="kicker">Квест · Творчество</p> : null}
       {mode !== "loading" ? <Steps mode={mode} /> : null}
       {error ? <p className="banner bad" role="alert">{error}</p> : null}
       {notice ? <p className="banner good" role="status">{notice}</p> : null}

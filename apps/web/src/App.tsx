@@ -1,5 +1,5 @@
-import { isDisplayableImageUrl, XP_PER_LEVEL } from "@levex/domain";
-import { useEffect, useState, type FormEvent } from "react";
+import { isDisplayableImageUrl, LIFE_SPHERES, XP_PER_LEVEL } from "@levex/domain";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import {
   ApiError,
   completeGoal,
@@ -30,6 +30,8 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [broken, setBroken] = useState<Record<string, boolean>>({});
+  const [cheer, setCheer] = useState(0);
+  const [floatXp, setFloatXp] = useState<{ amount: number; id: number } | null>(null);
 
   async function refresh(): Promise<void> {
     const data = await loadRoom();
@@ -137,6 +139,14 @@ export function App() {
       setFile(null);
       setFileKey((key) => key + 1);
       setWantNew(false);
+      if (gained > 0) {
+        const id = cheer + 1;
+        setCheer(id);
+        setFloatXp({ amount: gained, id });
+        window.setTimeout(() => {
+          setFloatXp((current) => (current?.id === id ? null : current));
+        }, 1700);
+      }
       setNotice(gained > 0
         ? `«${title}» на стене. +${gained} XP.`
         : `«${title}» на стене. Опыт за эту цель уже начислен.`);
@@ -151,45 +161,66 @@ export function App() {
   const xp = player?.progress.xp ?? 0;
   const level = player?.progress.level ?? 1;
   const intoLevel = xp % XP_PER_LEVEL;
-  const creativityXp = player?.progress.xpBySphere.creativity;
+  const spheres = LIFE_SPHERES.filter((sphere) => sphere.id === "creativity" || (player?.progress.xpBySphere[sphere.id] ?? 0) > 0);
 
   return (
     <div className="page">
-      <header className="plaque">
-        <p className="mark">LEVEX</p>
-        <div>
+      <header className="hud">
+        <div className="hud-who">
+          <p className="mark">LEVEX</p>
           <h1>{player?.nickname ?? (loading ? "…" : "Игрок")}</h1>
           {player?.title ? <p className="epithet">{player.title}</p> : null}
         </div>
-        <div className="meters">
-          <p className="level">
-            Уровень {player ? level : "—"}
-            <span>{player ? `${xp} XP` : ""}</span>
-          </p>
-          <div
-            className="bar"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={XP_PER_LEVEL}
-            aria-valuenow={player ? intoLevel : 0}
-            aria-label="Опыт внутри текущего уровня"
-          >
-            <span style={{ width: `${player ? intoLevel : 0}%` }} />
+        <div className={`hud-xp${cheer ? " hot" : ""}`}>
+          <div className="badge" aria-hidden="true">{player ? level : "–"}</div>
+          <div className="meters">
+            <p className="level">
+              Уровень {player ? level : "—"}
+              <span>{player ? `${xp} XP` : ""}</span>
+            </p>
+            <div
+              className="bar"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={XP_PER_LEVEL}
+              aria-valuenow={player ? intoLevel : 0}
+              aria-label="Опыт внутри текущего уровня"
+            >
+              <span style={{ width: `${player ? intoLevel : 0}%` }} />
+            </div>
+            <p className="next">
+              {player ? `До уровня ${level + 1}: ${XP_PER_LEVEL - intoLevel} XP` : "Ждём API"}
+            </p>
           </div>
-          <p className="next">
-            {player ? `До уровня ${level + 1}: ${XP_PER_LEVEL - intoLevel} XP` : "Ждём API"}
-            {creativityXp ? ` · Творчество ${creativityXp}` : ""}
-          </p>
         </div>
+        <ul className="spheres" aria-label="Опыт по сферам">
+          {spheres.map((sphere) => (
+            <li key={sphere.id}>
+              <span>{sphere.name}</span>
+              <strong>{player?.progress.xpBySphere[sphere.id] ?? 0}</strong>
+            </li>
+          ))}
+        </ul>
       </header>
 
       <main>
-        <RoomScene
-          placements={placements}
-          goals={goals}
-          broken={broken}
-          onImageError={(id) => setBroken((current) => ({ ...current, [id]: true }))}
-        />
+        <div className="stage">
+          {floatXp ? (
+            <div className="xp-pop" key={floatXp.id} aria-hidden="true">
+              <p className="xp-float">+{floatXp.amount} XP</p>
+              {Array.from({ length: 10 }, (_, index) => (
+                <i key={index} className="spark" style={{ "--i": index } as CSSProperties} />
+              ))}
+            </div>
+          ) : null}
+          <RoomScene
+            placements={placements}
+            goals={goals}
+            broken={broken}
+            cheer={cheer}
+            onImageError={(id) => setBroken((current) => ({ ...current, [id]: true }))}
+          />
+        </div>
         <QuestSlip
           mode={mode}
           busy={busy || loading}
