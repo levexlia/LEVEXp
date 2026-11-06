@@ -101,6 +101,32 @@ export function xpGrantedForGoal(input: GoalXpInput & { xpReward: number }): num
 
 export const ARTIFACT_TITLE_MAX_LENGTH = 200;
 export const ARTIFACT_IMAGE_URL_MAX_LENGTH = 2048;
+
+/**
+ * Names produced by `POST /uploads`. Other paths are not treated as images:
+ * a stored file name is a uuid plus png, jpg, gif, or webp.
+ */
+const STORED_UPLOAD_URL = /^\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|gif|webp)$/i;
+
+/**
+ * Whether a photo address may be stored and used as an image source.
+ * Allows http(s) URLs without embedded credentials, and `/uploads/<uuid>.<ext>`.
+ * Rejects `javascript:`, `data:`, protocol-relative URLs, and other schemes.
+ */
+export function isDisplayableImageUrl(value: string): boolean {
+  const text = value.trim();
+  if (STORED_UPLOAD_URL.test(text)) return true;
+  let url: URL;
+  try {
+    url = new URL(text);
+  } catch {
+    return false;
+  }
+  if (url.username !== "" || url.password !== "") return false;
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  return url.hostname !== "";
+}
+
 /** Kinds a room can hold in v0. Only photos for now. */
 export const ARTIFACT_KINDS = ["photo"] as const;
 export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];

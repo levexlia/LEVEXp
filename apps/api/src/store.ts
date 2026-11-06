@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, 
 import { dirname } from "node:path";
 import {
   getLifeSphere,
+  isDisplayableImageUrl,
   levelForXp,
   progressFromProgression,
   xpForGoal,
@@ -265,6 +266,9 @@ export function createArtifact(input: ArtifactInput): Artifact {
   const imageUrl = input.imageUrl === undefined
     ? undefined
     : artifactText(input.imageUrl, "imageUrl", ARTIFACT_IMAGE_URL_MAX_LENGTH);
+  if (imageUrl !== undefined && !isDisplayableImageUrl(imageUrl)) {
+    throw new InvalidArtifact("imageUrl must be an http(s) URL or an /uploads file");
+  }
 
   const next = cloneState();
   const linkedGoal = input.goalId === undefined ? undefined : next.goals.get(input.goalId);
