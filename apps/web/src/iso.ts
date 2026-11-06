@@ -48,6 +48,30 @@ export function rightWall(x0: number, x1: number, z0: number, z1: number, y = 0)
 }
 
 /**
+ * Map a bitmap onto a left-wall rectangle (constant x).
+ * Image space (0,0) is the top-left; +u runs along +y.
+ */
+export function leftWallImageMatrix(
+  y: number,
+  w: number,
+  zBottom: number,
+  zHeight: number,
+  imgW: number,
+  imgH: number,
+  x = 0.08,
+): string {
+  // Start at the near end of the wall so the bitmap is not mirrored.
+  const topLeft = iso(x, y + w, zBottom + zHeight);
+  const topRight = iso(x, y, zBottom + zHeight);
+  const bottomLeft = iso(x, y + w, zBottom);
+  const a = (topRight.x - topLeft.x) / imgW;
+  const b = (topRight.y - topLeft.y) / imgW;
+  const c = (bottomLeft.x - topLeft.x) / imgH;
+  const d = (bottomLeft.y - topLeft.y) / imgH;
+  return `matrix(${a} ${b} ${c} ${d} ${topLeft.x} ${topLeft.y})`;
+}
+
+/**
  * Map a bitmap onto a right-wall rectangle.
  * Image space (0,0) is the top-left of the photo.
  */

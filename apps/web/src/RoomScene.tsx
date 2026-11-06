@@ -6,6 +6,7 @@ import {
   boxFaces,
   iso,
   leftWall,
+  leftWallImageMatrix,
   pts,
   rightWall,
   rightWallImageMatrix,
@@ -59,6 +60,8 @@ export function RoomScene({
     return () => window.clearTimeout(timer);
   }, [cheer]);
 
+  const shown = placements.slice(-FRAME_SLOTS.length);
+  const hidden = placements.length - shown.length;
   const home = iso(2.55, 4.05, 0);
   const look = iso(3.15, 2.85, 0);
   const stepStyle = {
@@ -107,7 +110,7 @@ export function RoomScene({
         {stage >= 3 ? <Plant fresh={walking && stage === 3} /> : null}
         {stage >= 2 ? <Lamp fresh={walking && stage === 2} night={timeOfDay === "night"} /> : null}
 
-        <Photos placements={placements} goals={goals} broken={broken} onImageError={onImageError} />
+        <Photos placements={shown} goals={goals} broken={broken} onImageError={onImageError} />
 
         <g className={walking ? "avatar walk" : "avatar"} style={stepStyle}>
           <Character />
@@ -117,6 +120,9 @@ export function RoomScene({
           <text x="470" y="250" textAnchor="middle" className="await-label">Стена ждёт первую работу</text>
         ) : null}
       </svg>
+      {hidden > 0 ? (
+        <p className="gallery-count" aria-label={`В галерее ещё ${hidden}`}>Ещё {hidden}</p>
+      ) : null}
       <ul className="sr-only">
         {placements.map((placement) => (
           <li key={placement.artifactId}>{placement.artifact.title}</li>
@@ -310,10 +316,10 @@ function Solid({
 function Bed() {
   return (
     <g>
-      <Solid x={0.38} y={3.15} w={1.25} d={1.65} h={12} top="#6b4632" south="#4e3224" east="#3d271c" />
-      <Solid x={0.48} y={3.25} z={12} w={1.05} d={1.45} h={8} top="#f4efe6" south="#d9cfc2" east="#c9bfb0" />
-      <Solid x={0.55} y={3.32} z={20} w={0.42} d={0.95} h={6} top="#f7f4ee" south="#e4ddd2" east="#d5cdc0" />
-      <Solid x={1.05} y={3.4} z={20} w={0.4} d={1.15} h={3} top="#7d4a55" south="#5e3640" east="#4c2c34" />
+      <Solid x={0.38} y={3.55} w={1.15} d={1.25} h={12} top="#6b4632" south="#4e3224" east="#3d271c" />
+      <Solid x={0.46} y={3.62} z={12} w={0.98} d={1.1} h={8} top="#f4efe6" south="#d9cfc2" east="#c9bfb0" />
+      <Solid x={0.52} y={3.68} z={20} w={0.38} d={0.7} h={6} top="#f7f4ee" south="#e4ddd2" east="#d5cdc0" />
+      <Solid x={0.95} y={3.74} z={20} w={0.38} d={0.85} h={3} top="#7d4a55" south="#5e3640" east="#4c2c34" />
     </g>
   );
 }
@@ -426,6 +432,15 @@ function Lamp({ fresh, night }: { fresh: boolean; night: boolean }) {
 const PLAQUE_W = 168;
 const PLAQUE_H = 28;
 
+/** Fixed slots. Right wall is one row of three; the left wall, beside the window, holds two more. */
+const FRAME_SLOTS: Array<{ wall: "right" | "left"; along: number; w: number; zBottom: number; zHeight: number }> = [
+  { wall: "right", along: 0.4, w: 1.4, zBottom: 108, zHeight: 46 },
+  { wall: "right", along: 2.15, w: 1.4, zBottom: 108, zHeight: 46 },
+  { wall: "right", along: 3.9, w: 1.4, zBottom: 108, zHeight: 46 },
+  { wall: "left", along: 2.58, w: 1.05, zBottom: 112, zHeight: 42 },
+  { wall: "left", along: 2.58, w: 1.05, zBottom: 42, zHeight: 40 },
+];
+
 function Photos({
   placements,
   goals,
@@ -442,23 +457,35 @@ function Photos({
   return (
     <g className="photos">
       {placements.map((placement, index) => {
-        const col = index % 3;
-        const row = Math.floor(index / 3);
-        const x = 0.32 + col * 1.72;
-        const zBottom = 118 - row * 72;
-        const w = 1.38;
-        const zHeight = 46;
-        const frame = rightWall(x - 0.05, x + w + 0.05, zBottom - 3, zBottom + zHeight + 4, 0.03);
-        const mat = rightWall(x, x + w, zBottom, zBottom + zHeight, 0.05);
-        const plaqueX = x + 0.08;
+        const slot = FRAME_SLOTS[index];
+        if (!slot) return null;
+        const { along, w, zBottom, zHeight } = slot;
+        const frame = slot.wall === "right"
+          ? rightWall(along - 0.05, along + w + 0.05, zBottom - 3, zBottom + zHeight + 4, 0.03)
+          : leftWall(along - 0.05, along + w + 0.05, zBottom - 3, zBottom + zHeight + 4, 0.04);
+        const mat = slot.wall === "right"
+          ? rightWall(along, along + w, zBottom, zBottom + zHeight, 0.05)
+          : leftWall(along, along + w, zBottom, zBottom + zHeight, 0.07);
+        const plaqueAlong = along + 0.08;
         const plaqueW = w - 0.16;
-        const plaqueZ = zBottom - 20;
+        const plaqueZ = zBottom - 18;
+        const imageMatrix = slot.wall === "right"
+          ? rightWallImageMatrix(along, w, zBottom, zHeight, 120, 90)
+          : leftWallImageMatrix(along, w, zBottom, zHeight, 120, 90);
+        const plaqueMatrix = slot.wall === "right"
+          ? rightWallImageMatrix(plaqueAlong, plaqueW, plaqueZ, 14, PLAQUE_W, PLAQUE_H)
+          : leftWallImageMatrix(plaqueAlong, plaqueW, plaqueZ, 14, PLAQUE_W, PLAQUE_H);
         const src = placement.artifact.imageUrl && !broken[placement.artifact.id]
           ? safeImageSrc(placement.artifact.imageUrl)
           : null;
         const goal = goals.find((item) => item.id === placement.artifact.goalId);
         const full = goal ? `${placement.artifact.title} — ${goal.title}` : placement.artifact.title;
-        const anchor = iso(plaqueX + plaqueW / 2, 0.08, plaqueZ + 8);
+        const anchor = slot.wall === "right"
+          ? iso(plaqueAlong + plaqueW / 2, 0.08, plaqueZ + 7)
+          : iso(0.1, plaqueAlong + plaqueW / 2, plaqueZ + 7);
+        const missingAt = slot.wall === "right"
+          ? iso(along + w / 2, 0.08, zBottom + 20)
+          : iso(0.1, along + w / 2, zBottom + 20);
         return (
           <g key={placement.artifactId} filter="url(#photo-shadow)">
             <title>{full}</title>
@@ -470,20 +497,20 @@ function Photos({
                 width="120"
                 height="90"
                 preserveAspectRatio="xMidYMid slice"
-                transform={rightWallImageMatrix(x, w, zBottom, zHeight, 120, 90)}
+                transform={imageMatrix}
                 onError={() => onImageError(placement.artifact.id)}
               >
                 <title>{placement.artifact.title}</title>
               </image>
             ) : (
-              <text x={iso(x + w / 2, 0.08, zBottom + 22).x} y={iso(x + w / 2, 0.08, zBottom + 22).y} textAnchor="middle" className="frame-label">
+              <text x={missingAt.x} y={missingAt.y} textAnchor="middle" className="frame-label">
                 {placement.artifact.imageUrl ? "не показывается" : "без фото"}
               </text>
             )}
             <foreignObject
               width={PLAQUE_W}
               height={PLAQUE_H}
-              transform={rightWallImageMatrix(plaqueX, plaqueW, plaqueZ, 16, PLAQUE_W, PLAQUE_H)}
+              transform={plaqueMatrix}
             >
               <div
                 className="wall-plaque"

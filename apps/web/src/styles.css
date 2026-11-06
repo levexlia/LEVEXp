@@ -112,9 +112,9 @@ label {
 
 h1 {
   margin: 0;
-  font-family: Palatino, Georgia, serif;
+  font-family: inherit;
   font-size: 1.45rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.1;
 }
 
@@ -130,7 +130,7 @@ h1 {
   flex: none;
   background: radial-gradient(circle at 40% 35%, #f0d48a, #a86b22 62%, #6a3e12);
   color: #2a1608;
-  font-family: Palatino, Georgia, serif;
+  font-family: inherit;
   font-size: 1.35rem;
   font-weight: 700;
   clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
@@ -279,12 +279,34 @@ h1 {
 
 .xp-float {
   margin: 0;
-  font-family: Palatino, Georgia, serif;
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: #fff1c2;
-  text-shadow: 0 2px 0 #6a3e12, 0 0 16px #f0c36a;
+  font-family: inherit;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff6d0;
+  text-shadow:
+    -1px -1px 0 #5a320c,
+    1px -1px 0 #5a320c,
+    -1px 1px 0 #5a320c,
+    1px 1px 0 #5a320c,
+    0 3px 0 #3a1e08,
+    0 0 18px #f0c36a;
   animation: rise 1.5s ease-out forwards;
+}
+
+.gallery-count {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.65rem;
+  margin: 0;
+  padding: 0.22rem 0.55rem;
+  background: #2a1c16;
+  color: #f6ecdf;
+  border: 1px solid #e0a84a;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .spark {
@@ -321,9 +343,9 @@ h1 {
 
 .slip h2 {
   margin: 0.1rem 0 0.3rem;
-  font-family: Palatino, Georgia, serif;
+  font-family: inherit;
   font-size: 1.45rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .slip p { margin: 0; color: #4e4034; }
