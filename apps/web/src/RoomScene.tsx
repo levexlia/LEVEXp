@@ -98,6 +98,7 @@ export function RoomScene({
 
         <Walls time={timeOfDay} />
         <Floor />
+        <Occlusion />
         <Window time={timeOfDay} />
         <LightShaft time={timeOfDay} />
 
@@ -209,19 +210,63 @@ function Window({ time }: { time: TimeOfDay }) {
 }
 
 function LightShaft({ time }: { time: TimeOfDay }) {
-  if (time === "night") return null;
-  const opacity = time === "dusk" ? 0.16 : 0.22;
+  const night = time === "night";
+  const dusk = time === "dusk";
+  const beam = night ? "#c9d7ee" : dusk ? "#f0a36a" : "#ffe3a8";
+  const core = night ? "#e4ecf8" : "#fff6d4";
   return (
-    <polygon
-      points={pts([
-        iso(0.08, 1.05, 58),
-        iso(0.08, 2.25, 58),
-        iso(2.4, 3.15, 2),
-        iso(1.15, 1.7, 2),
-      ])}
-      fill={time === "dusk" ? "#f0a36a" : "#ffe0a0"}
-      opacity={opacity}
-    />
+    <g className="beam">
+      <polygon
+        points={pts([
+          iso(0.08, 0.95, 64),
+          iso(0.08, 2.35, 64),
+          iso(2.7, 3.35, 1),
+          iso(0.95, 1.45, 1),
+        ])}
+        fill={beam}
+        opacity={night ? 0.16 : dusk ? 0.24 : 0.3}
+      />
+      <polygon
+        points={pts([
+          iso(0.09, 1.25, 78),
+          iso(0.09, 2.05, 78),
+          iso(2.15, 2.85, 2),
+          iso(1.25, 1.85, 2),
+        ])}
+        fill={core}
+        opacity={night ? 0.12 : 0.28}
+      />
+    </g>
+  );
+}
+
+function Occlusion() {
+  const strips = [];
+  for (let i = 0; i < ROOM_X; i += 1) {
+    strips.push(
+      <polygon
+        key={`ar${i}`}
+        points={pts([iso(i, 0, 1), iso(i + 1, 0, 1), iso(i + 1, 0.38, 1), iso(i, 0.38, 1)])}
+        fill="#000"
+        opacity={0.16}
+      />,
+    );
+  }
+  for (let i = 0; i < ROOM_Y; i += 1) {
+    strips.push(
+      <polygon
+        key={`al${i}`}
+        points={pts([iso(0, i, 1), iso(0.38, i, 1), iso(0.38, i + 1, 1), iso(0, i + 1, 1)])}
+        fill="#000"
+        opacity={0.14}
+      />,
+    );
+  }
+  return (
+    <g className="ao">
+      {strips}
+      <polygon points={pts([iso(0, 0, 1.2), iso(1.1, 0, 1.2), iso(0, 1.1, 1.2)])} fill="#000" opacity="0.2" />
+    </g>
   );
 }
 
@@ -238,7 +283,7 @@ function Furniture() {
 }
 
 function Solid({
-  x, y, z = 0, w, d, h, top, south, east,
+  x, y, z = 0, w, d, h, top, south, east, stroke,
 }: {
   x: number;
   y: number;
@@ -249,13 +294,15 @@ function Solid({
   top: string;
   south: string;
   east: string;
+  stroke?: string;
 }) {
   const faces = boxFaces(x, y, w, d, h, z);
+  const line = stroke ? { stroke, strokeWidth: 0.8, strokeLinejoin: "round" as const } : {};
   return (
     <g>
-      <polygon points={pts(faces.south)} fill={south} />
-      <polygon points={pts(faces.east)} fill={east} />
-      <polygon points={pts(faces.top)} fill={top} />
+      <polygon points={pts(faces.south)} fill={south} {...line} />
+      <polygon points={pts(faces.east)} fill={east} {...line} />
+      <polygon points={pts(faces.top)} fill={top} {...line} />
     </g>
   );
 }
@@ -278,9 +325,13 @@ function Shelf() {
       <Solid x={0.08} y={0.16} z={22} w={0.42} d={0.66} h={3} top="#c49a6a" south="#8d6844" east="#6b4c30" />
       <Solid x={0.08} y={0.16} z={46} w={0.42} d={0.66} h={3} top="#c49a6a" south="#8d6844" east="#6b4c30" />
       <Solid x={0.08} y={0.16} z={68} w={0.42} d={0.66} h={3} top="#c49a6a" south="#8d6844" east="#6b4c30" />
-      <Solid x={0.16} y={0.28} z={25} w={0.16} d={0.12} h={16} top="#6b3a4a" south="#4e2834" east="#3a1e28" />
-      <Solid x={0.16} y={0.42} z={25} w={0.16} d={0.14} h={14} top="#2f4d6b" south="#22384e" east="#1a2c3e" />
-      <Solid x={0.18} y={0.34} z={49} w={0.18} d={0.22} h={8} top="#e6d2a4" south="#c4b088" east="#a89470" />
+      <Solid x={0.16} y={0.22} z={25} w={0.12} d={0.1} h={18} top="#6b3a4a" south="#4e2834" east="#3a1e28" />
+      <Solid x={0.16} y={0.34} z={25} w={0.12} d={0.12} h={15} top="#2f4d6b" south="#22384e" east="#1a2c3e" />
+      <Solid x={0.16} y={0.48} z={25} w={0.12} d={0.1} h={12} top="#c4a15a" south="#8d7340" east="#6e582c" />
+      <Solid x={0.18} y={0.28} z={49} w={0.14} d={0.16} h={10} top="#e6d2a4" south="#c4b088" east="#a89470" />
+      <Solid x={0.18} y={0.48} z={49} w={0.12} d={0.12} h={7} top="#3f6b5c" south="#2c4e44" east="#214038" />
+      <Solid x={0.2} y={0.36} z={71} w={0.14} d={0.14} h={5} top="#f4efe6" south="#d9cfc2" east="#c9bfb0" />
+      <Solid x={0.24} y={0.4} z={76} w={0.06} d={0.06} h={6} top="#f0c36a" south="#d7a44a" east="#b8883a" />
     </g>
   );
 }
@@ -356,16 +407,24 @@ function Plant({ fresh }: { fresh: boolean }) {
 }
 
 function Lamp({ fresh, night }: { fresh: boolean; night: boolean }) {
-  const glow = iso(4.95, 3.55, 2);
+  const foot = iso(4.95, 3.48, 1.5);
+  const wall = iso(5.15, 0.08, 48);
   return (
     <g className={fresh ? "fresh" : undefined}>
-      <ellipse cx={glow.x} cy={glow.y} rx={night ? 78 : 58} ry={night ? 34 : 24} fill="url(#lamp-glow)" />
-      <Solid x={4.82} y={3.35} w={0.16} d={0.16} h={4} top="#5c3e2c" south="#3d2918" east="#2c1d12" />
-      <Solid x={4.86} y={3.39} z={4} w={0.08} d={0.08} h={36} top="#e0b15a" south="#b8883a" east="#8d6828" />
-      <Solid x={4.62} y={3.18} z={40} w={0.55} d={0.5} h={14} top="#ffe3a4" south="#f0c36a" east="#d7a44a" />
+      <ellipse cx={wall.x} cy={wall.y} rx={night ? 46 : 34} ry={night ? 28 : 20} fill="url(#lamp-glow)" opacity="0.85" />
+      <ellipse cx={foot.x} cy={foot.y + 3} rx={night ? 54 : 42} ry={night ? 22 : 16} fill="#000" opacity="0.28" />
+      <ellipse cx={foot.x} cy={foot.y} rx={night ? 70 : 56} ry={night ? 28 : 22} fill="url(#lamp-glow)" />
+      <Solid x={4.72} y={3.22} w={0.48} d={0.42} h={3} top="#4a301c" south="#3a2414" east="#2a1a0e" />
+      <Solid x={4.84} y={3.32} z={3} w={0.22} d={0.2} h={3} top="#6b4428" south="#4e311c" east="#3a2414" />
+      <Solid x={4.9} y={3.38} z={6} w={0.1} d={0.1} h={38} top="#f0d48a" south="#c9963e" east="#8d6828" />
+      <Solid x={4.66} y={3.16} z={42} w={0.58} d={0.52} h={4} top="#a86820" south="#8a5418" east="#6a3e10" />
+      <Solid x={4.62} y={3.12} z={46} w={0.66} d={0.58} h={12} top="#fff0c4" south="#f0c36a" east="#e0a84a" />
     </g>
   );
 }
+
+const PLAQUE_W = 168;
+const PLAQUE_H = 28;
 
 function Photos({
   placements,
@@ -378,27 +437,31 @@ function Photos({
   broken: Record<string, boolean>;
   onImageError: (id: string) => void;
 }) {
+  const [tip, setTip] = useState<{ id: string; title: string; left: number; top: number } | null>(null);
+
   return (
     <g className="photos">
       {placements.map((placement, index) => {
         const col = index % 3;
         const row = Math.floor(index / 3);
-        const x = 0.4 + col * 1.5;
-        const zBottom = 96 - row * 52;
-        const w = 1.25;
-        const zHeight = 52;
-        const frame = rightWall(x - 0.06, x + w + 0.06, zBottom - 4, zBottom + zHeight + 4, 0.03);
+        const x = 0.32 + col * 1.72;
+        const zBottom = 118 - row * 72;
+        const w = 1.38;
+        const zHeight = 46;
+        const frame = rightWall(x - 0.05, x + w + 0.05, zBottom - 3, zBottom + zHeight + 4, 0.03);
         const mat = rightWall(x, x + w, zBottom, zBottom + zHeight, 0.05);
+        const plaqueX = x + 0.08;
+        const plaqueW = w - 0.16;
+        const plaqueZ = zBottom - 20;
         const src = placement.artifact.imageUrl && !broken[placement.artifact.id]
           ? safeImageSrc(placement.artifact.imageUrl)
           : null;
         const goal = goals.find((item) => item.id === placement.artifact.goalId);
-        const caption = iso(x + w / 2, 0.08, zBottom - 10);
+        const full = goal ? `${placement.artifact.title} — ${goal.title}` : placement.artifact.title;
+        const anchor = iso(plaqueX + plaqueW / 2, 0.08, plaqueZ + 8);
         return (
           <g key={placement.artifactId} filter="url(#photo-shadow)">
-            <title>
-              {placement.artifact.title}{goal ? `, ${goal.title}` : ""}
-            </title>
+            <title>{full}</title>
             <polygon points={pts(frame)} fill="#5c3b24" />
             <polygon points={pts(mat)} fill="#f7f1e6" />
             {src ? (
@@ -413,16 +476,54 @@ function Photos({
                 <title>{placement.artifact.title}</title>
               </image>
             ) : (
-              <text x={caption.x} y={iso(x + w / 2, 0.08, zBottom + 24).y} textAnchor="middle" className="frame-label">
+              <text x={iso(x + w / 2, 0.08, zBottom + 22).x} y={iso(x + w / 2, 0.08, zBottom + 22).y} textAnchor="middle" className="frame-label">
                 {placement.artifact.imageUrl ? "не показывается" : "без фото"}
               </text>
             )}
-            <text x={caption.x} y={caption.y} textAnchor="middle" className="frame-label">{shortTitle(placement.artifact.title)}</text>
+            <foreignObject
+              width={PLAQUE_W}
+              height={PLAQUE_H}
+              transform={rightWallImageMatrix(plaqueX, plaqueW, plaqueZ, 16, PLAQUE_W, PLAQUE_H)}
+            >
+              <div
+                className="wall-plaque"
+                title={full}
+                role="button"
+                tabIndex={0}
+                onPointerEnter={(event) => {
+                  if (event.pointerType === "mouse") setTip({ id: placement.artifactId, title: full, ...tipPos(anchor) });
+                }}
+                onPointerLeave={(event) => {
+                  if (event.pointerType === "mouse") setTip((current) => current?.id === placement.artifactId ? null : current);
+                }}
+                onClick={() => {
+                  const next = { id: placement.artifactId, title: full, ...tipPos(anchor) };
+                  setTip((current) => current?.id === placement.artifactId ? null : next);
+                }}
+                onFocus={() => setTip({ id: placement.artifactId, title: full, ...tipPos(anchor) })}
+                onBlur={() => setTip((current) => current?.id === placement.artifactId ? null : current)}
+              >
+                <span>{placement.artifact.title}</span>
+              </div>
+            </foreignObject>
           </g>
         );
       })}
+      {tip ? <CaptionTip title={tip.title} left={tip.left} top={tip.top} /> : null}
     </g>
   );
+}
+
+function CaptionTip({ title, left, top }: { title: string; left: number; top: number }) {
+  return (
+    <foreignObject x={left} y={top} width="180" height="64" className="caption-tip-fo">
+      <div className="caption-tip">{title}</div>
+    </foreignObject>
+  );
+}
+
+function tipPos(anchor: { x: number; y: number }): { left: number; top: number } {
+  return { left: anchor.x - 90, top: anchor.y - 70 };
 }
 
 function safeImageSrc(value: string): string | null {
@@ -430,29 +531,29 @@ function safeImageSrc(value: string): string | null {
   return value.trim();
 }
 
-function shortTitle(title: string): string {
-  const text = title.trim();
-  return text.length > 16 ? `${text.slice(0, 15)}…` : text;
-}
-
 /** Cosmetic figure. Idle motion is decorative; it is not a progression system. */
 function Character() {
   const x = 2.55;
   const y = 4.02;
+  const ink = "#2a1c14";
   return (
     <g className="bob">
-      <ellipse cx={iso(x + 0.22, y + 0.18, 0).x} cy={iso(x + 0.22, y + 0.18, 0).y + 2} rx="16" ry="6" fill="#000" opacity="0.2" />
-      <Solid x={x + 0.06} y={y + 0.08} w={0.14} d={0.14} h={16} top="#3a2e28" south="#2a221e" east="#1c1612" />
-      <Solid x={x + 0.24} y={y + 0.16} w={0.14} d={0.14} h={16} top="#4a3b32" south="#2a221e" east="#1c1612" />
+      <ellipse cx={iso(x + 0.22, y + 0.18, 0).x} cy={iso(x + 0.22, y + 0.18, 0).y + 3} rx="18" ry="7" fill="#000" opacity="0.22" />
+      <Solid x={x + 0.04} y={y + 0.06} w={0.16} d={0.16} h={15} top="#3a2e28" south="#2a221e" east="#1c1612" stroke={ink} />
+      <Solid x={x + 0.24} y={y + 0.16} w={0.16} d={0.16} h={15} top="#4a3b32" south="#2a221e" east="#1c1612" stroke={ink} />
+      <Solid x={x - 0.02} y={y + 0.02} w={0.22} d={0.2} h={4} top="#1c1612" south="#14100e" east="#0e0c0a" />
+      <Solid x={x + 0.22} y={y + 0.14} w={0.22} d={0.2} h={4} top="#1c1612" south="#14100e" east="#0e0c0a" />
       <g className="breathe">
-        <Solid x={x + 0.02} y={y + 0.02} z={16} w={0.42} d={0.34} h={24} top="#e07a52" south="#c4623e" east="#a34e30" />
+        <Solid x={x} y={y} z={15} w={0.46} d={0.36} h={22} top="#f09068" south="#d86b42" east="#b55230" stroke={ink} />
+        <Solid x={x + 0.08} y={y + 0.06} z={22} w={0.16} d={0.22} h={12} top="#f7d2bc" south="#e7b89a" east="#d4a484" stroke={ink} />
+        <Solid x={x + 0.04} y={y + 0.04} z={34} w={0.38} d={0.28} h={4} top="#5c3e2c" south="#3d2918" east="#2c1d12" />
         <g className="arm-rest">
-          <Solid x={x + 0.36} y={y + 0.18} z={20} w={0.1} d={0.12} h={16} top="#efc7a8" south="#e0b494" east="#c99a7c" />
+          <Solid x={x + 0.4} y={y + 0.16} z={18} w={0.12} d={0.14} h={16} top="#efc7a8" south="#e0b494" east="#c99a7c" stroke={ink} />
         </g>
         <g className="arm-up">
-          <Solid x={x + 0.34} y={y - 0.02} z={30} w={0.1} d={0.12} h={18} top="#efc7a8" south="#e0b494" east="#c99a7c" />
+          <Solid x={x + 0.38} y={y - 0.06} z={32} w={0.12} d={0.14} h={18} top="#efc7a8" south="#e0b494" east="#c99a7c" stroke={ink} />
         </g>
-        <Head x={x + 0.2} y={y + 0.16} z={46} />
+        <Head x={x + 0.22} y={y + 0.16} z={48} />
       </g>
     </g>
   );
@@ -460,16 +561,24 @@ function Character() {
 
 function Head({ x, y, z }: { x: number; y: number; z: number }) {
   const c = iso(x, y, z);
+  const hair = `M${c.x - 14} ${c.y - 2}
+    C ${c.x - 16} ${c.y - 20}, ${c.x - 6} ${c.y - 28}, ${c.x} ${c.y - 27}
+    C ${c.x + 8} ${c.y - 30}, ${c.x + 16} ${c.y - 18}, ${c.x + 14} ${c.y - 1}
+    C ${c.x + 8} ${c.y - 12}, ${c.x - 8} ${c.y - 12}, ${c.x - 14} ${c.y - 2} Z`;
   return (
     <g>
-      <ellipse cx={c.x} cy={c.y - 2} rx="13" ry="14" fill="#efc7a8" />
-      <path d={`M${c.x - 13} ${c.y - 4} C ${c.x - 12} ${c.y - 22}, ${c.x + 12} ${c.y - 22}, ${c.x + 13} ${c.y - 2} C ${c.x + 8} ${c.y - 12}, ${c.x - 8} ${c.y - 12}, ${c.x - 13} ${c.y - 4} Z`} fill="#3a2a22" />
+      <ellipse cx={c.x} cy={c.y - 1} rx="14" ry="15" fill="#efc7a8" stroke="#3a2418" strokeWidth="1.3" />
+      <path d={hair} fill="#3a2a22" stroke="#241810" strokeWidth="1" />
+      <path d={`M${c.x - 4} ${c.y - 18} C ${c.x - 1} ${c.y - 22}, ${c.x + 4} ${c.y - 16}, ${c.x + 2} ${c.y - 12}`} fill="none" stroke="#6b5344" strokeWidth="1.4" />
+      <ellipse cx={c.x - 12} cy={c.y + 1} rx="2.2" ry="3" fill="#e7b498" stroke="#3a2418" strokeWidth="0.6" />
       <g className="eyes">
-        <ellipse cx={c.x - 4} cy={c.y - 1} rx="1.5" ry="1.7" fill="#241910" />
-        <ellipse cx={c.x + 4} cy={c.y - 1} rx="1.5" ry="1.7" fill="#241910" />
-        <rect className="lid" x={c.x - 8} y={c.y - 4} width="16" height="6" fill="#efc7a8" />
+        <ellipse cx={c.x - 4.5} cy={c.y} rx="1.7" ry="1.9" fill="#241910" />
+        <ellipse cx={c.x + 4.5} cy={c.y} rx="1.7" ry="1.9" fill="#241910" />
+        <circle cx={c.x - 4} cy={c.y - 0.6} r="0.45" fill="#fff" />
+        <circle cx={c.x + 5} cy={c.y - 0.6} r="0.45" fill="#fff" />
+        <rect className="lid" x={c.x - 8} y={c.y - 3} width="16" height="6" fill="#efc7a8" />
       </g>
-      <path d={`M${c.x - 3} ${c.y + 5} Q ${c.x} ${c.y + 8} ${c.x + 3} ${c.y + 5}`} fill="none" stroke="#c4846a" strokeWidth="1" />
+      <path d={`M${c.x - 3.5} ${c.y + 6} Q ${c.x} ${c.y + 9} ${c.x + 3.5} ${c.y + 6}`} fill="none" stroke="#a86b58" strokeWidth="1.2" strokeLinecap="round" />
     </g>
   );
 }

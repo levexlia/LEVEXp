@@ -213,12 +213,50 @@ h1 {
 .iso { display: block; width: 100%; height: auto; }
 
 .frame-label, .await-label {
-  font-family: Palatino, Georgia, serif;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
   font-size: 11px;
   fill: #4a3728;
 }
 
-.await-label { fill: #f0e2c8; font-size: 16px; }
+.await-label { fill: #f0e2c8; font-size: 15px; }
+
+.wall-plaque {
+  box-sizing: border-box;
+  width: 168px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f6efe2;
+  border: 2px solid #6b4a30;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 1;
+  color: #3a2a1c;
+  cursor: pointer;
+}
+
+.wall-plaque span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 8px;
+}
+
+.caption-tip {
+  box-sizing: border-box;
+  width: 180px;
+  padding: 6px 8px;
+  background: #2a1c16;
+  color: #f6ecdf;
+  border: 1px solid #e0a84a;
+  border-radius: 4px;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 12px;
+  line-height: 1.3;
+}
 
 .avatar { transform: translate(0, 0); }
 .avatar.walk { animation: stroll 2s ease-in-out; }
