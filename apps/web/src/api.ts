@@ -38,6 +38,20 @@ export interface RoomData {
   placements: Placement[];
 }
 
+export interface AvatarCandidate {
+  id: string;
+  url: string;
+}
+
+export interface AvatarStatus {
+  provider: "mock" | "openai" | "xai";
+  limit: number;
+  used: number;
+  remaining: number;
+  candidates: AvatarCandidate[];
+  sourceUrl?: string;
+}
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -53,11 +67,17 @@ const KNOWN: Record<string, string> = {
   "file is empty": "Файл пустой",
   "file is too large": "Файл больше 5 МБ",
   "file must be a png, jpeg, gif, or webp image": "Нужна картинка PNG, JPEG, GIF или WebP",
+  "file must be a png, jpeg, or webp image": "Нужна картинка PNG, JPEG или WebP",
   "expected multipart file": "Сервер ждал файл",
   "goal not found": "Цель не найдена",
   "artifact not found": "Фото не найдено",
   "goal must be a creativity goal": "Фото можно привязать только к цели творчества",
   "imageUrl must be an http(s) URL or an /uploads file": "Нужна ссылка http(s) или адрес загруженного файла",
+  "consent is required": "Нужно согласие: на фото должен быть реальный человек",
+  "daily avatar limit reached": "Лимит генераций на сегодня исчерпан",
+  "avatar provider failed": "Не удалось нарисовать персонажа. Попробуйте ещё раз",
+  "candidate not found": "Этот вариант уже недоступен",
+  "could not save avatar": "Не удалось сохранить персонажа. Попробуйте ещё раз",
 };
 
 export async function loadRoom(): Promise<RoomData> {
@@ -79,6 +99,28 @@ export function createArtifact(input: { title: string; imageUrl: string; goalId:
 
 export function completeGoal(id: string): Promise<{ goal: Goal; progress: Player["progress"] }> {
   return sendJson(`/goals/${id}/complete`);
+}
+
+export function loadAvatar(): Promise<AvatarStatus> {
+  return getJson<AvatarStatus>("/avatar");
+}
+
+export function generateAvatar(file: File, consent: boolean, keepOriginal: boolean): Promise<AvatarStatus> {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("consent", consent ? "true" : "false");
+  if (keepOriginal) body.append("keepOriginal", "true");
+  return request<AvatarStatus>("/avatar/generate", { method: "POST", body });
+}
+
+export function selectAvatar(candidateId: string): Promise<Player> {
+  return sendJson<Player>("/avatar/select", { candidateId });
+}
+
+export function errorMessage(err: unknown): string {
+  if (err instanceof ApiError) return err.message;
+  if (err instanceof Error && err.message) return err.message;
+  return "Что-то пошло не так";
 }
 
 export async function uploadImage(file: File): Promise<string> {

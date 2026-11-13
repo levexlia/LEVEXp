@@ -67,6 +67,39 @@ export class ArtifactAlreadyLinked extends Error {
   }
 }
 
+export class AvatarLimitReached extends Error {
+  readonly limit: number;
+  readonly used: number;
+
+  constructor(limit: number, used: number) {
+    super("daily avatar limit reached");
+    this.name = "AvatarLimitReached";
+    this.limit = limit;
+    this.used = used;
+  }
+}
+
+export class AvatarCandidateNotFound extends Error {
+  constructor() {
+    super("candidate not found");
+    this.name = "AvatarCandidateNotFound";
+  }
+}
+
+export interface AvatarCandidateRecord {
+  id: string;
+  url: string;
+  createdAt: string;
+  generationId: string;
+}
+
+interface AvatarBook {
+  /** UTC day `YYYY-MM-DD` the count belongs to. Empty until the first generation. */
+  usageDay: string;
+  usageCount: number;
+  candidates: AvatarCandidateRecord[];
+}
+
 export interface PlayerUpdate {
   nickname?: string;
   title?: string | null;
@@ -93,6 +126,11 @@ interface StoreFile {
   goals: Goal[];
   artifacts: Artifact[];
   room: Room;
+  /** Present after the first avatar generation. Older files omit it. */
+  avatar?: {
+    usage: { day: string; count: number };
+    candidates: AvatarCandidateRecord[];
+  };
 }
 
 interface MemoryState {
@@ -100,6 +138,7 @@ interface MemoryState {
   goals: Map<string, Goal>;
   artifacts: Map<string, Artifact>;
   room: Room;
+  avatar: AvatarBook;
 }
 
 // Single player, goals, and the virtual room. Null dataFile means in-memory (tests).
@@ -109,6 +148,22 @@ let goals = new Map<string, Goal>();
 let artifacts = new Map<string, Artifact>();
 let room: Room = { placements: [] };
 let player: Player = makePlayer();
+let avatar: AvatarBook = emptyAvatar();
+
+let clock: () => Date = () => new Date();
+
+/** Tests pin the UTC day used by the avatar rate limit. Pass null to restore the real clock. */
+export function setClockForTests(fn: (() => Date) | null): void {
+  clock = fn ?? (() => new Date());
+}
+
+function currentDay(): string {
+  return clock().toISOString().slice(0, 10);
+}
+
+function emptyAvatar(): AvatarBook {
+  return { usageDay: "", usageCount: 0, candidates: [] };
+}
 
 export function currentDataFile(): string | null {
   return dataFile;
@@ -144,6 +199,7 @@ export function openStore(filePath: string | null): void {
         goals: loaded.goals,
         artifacts: loaded.artifacts,
         room: loaded.room,
+        avatar: loaded.avatar,
       });
     } catch (err) {
       dataFile = previous;
@@ -156,6 +212,7 @@ export function openStore(filePath: string | null): void {
   goals = loaded.goals;
   artifacts = loaded.artifacts;
   room = loaded.room;
+  avatar = loaded.avatar;
 }
 
 /** Replace memory with a new player and, when `seed` is true, the demo goals. Persists when a file is open. */
@@ -196,6 +253,70 @@ export function updatePlayer(patch: PlayerUpdate): PlayerView {
     else player.avatarUrl = avatarUrl;
   }
   writeState();
+  return getPlayer();
+}
+
+export interface AvatarQuota {
+  day: string;
+  limit: number;
+  used: number;
+  remaining: number;
+  candidates: Array<{ id: string; url: string }>;
+}
+
+/** Today's usage and the candidates from the latest generation. A new UTC day starts the count over. */
+export function avatarQuota(limit: number): AvatarQuota {
+  const day = currentDay();
+  const used = avatar.usageDay === day ? avatar.usageCount : 0;
+  const last = avatar.candidates.at(-1);
+  const candidates = last
+    ? avatar.candidates.filter((candidate) => candidate.generationId === last.generationId)
+    : [];
+  return {
+    day,
+    limit,
+    used,
+    remaining: Math.max(0, limit - used),
+    candidates: candidates.map((candidate) => ({ id: candidate.id, url: candidate.url })),
+  };
+}
+
+/**
+ * Records one successful generation and its candidates. Memory changes only after the file write.
+ * Throws {@link AvatarLimitReached} when today's count is already at `limit`.
+ */
+export function recordAvatarGeneration(input: {
+  limit: number;
+  candidates: Array<{ id: string; url: string }>;
+}): AvatarQuota {
+  const day = currentDay();
+  const next = cloneState();
+  const usedToday = next.avatar.usageDay === day ? next.avatar.usageCount : 0;
+  if (usedToday >= input.limit) throw new AvatarLimitReached(input.limit, usedToday);
+  const generationId = randomUUID();
+  const createdAt = clock().toISOString();
+  const stored: AvatarCandidateRecord[] = input.candidates.map((candidate) => ({
+    id: candidate.id,
+    url: candidate.url,
+    createdAt,
+    generationId,
+  }));
+  next.avatar = {
+    usageDay: day,
+    usageCount: usedToday + 1,
+    candidates: [...next.avatar.candidates, ...stored].slice(-48),
+  };
+  commitState(next);
+  return avatarQuota(input.limit);
+}
+
+/** Sets `player.avatarUrl` to a stored candidate. Memory changes only after the file write. */
+export function selectAvatar(candidateId: string): PlayerView {
+  const candidate = avatar.candidates.find((item) => item.id === candidateId);
+  if (!candidate || !isDisplayableImageUrl(candidate.url)) throw new AvatarCandidateNotFound();
+  const next = cloneState();
+  next.player = { ...next.player, avatarUrl: candidate.url };
+  commitState(next);
   return getPlayer();
 }
 
@@ -312,6 +433,7 @@ function freshState(seedGoals: boolean): MemoryState {
     goals: new Map(),
     artifacts: new Map(),
     room: { placements: [] },
+    avatar: emptyAvatar(),
   };
   if (seedGoals) {
     for (const demo of DEMO_GOALS) {
@@ -346,6 +468,11 @@ function cloneState(): MemoryState {
     goals: new Map([...goals].map(([id, goal]) => [id, { ...goal }])),
     artifacts: new Map([...artifacts].map(([id, artifact]) => [id, { ...artifact }])),
     room: { placements: room.placements.map((placement) => ({ ...placement })) },
+    avatar: {
+      usageDay: avatar.usageDay,
+      usageCount: avatar.usageCount,
+      candidates: avatar.candidates.map((candidate) => ({ ...candidate })),
+    },
   };
 }
 
@@ -356,6 +483,7 @@ function commitState(next: MemoryState): void {
   goals = next.goals;
   artifacts = next.artifacts;
   room = next.room;
+  avatar = next.avatar;
 }
 
 function hasLinkedPhoto(artifactMap: Map<string, Artifact>, goalId: string): boolean {
@@ -416,7 +544,7 @@ function storedPlayer(): Player {
 }
 
 function snapshot(): StoreFile {
-  return snapshotFrom({ player, goals, artifacts, room });
+  return snapshotFrom({ player, goals, artifacts, room, avatar });
 }
 
 function snapshotFrom(state: MemoryState): StoreFile {
@@ -438,6 +566,14 @@ function snapshotFrom(state: MemoryState): StoreFile {
     goals: [...state.goals.values()].map((goal) => ({ ...goal })),
     artifacts: [...state.artifacts.values()].map((artifact) => ({ ...artifact })),
     room: { placements: state.room.placements.map((placement) => ({ ...placement })) },
+    ...(state.avatar.usageCount > 0 || state.avatar.candidates.length > 0
+      ? {
+        avatar: {
+          usage: { day: state.avatar.usageDay, count: state.avatar.usageCount },
+          candidates: state.avatar.candidates.map((candidate) => ({ ...candidate })),
+        },
+      }
+      : {}),
   };
 }
 
@@ -480,6 +616,7 @@ function readState(file: string): {
   goals: Map<string, Goal>;
   artifacts: Map<string, Artifact>;
   room: Room;
+  avatar: AvatarBook;
   seededPlayer: boolean;
 } {
   const raw = readFileSync(file, "utf8");
@@ -507,6 +644,7 @@ function readState(file: string): {
 
   const loadedArtifacts = parseArtifacts(file, data.artifacts, loadedGoals);
   const loadedRoom = parseRoom(file, data.room, loadedArtifacts);
+  const loadedAvatar = parseAvatar(file, data.avatar);
 
   if (data.player == null) {
     return {
@@ -514,6 +652,7 @@ function readState(file: string): {
       goals: loadedGoals,
       artifacts: loadedArtifacts,
       room: loadedRoom,
+      avatar: loadedAvatar,
       seededPlayer: true,
     };
   }
@@ -522,6 +661,7 @@ function readState(file: string): {
     goals: loadedGoals,
     artifacts: loadedArtifacts,
     room: loadedRoom,
+    avatar: loadedAvatar,
     seededPlayer: false,
   };
 }
@@ -667,6 +807,51 @@ function parseArtifact(
     artifact.goalId = raw.goalId;
   }
   return artifact;
+}
+
+function parseAvatar(file: string, value: unknown): AvatarBook {
+  if (value === undefined) return emptyAvatar();
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw storeError(file, "invalid avatar");
+  const raw = value as Record<string, unknown>;
+  if (!raw.usage || typeof raw.usage !== "object" || Array.isArray(raw.usage)) {
+    throw storeError(file, "avatar.usage invalid");
+  }
+  const usage = raw.usage as Record<string, unknown>;
+  if (typeof usage.day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(usage.day)) {
+    throw storeError(file, "avatar.usage.day invalid");
+  }
+  if (typeof usage.count !== "number" || !Number.isInteger(usage.count) || usage.count < 0) {
+    throw storeError(file, "avatar.usage.count invalid");
+  }
+  if (!Array.isArray(raw.candidates)) throw storeError(file, "avatar.candidates must be an array");
+  const seen = new Set<string>();
+  const candidates = raw.candidates.map((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw storeError(file, `invalid avatar candidate at ${index}`);
+    }
+    const candidate = entry as Record<string, unknown>;
+    if (typeof candidate.id !== "string" || candidate.id.length < 1 || candidate.id.length > 80) {
+      throw storeError(file, `avatar candidate ${index} missing id`);
+    }
+    if (seen.has(candidate.id)) throw storeError(file, `duplicate avatar candidate ${candidate.id}`);
+    seen.add(candidate.id);
+    if (typeof candidate.url !== "string" || !isDisplayableImageUrl(candidate.url)) {
+      throw storeError(file, `avatar candidate ${index} has invalid url`);
+    }
+    if (typeof candidate.createdAt !== "string" || candidate.createdAt.length === 0) {
+      throw storeError(file, `avatar candidate ${index} missing createdAt`);
+    }
+    if (typeof candidate.generationId !== "string" || candidate.generationId.length === 0) {
+      throw storeError(file, `avatar candidate ${index} missing generationId`);
+    }
+    return {
+      id: candidate.id,
+      url: candidate.url,
+      createdAt: candidate.createdAt,
+      generationId: candidate.generationId,
+    };
+  });
+  return { usageDay: usage.day, usageCount: usage.count, candidates };
 }
 
 function parseRoom(file: string, value: unknown, loadedArtifacts: Map<string, Artifact>): Room {

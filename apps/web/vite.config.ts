@@ -5,7 +5,7 @@ const api = process.env.LEVEX_API ?? "http://127.0.0.1:3000";
 
 // Same-origin in dev: the page calls these paths, Vite forwards them to the API.
 // Uploaded pictures come back as `/uploads/…`, so that prefix is on the list too.
-const proxyPaths = ["/health", "/player", "/goals", "/artifacts", "/room", "/progress", "/spheres", "/uploads"];
+const proxyPaths = ["/health", "/player", "/goals", "/artifacts", "/room", "/progress", "/spheres", "/uploads", "/avatar"];
 
 export default defineConfig({
   plugins: [react()],
