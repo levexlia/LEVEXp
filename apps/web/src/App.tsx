@@ -250,11 +250,13 @@ export function App() {
           ) : null}
           <RoomScene
             placements={placements}
-            goals={goals}
             broken={broken}
             cheer={cheer}
             avatarUrl={player?.avatarUrl ?? null}
             onImageError={(id) => setBroken((current) => ({ ...current, [id]: true }))}
+            onCreateCharacter={() => {
+              window.location.hash = "avatar";
+            }}
           />
         </div>
         <QuestSlip

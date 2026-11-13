@@ -201,79 +201,193 @@ h1 {
   position: relative;
   border-radius: 14px;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse at 50% 18%, rgba(255, 214, 150, 0.16), transparent 42%),
-    linear-gradient(#2a211c, #14100e);
+  background: #1a120e;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
 }
 
-.time-dusk.room-frame { background: radial-gradient(ellipse at 40% 10%, rgba(240, 140, 80, 0.2), transparent 46%), #1a1214; }
-.time-night.room-frame { background: radial-gradient(ellipse at 70% 80%, rgba(255, 196, 90, 0.12), transparent 28%), #10141c; }
-
-.iso { display: block; width: 100%; height: auto; }
-
-.frame-label, .await-label {
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
-  font-size: 11px;
-  fill: #4a3728;
+.room-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1152 / 864;
 }
 
-.await-label { fill: #f0e2c8; font-size: 15px; }
+.room-art,
+.room-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
 
-.wall-plaque {
+.room-art { display: block; pointer-events: none; }
+
+.room-art img {
+  object-fit: cover;
+  object-position: 64% 46%;
+}
+
+.lamp-glow {
+  position: absolute;
+  left: 50%;
+  top: 20%;
+  width: 18%;
+  height: 22%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 206, 120, 0.42), rgba(255, 170, 60, 0) 70%);
+  pointer-events: none;
+  animation: flicker 3.4s ease-in-out infinite;
+}
+
+.fairy-lights i {
+  position: absolute;
+  width: 1.7%;
+  height: 2.3%;
+  margin: -0.8% 0 0 -0.8%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 236, 180, 0.95) 0 18%, rgba(255, 186, 70, 0.45) 40%, rgba(255, 170, 50, 0) 72%);
+  pointer-events: none;
+  animation: flicker 2.6s ease-in-out infinite;
+}
+
+.motes i {
+  position: absolute;
+  left: calc(34% + (var(--i) * 1.6%));
+  top: calc(16% + (var(--i) * 1.1%));
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 236, 196, 0.85);
+  box-shadow: 0 0 6px rgba(255, 214, 150, 0.8);
+  pointer-events: none;
+  animation: mote 7s linear infinite;
+  animation-delay: calc(var(--i) * -0.55s);
+}
+
+.wall-frame {
+  position: absolute;
   box-sizing: border-box;
-  width: 168px;
-  height: 28px;
+  padding: 0;
+  background: #f6efe4;
+  border: 2px solid #6b4428;
+  box-shadow:
+    0 0 0 1px #e7c98a,
+    1px 2px 5px rgba(40, 22, 10, 0.45);
+  border-radius: 1px;
+  cursor: pointer;
+  color: #6a5038;
+  overflow: hidden;
+}
+
+.wall-frame.empty { cursor: default; }
+
+.wall-frame img,
+.wall-blank {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 240, 0.55), rgba(90, 60, 30, 0.08)),
+    #f4ead8;
+}
+
+.wall-blank {
+  font-size: 0.55rem;
+  line-height: 1.2;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f6efe2;
-  border: 2px solid #6b4a30;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
-  font-size: 13px;
-  line-height: 1;
-  color: #3a2a1c;
-  cursor: pointer;
+  text-align: center;
+  padding: 0.15rem;
 }
 
-.wall-plaque span {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0 8px;
-}
-
-.caption-tip {
-  box-sizing: border-box;
-  width: 180px;
-  padding: 6px 8px;
+.wall-cap {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%);
+  max-width: 9rem;
+  padding: 0.2rem 0.4rem;
   background: #2a1c16;
   color: #f6ecdf;
   border: 1px solid #e0a84a;
-  border-radius: 4px;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
-  font-size: 12px;
-  line-height: 1.3;
+  border-radius: 3px;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  pointer-events: none;
 }
 
-.avatar { transform: translate(0, 0); }
-.avatar.walk { animation: stroll 2s ease-in-out; }
-.avatar.walk .bob { animation: step 0.28s ease-in-out infinite; }
-.breathe { animation: breathe 3.4s ease-in-out infinite; transform-box: fill-box; }
-.lid { transform: scaleY(0.08); transform-origin: center; transform-box: fill-box; animation: blink 5.2s infinite; }
-.arm-up { display: none; }
-.avatar.walk .arm-rest { display: none; }
-.avatar.walk .arm-up { display: block; }
+.wall-frame:hover .wall-cap,
+.wall-frame:focus-visible .wall-cap,
+.wall-frame.open .wall-cap { opacity: 1; }
 
-.fresh { animation: appear 0.7s ease-out; }
+.resident {
+  position: absolute;
+  left: 57.5%;
+  top: 31%;
+  width: 15%;
+  height: 46%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.ground-shadow {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 0;
+  height: 7%;
+  background: radial-gradient(ellipse, rgba(42, 24, 14, 0.38), rgba(42, 24, 14, 0) 70%);
+}
+
+.resident-figure,
+.silhouette {
+  display: block;
+  width: 100%;
+  height: 92%;
+  object-fit: contain;
+  object-position: center bottom;
+  transform-origin: center bottom;
+  animation: idle 3.6s ease-in-out infinite;
+}
+
+.resident.celebrate .resident-figure { animation: step-to-wall 2s ease-in-out; }
+
+.resident-cta {
+  pointer-events: auto;
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: #f6ecdf;
+  cursor: pointer;
+}
+
+.resident-cta span {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  padding: 0.18rem 0.5rem;
+  background: #2a1c16;
+  border: 1px solid #e0a84a;
+  border-radius: 99px;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
 
 .xp-pop {
   position: absolute;
-  left: 58%;
-  top: 38%;
-  z-index: 3;
+  left: 62%;
+  top: 34%;
+  z-index: 4;
   pointer-events: none;
 }
 
@@ -296,8 +410,8 @@ h1 {
 
 .gallery-count {
   position: absolute;
-  right: 0.75rem;
-  bottom: 0.65rem;
+  right: 3%;
+  top: 50%;
   margin: 0;
   padding: 0.22rem 0.55rem;
   background: #2a1c16;
@@ -530,29 +644,27 @@ h1 {
 
 .candidates button { width: 100%; }
 
-@keyframes breathe {
+@keyframes idle {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-1.6px); }
+  50% { transform: translateY(-1.6%); }
 }
 
-@keyframes blink {
-  0%, 90%, 100% { transform: scaleY(0.08); }
-  94%, 97% { transform: scaleY(1); }
-}
-
-@keyframes stroll {
+@keyframes step-to-wall {
   0%, 100% { transform: translate(0, 0); }
-  38%, 68% { transform: translate(var(--step-x), var(--step-y)); }
+  40%, 70% { transform: translate(10%, -8%); }
 }
 
-@keyframes step {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+@keyframes flicker {
+  0%, 100% { opacity: 0.55; }
+  35% { opacity: 0.95; }
+  55% { opacity: 0.4; }
+  78% { opacity: 0.8; }
 }
 
-@keyframes appear {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@keyframes mote {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  12% { opacity: 0.75; }
+  100% { transform: translate3d(10%, 22%, 0); opacity: 0; }
 }
 
 @keyframes rise {
@@ -578,20 +690,18 @@ h1 {
 
 @media (prefers-reduced-motion: reduce) {
   .bar > span,
-  .breathe,
-  .lid,
-  .avatar,
-  .avatar.walk,
-  .avatar.walk .bob,
-  .fresh,
+  .resident-figure,
+  .silhouette,
+  .resident.celebrate .resident-figure,
+  .lamp-glow,
+  .fairy-lights i,
+  .motes i,
   .xp-float,
   .spark {
     animation: none;
     transition: none;
   }
-  .lid { transform: scaleY(0.08); }
-  .avatar.walk .arm-rest { display: none; }
-  .avatar.walk .arm-up { display: block; }
   .xp-float { opacity: 1; transform: none; }
   .spark { opacity: 0; }
+  .motes { display: none; }
 }
