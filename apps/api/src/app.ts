@@ -36,8 +36,17 @@ import {
   saveImageUpload,
   UPLOAD_MAX_BYTES,
 } from "./uploads.js";
+import { registerAvatarRoutes } from "./avatar/routes.js";
+import type { AvatarGenerator } from "./avatar/generator.js";
 
-export function buildApp(opts: { logger?: boolean; uploadsDir?: string; maxUploadBytes?: number } = {}) {
+export function buildApp(opts: {
+  logger?: boolean;
+  uploadsDir?: string;
+  maxUploadBytes?: number;
+  avatarGenerator?: AvatarGenerator;
+  avatarDailyLimit?: number;
+  avatarCandidateCount?: number;
+} = {}) {
   const app = Fastify({
     logger: opts.logger ?? true,
     // Default Ajv removes unknown fields. Reject them so additionalProperties: false means 400.
@@ -50,6 +59,14 @@ export function buildApp(opts: { logger?: boolean; uploadsDir?: string; maxUploa
   });
 
   const uploadsDir = (): string => opts.uploadsDir ?? defaultUploadsDir();
+
+  registerAvatarRoutes(app, {
+    uploadsDir,
+    maxUploadBytes,
+    generator: opts.avatarGenerator,
+    dailyLimit: opts.avatarDailyLimit,
+    candidateCount: opts.avatarCandidateCount,
+  });
 
   app.get("/health", async () => ({ status: "ok", service: "levex-api" }));
 

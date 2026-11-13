@@ -213,3 +213,12 @@ export function progressFromProgression(progression: Progression): PlayerProgres
     xpBySphere: { ...progression.xpBySphere },
   };
 }
+
+export {
+  AVATAR_CANDIDATE_COUNT,
+  AVATAR_CANDIDATE_MAX,
+  AVATAR_CANDIDATE_MIN,
+  AVATAR_DAILY_LIMIT_DEFAULT,
+  AVATAR_STYLE_PROMPT,
+  clampAvatarCount,
+} from "./avatar.js";

@@ -42,16 +42,24 @@ export function RoomScene({
   broken,
   onImageError,
   cheer,
+  avatarUrl,
 }: {
   placements: Placement[];
   goals: Goal[];
   broken: Record<string, boolean>;
   onImageError: (id: string) => void;
   cheer: number;
+  avatarUrl?: string | null;
 }) {
   const stage = roomStage(hungWorkCount(goals, placements));
   const [timeOfDay] = useState<TimeOfDay>(readTimeOfDay);
   const [walking, setWalking] = useState(false);
+  const [avatarBroken, setAvatarBroken] = useState(false);
+  const portrait = avatarUrl && !avatarBroken && isDisplayableImageUrl(avatarUrl) ? avatarUrl.trim() : null;
+
+  useEffect(() => {
+    setAvatarBroken(false);
+  }, [avatarUrl]);
 
   useEffect(() => {
     if (cheer === 0) return;
@@ -113,11 +121,15 @@ export function RoomScene({
         <Photos placements={shown} goals={goals} broken={broken} onImageError={onImageError} />
 
         <g className={walking ? "avatar walk" : "avatar"} style={stepStyle}>
-          <Character />
+          {portrait ? (
+            <AvatarPhoto src={portrait} onError={() => setAvatarBroken(true)} />
+          ) : (
+            <Character />
+          )}
         </g>
 
         {placements.length === 0 ? (
-          <text x="470" y="250" textAnchor="middle" className="await-label">Стена ждёт первую работу</text>
+          <text x={portrait ? "600" : "470"} y={portrait ? "300" : "250"} textAnchor="middle" className="await-label">Стена ждёт первую работу</text>
         ) : null}
       </svg>
       {hidden > 0 ? (
@@ -556,6 +568,28 @@ function tipPos(anchor: { x: number; y: number }): { left: number; top: number }
 function safeImageSrc(value: string): string | null {
   if (!isDisplayableImageUrl(value)) return null;
   return value.trim();
+}
+
+/** Chosen portrait, standing where the drawn figure stood. Feet sit on the floor. */
+function AvatarPhoto({ src, onError }: { src: string; onError: () => void }) {
+  const foot = iso(2.72, 4.2, 2);
+  const w = 112;
+  const h = 184;
+  return (
+    <g className="breathe">
+      <image
+        href={src}
+        x={foot.x - w / 2}
+        y={foot.y - h}
+        width={w}
+        height={h}
+        preserveAspectRatio="xMidYMax meet"
+        onError={onError}
+      >
+        <title>Персонаж</title>
+      </image>
+    </g>
+  );
 }
 
 /** Cosmetic figure. Idle motion is decorative; it is not a progression system. */

@@ -1,16 +1,17 @@
 import { isDisplayableImageUrl, LIFE_SPHERES, XP_PER_LEVEL } from "@levex/domain";
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import {
-  ApiError,
   completeGoal,
   createArtifact,
   createGoal,
+  errorMessage,
   loadRoom,
   uploadImage,
   type Goal,
   type Placement,
   type Player,
 } from "./api";
+import { CharacterScreen } from "./CharacterScreen";
 import { QuestSlip, type QuestMode } from "./QuestSlip";
 import { RoomScene } from "./RoomScene";
 
@@ -32,6 +33,7 @@ export function App() {
   const [broken, setBroken] = useState<Record<string, boolean>>({});
   const [cheer, setCheer] = useState(0);
   const [floatXp, setFloatXp] = useState<{ amount: number; id: number } | null>(null);
+  const [screen, setScreen] = useState<"room" | "avatar">(readScreen);
 
   async function refresh(): Promise<void> {
     const data = await loadRoom();
@@ -40,6 +42,12 @@ export function App() {
     setPlacements(data.placements);
     setGoalId((current) => keepGoal(current, data.goals));
   }
+
+  useEffect(() => {
+    const onHash = () => setScreen(readScreen());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,9 +175,26 @@ export function App() {
     <div className="page">
       <header className="hud">
         <div className="hud-who">
-          <p className="mark">LEVEX</p>
-          <h1>{player?.nickname ?? (loading ? "…" : "Игрок")}</h1>
-          {player?.title ? <p className="epithet">{player.title}</p> : null}
+          <div className="who-row">
+            {avatarSrc(player?.avatarUrl) ? (
+              <img className="hud-face" src={avatarSrc(player?.avatarUrl) ?? ""} alt="" />
+            ) : null}
+            <div>
+              <p className="mark">LEVEX</p>
+              <h1>{player?.nickname ?? (loading ? "…" : "Игрок")}</h1>
+              {player?.title ? <p className="epithet">{player.title}</p> : null}
+              <button
+                type="button"
+                className="hud-create"
+                onClick={() => {
+                  if (screen === "avatar") closeAvatar(setScreen);
+                  else window.location.hash = "avatar";
+                }}
+              >
+                {screen === "avatar" ? "В комнату" : player?.avatarUrl ? "Сменить персонажа" : "Создать персонажа"}
+              </button>
+            </div>
+          </div>
         </div>
         <div className={`hud-xp${cheer ? " hot" : ""}`}>
           <div className="badge" aria-hidden="true">{player ? level : "–"}</div>
@@ -204,6 +229,16 @@ export function App() {
       </header>
 
       <main>
+        {screen === "avatar" ? (
+          <CharacterScreen
+            onClose={() => closeAvatar(setScreen)}
+            onPlayer={(next) => {
+              setPlayer(next);
+              closeAvatar(setScreen);
+            }}
+          />
+        ) : (
+        <>
         <div className="stage">
           {floatXp ? (
             <div className="xp-pop" key={floatXp.id} aria-hidden="true">
@@ -218,6 +253,7 @@ export function App() {
             goals={goals}
             broken={broken}
             cheer={cheer}
+            avatarUrl={player?.avatarUrl ?? null}
             onImageError={(id) => setBroken((current) => ({ ...current, [id]: true }))}
           />
         </div>
@@ -254,9 +290,26 @@ export function App() {
               .finally(() => setBusy(false));
           }}
         />
+        </>
+        )}
       </main>
     </div>
   );
+}
+
+function readScreen(): "room" | "avatar" {
+  return window.location.hash === "#avatar" ? "avatar" : "room";
+}
+
+function closeAvatar(setScreen: (screen: "room" | "avatar") => void): void {
+  const next = window.location.pathname + window.location.search;
+  window.history.pushState(null, "", next);
+  setScreen("room");
+}
+
+function avatarSrc(value: string | undefined): string | null {
+  if (!value || !isDisplayableImageUrl(value)) return null;
+  return value.trim();
 }
 
 function keepGoal(current: string, goals: Goal[]): string {
@@ -266,7 +319,5 @@ function keepGoal(current: string, goals: Goal[]): string {
 }
 
 function messageOf(err: unknown): string {
-  if (err instanceof ApiError) return err.message;
-  if (err instanceof Error && err.message) return err.message;
-  return "Что-то пошло не так";
+  return errorMessage(err);
 }

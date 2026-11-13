@@ -81,6 +81,13 @@ export function resolveUpload(
   return { filePath, mediaType };
 }
 
+/** Deletes a file this process stored. A bad or missing name is a no-op. */
+export function removeUpload(dir: string, name: string): void {
+  const found = resolveUpload(dir, name);
+  if (found === "bad-name" || found === "missing") return;
+  unlinkSync(found.filePath);
+}
+
 /** Identify an image from its bytes. The multipart Content-Type is not trusted. */
 export function imageExtension(bytes: Buffer): ImageExtension | null {
   if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
