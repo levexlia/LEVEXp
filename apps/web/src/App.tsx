@@ -1,4 +1,4 @@
-import { DEFAULT_AVATAR_CONFIG, MAP_NODES, XP_PER_LEVEL, type AvatarConfig, type MapNodeId } from "@levex/domain";
+import { DEFAULT_AVATAR_CONFIG, LIFE_SPHERES, MAP_NODES, XP_PER_LEVEL, mapNodeStates, type AvatarConfig, type MapNodeId } from "@levex/domain";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   completeGoal,
@@ -16,6 +16,8 @@ import {
 import { Avatar } from "./avatar/Avatar";
 import { AvatarBuilder } from "./AvatarBuilder";
 import { HomeMap, missionsFor } from "./HomeMap";
+import { avatarInView } from "./map/layout";
+import { KitIcon, SPHERE_ICON, type KitIconName } from "./map/KitIcon";
 import { Logo } from "./Logo";
 
 type Tab = "map" | "missions" | "resources" | "profile";
@@ -52,6 +54,9 @@ export function App() {
   const into = xp % XP_PER_LEVEL;
   const config = player?.avatarConfig ?? DEFAULT_AVATAR_CONFIG;
   const energy = player?.energy ?? { current: 50, max: 50 };
+  const doneSpheres = goals.filter((goal) => goal.status === "done" && goal.sphere).map((goal) => goal.sphere as string);
+  const currentNode = mapNodeStates({ level, doneSpheres }).find((node) => node.state === "current");
+  const avatarSpot = avatarInView(currentNode?.id ?? "home");
 
   function burst() {
     setCheer(true);
@@ -84,17 +89,19 @@ export function App() {
           <strong>LEVEX</strong>
         </div>
         <div className="meters">
-          <span className="pill">🔥 {player?.streak ?? 0}</span>
-          <span className="pill">⚡ {energy.current}/{energy.max}</span>
-          <span className="level-badge">Ур. {level}</span>
-        </div>
-        <div className="xp" role="progressbar" aria-valuenow={into} aria-valuemin={0} aria-valuemax={XP_PER_LEVEL}>
-          <span style={{ width: `${into}%` }} />
-          <em>{into} / {XP_PER_LEVEL} XP</em>
+          <span className="pill streak"><KitIcon name="streak" size={18} />{player?.streak ?? 0}</span>
+          <span className="pill energy"><KitIcon name="energy" size={18} />{energy.current}/{energy.max}</span>
+          <span className="pill level"><KitIcon name="level" size={18} />Ур. {level}</span>
         </div>
         <button type="button" className="mini" onClick={() => { setDraft(config); setBuilding(true); }} aria-label="Персонаж">
           <Avatar config={config} cheer={cheer} title="Персонаж" />
         </button>
+        <div className="xp-line">
+          <div className="xp" role="progressbar" aria-valuenow={into} aria-valuemin={0} aria-valuemax={XP_PER_LEVEL}>
+            <span style={{ width: `${into}%` }} />
+          </div>
+          <em>XP {into} / {XP_PER_LEVEL}</em>
+        </div>
       </header>
 
       <main>
@@ -106,15 +113,26 @@ export function App() {
               <Avatar config={config} cheer={cheer} title="Персонаж" />
             </aside>
             <div className="map-column">
-              <HomeMap level={level} goals={goals} onOpen={setNodeId} />
-              <button type="button" className="proof" onClick={() => setProof(true)}>
-                <span aria-hidden="true">📷</span>
-                Proof: загрузи фото
-              </button>
+              <div className="map-frame">
+                <HomeMap level={level} goals={goals} onOpen={setNodeId} />
+                <button
+                  type="button"
+                  className="map-avatar"
+                  style={avatarSpot}
+                  onClick={() => { setDraft(config); setBuilding(true); }}
+                  aria-label="Персонаж на карте"
+                >
+                  <Avatar config={config} cheer={cheer} decorative />
+                </button>
+                <button type="button" className="proof" onClick={() => setProof(true)}>
+                  <KitIcon name="camera" size={26} />
+                  Proof
+                </button>
+              </div>
             </div>
             <aside className="stage-side">
               <h2>Сегодня</h2>
-              <p className="streak-line">Серия: {player?.streak ?? 0} {dayWord(player?.streak ?? 0)}</p>
+              <p className="streak-line"><KitIcon name="streak" size={18} /> Серия: {player?.streak ?? 0} {dayWord(player?.streak ?? 0)}</p>
               <GoalList goals={goals.filter((goal) => goal.status === "open")} busy={busy} onDone={finish} />
             </aside>
           </div>
@@ -132,10 +150,10 @@ export function App() {
       </main>
 
       <nav className="dock" aria-label="Разделы">
-        <Dock id="map" tab={tab} label="Карта" onPick={setTab} />
-        <Dock id="missions" tab={tab} label="Миссии" onPick={setTab} />
-        <Dock id="resources" tab={tab} label="Ресурсы" onPick={setTab} />
-        <Dock id="profile" tab={tab} label="Профиль" onPick={setTab} />
+        <Dock id="map" tab={tab} label="Карта" icon="map" onPick={setTab} />
+        <Dock id="missions" tab={tab} label="Миссии" icon="missions" onPick={setTab} />
+        <Dock id="resources" tab={tab} label="Ресурсы" icon="resources" onPick={setTab} />
+        <Dock id="profile" tab={tab} label="Профиль" icon="profile" onPick={setTab} />
       </nav>
 
       {nodeId ? (
@@ -231,10 +249,11 @@ function dayWord(count: number): string {
   return "дней";
 }
 
-function Dock({ id, tab, label, onPick }: { id: Tab; tab: Tab; label: string; onPick: (id: Tab) => void }) {
+function Dock({ id, tab, label, icon, onPick }: { id: Tab; tab: Tab; label: string; icon: KitIconName; onPick: (id: Tab) => void }) {
   return (
     <button type="button" className={tab === id ? "dock-btn on" : "dock-btn"} onClick={() => onPick(id)}>
-      {label}
+      <KitIcon name={icon} size={26} />
+      <span>{label}</span>
     </button>
   );
 }
@@ -265,7 +284,10 @@ function Resources({ player }: { player: Player | null }) {
       <ul className="bars">
         {rows.map(([id, value]) => (
           <li key={id}>
-            <span>{id}</span>
+            <span className="sphere-name">
+              {SPHERE_ICON[id] ? <KitIcon name={SPHERE_ICON[id]} size={18} /> : null}
+              {LIFE_SPHERES.find((sphere) => sphere.id === id)?.name ?? id}
+            </span>
             <i><b style={{ width: `${Math.min(100, value ?? 0)}%` }} /></i>
             <strong>{value}</strong>
           </li>

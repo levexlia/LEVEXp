@@ -1,32 +1,32 @@
-import { MAP_NODES, mapNodeStates, type MapNodeId } from "@levex/domain";
+import { MAP_NODES, mapNodeStates, type MapNodeId, type MapNodeState } from "@levex/domain";
+import { useId } from "react";
 import type { Goal } from "./api";
+import { painted } from "./map/markup";
+import {
+  BADGE_CENTER,
+  BADGE_SCALE,
+  MAP_VIEW,
+  PLACES,
+  PROPS,
+  labelPoint,
+  partAnchor,
+  placeName,
+  ribbonPath,
+  segmentLit,
+  type Place,
+} from "./map/layout";
 
-/**
- * The path is read from the bottom upward:
- * Дом → Учебный центр → Парк → Мастерская → Центр LEVEX.
- * Labels sit off the stroke and off the hex so they do not cover either.
- */
-const SPOTS: Record<MapNodeId, {
-  x: number;
-  y: number;
-  lx: number;
-  ly: number;
-  anchor: "start" | "end" | "middle";
-}> = {
-  home: { x: 168, y: 498, lx: -60, ly: 4, anchor: "end" },
-  study: { x: 206, y: 386, lx: -62, ly: 18, anchor: "end" },
-  park: { x: 108, y: 274, lx: -54, ly: 4, anchor: "end" },
-  workshop: { x: 228, y: 162, lx: 56, ly: 4, anchor: "start" },
-  center: { x: 180, y: 72, lx: 0, ly: -44, anchor: "middle" },
+const BADGE_ART: Record<MapNodeState, string> = {
+  done: "badge_done_full",
+  current: "badge_current_full",
+  locked: "badge_locked_full",
 };
 
-const ROUTE = [
-  "M168 498",
-  "Q196 446 206 386",
-  "Q168 328 108 274",
-  "Q156 214 228 162",
-  "Q248 116 180 72",
-].join(" ");
+const HALO_ART: Record<MapNodeState, string> = {
+  done: "badge_halo_done",
+  current: "badge_halo_current",
+  locked: "badge_halo_locked",
+};
 
 export function HomeMap({
   level,
@@ -37,107 +37,152 @@ export function HomeMap({
   goals: Goal[];
   onOpen: (id: MapNodeId) => void;
 }) {
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const doneSpheres = goals.filter((goal) => goal.status === "done" && goal.sphere).map((goal) => goal.sphere as string);
   const nodes = mapNodeStates({ level, doneSpheres });
+  const stateOf = new Map(nodes.map((node) => [node.id, node.state]));
+  const scenery = [
+    ...PROPS.map((prop) => ({ ...prop, y: prop.at[1], location: null as MapNodeId | null })),
+    ...PLACES.map((place) => ({ part: place.building, at: place.at, scale: place.scale, locked: false, y: place.at[1], location: place.id })),
+  ].sort((a, b) => a.y - b.y);
+
   return (
-    <svg className="district" viewBox="0 0 360 560" role="img" aria-label="Карта района: Дом, Учебный центр, Парк, Мастерская, Центр LEVEX">
-      <City />
-      <path className="route" d={ROUTE} fill="none" stroke="url(#path-glow)" strokeWidth="16" strokeLinecap="round" />
-      {nodes.map((node) => {
-        const spot = SPOTS[node.id];
+    <svg
+      className="district"
+      viewBox={`${MAP_VIEW.x} ${MAP_VIEW.y} ${MAP_VIEW.w} ${MAP_VIEW.h}`}
+      role="img"
+      aria-label="Карта района: Дом, Учебный центр, Парк, Мастерская, Центр LEVEX"
+    >
+      <defs>
+        <linearGradient id={`${uid}-sky`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#0B0B1F" />
+          <stop offset="1" stopColor="#14123a" />
+        </linearGradient>
+        <pattern id={`${uid}-ground`} width="128" height="64" patternUnits="userSpaceOnUse" patternTransform="scale(0.5)">
+          <g dangerouslySetInnerHTML={{ __html: painted("ground_tile") }} />
+        </pattern>
+        <filter id={`${uid}-glow`} x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="7" />
+        </filter>
+      </defs>
+      <rect x={MAP_VIEW.x} y={MAP_VIEW.y} width={MAP_VIEW.w} height={MAP_VIEW.h} fill={`url(#${uid}-sky)`} pointerEvents="none" />
+      <rect x={MAP_VIEW.x - 40} y={MAP_VIEW.y} width={MAP_VIEW.w + 80} height={MAP_VIEW.h} fill={`url(#${uid}-ground)`} pointerEvents="none" />
+      {scenery.map((item, index) => {
+        const state = item.location ? stateOf.get(item.location) : undefined;
+        const locked = item.locked || state === "locked";
+        const [ax, ay] = partAnchor(item.part);
+        const halo = item.location && state ? `halo_${item.part}` : item.locked ? `halo_${item.part}` : null;
         return (
-          <g key={node.id} transform={`translate(${spot.x} ${spot.y})`}>
+          <g key={`${item.part}-${index}`}>
+            {halo ? (
+              <g
+                className={state === "current" ? "bld-halo current" : "bld-halo"}
+                filter={`url(#${uid}-glow)`}
+                opacity={state === "current" ? 0.7 : state === "done" ? 0.4 : 0.22}
+                transform={placeTransform([item.at[0], item.at[1] + 8], item.scale * 1.08, ax, ay)}
+                dangerouslySetInnerHTML={{ __html: painted(halo, locked) }}
+              />
+            ) : null}
             <g
-              className={`node ${node.state}`}
-              role="button"
-              tabIndex={0}
-              aria-label={node.name}
-              onClick={() => {
-                if (node.state !== "locked") onOpen(node.id);
-              }}
-              onKeyDown={(event) => {
-                if ((event.key === "Enter" || event.key === " ") && node.state !== "locked") {
-                  event.preventDefault();
-                  onOpen(node.id);
-                }
-              }}
-            >
-              <polygon points="0,-28 24,-14 24,14 0,28 -24,14 -24,-14" />
-              {node.state === "done" ? <path d="M-8 0 l6 7 12-14" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" /> : null}
-              {node.state === "locked" ? <Lock /> : null}
-              {node.state === "current" ? <circle r="6" fill="#fff" /> : null}
-            </g>
+              transform={placeTransform(item.at, item.scale, ax, ay)}
+              dangerouslySetInnerHTML={{ __html: painted(item.part, locked) }}
+              onClick={item.location && state !== "locked" ? () => onOpen(item.location as MapNodeId) : undefined}
+            />
           </g>
         );
       })}
-      {nodes.map((node) => {
-        const spot = SPOTS[node.id];
-        const lines = labelLines(node.name);
+      {PLACES.slice(0, -1).map((place, index) => {
+        const next = PLACES[index + 1]!;
+        const lit = segmentLit(stateOf.get(next.id) ?? "locked");
+        const d = ribbonPath(place.badge, next.badge);
         return (
-          <text
-            key={`${node.id}-label`}
-            className="node-label"
-            x={spot.x + spot.lx}
-            y={spot.y + spot.ly}
-            textAnchor={spot.anchor}
-            fontSize="12"
-          >
-            {lines.map((line, index) => (
-              <tspan key={line} x={spot.x + spot.lx} dy={index === 0 ? 0 : 15}>{line}</tspan>
-            ))}
-          </text>
+          <g key={`path-${place.id}`}>
+            <path d={d} fill="none" stroke="#0a1c46" strokeWidth="20" strokeLinecap="round" pointerEvents="none" />
+            <path
+              d={d}
+              fill="none"
+              stroke={lit ? "#25cbfd" : "#8e94ae"}
+              strokeWidth="11"
+              strokeLinecap="round"
+              strokeDasharray={lit ? undefined : "1 18"}
+              pointerEvents="none"
+            />
+          </g>
         );
       })}
+      {PLACES.map((place) => (
+        <NodeBadge
+          key={place.id}
+          place={place}
+          state={stateOf.get(place.id) ?? "locked"}
+          onOpen={onOpen}
+        />
+      ))}
     </svg>
   );
 }
 
-function labelLines(name: string): string[] {
-  if (name === "Учебный центр") return ["Учебный", "центр"];
-  return [name];
+function placeTransform(at: [number, number], scale: number, ax: number, ay: number): string {
+  return `translate(${at[0]} ${at[1]}) scale(${scale}) translate(${-ax} ${-ay})`;
 }
 
-function Lock() {
+function NodeBadge({
+  place,
+  state,
+  onOpen,
+}: {
+  place: Place;
+  state: MapNodeState;
+  onOpen: (id: MapNodeId) => void;
+}) {
+  const name = placeName(place.id);
+  const [lx, ly] = labelPoint(place);
+  const width = Math.ceil(name.length * 7.15 + 18);
+  const open = () => {
+    if (state !== "locked") onOpen(place.id);
+  };
   return (
-    <g fill="none" stroke="#CBD5E1" strokeWidth="2.4">
-      <rect x="-7" y="-2" width="14" height="12" rx="2" />
-      <path d="M-4 -2 v-4 a4 4 0 0 1 8 0 v4" />
+    <g className={`map-node ${state}`} data-node={place.id}>
+      <g
+        role="button"
+        tabIndex={state === "locked" ? -1 : 0}
+        aria-disabled={state === "locked" || undefined}
+        aria-label={name}
+        onClick={open}
+        onKeyDown={(event) => {
+          if ((event.key === "Enter" || event.key === " ") && state !== "locked") {
+            event.preventDefault();
+            open();
+          }
+        }}
+      >
+        <g
+          className={state === "current" ? "badge-halo current" : "badge-halo"}
+          transform={placeTransform(place.badge, state === "current" ? 0.125 : 0.105, BADGE_CENTER[0], BADGE_CENTER[1])}
+          dangerouslySetInnerHTML={{ __html: painted(HALO_ART[state]) }}
+        />
+        <g
+          transform={placeTransform(place.badge, BADGE_SCALE, BADGE_CENTER[0], BADGE_CENTER[1])}
+          dangerouslySetInnerHTML={{ __html: painted(BADGE_ART[state]) }}
+        />
+        <circle cx={place.badge[0]} cy={place.badge[1]} r="34" fill="#fff" opacity="0" />
+      </g>
+      <g onClick={open} style={{ cursor: state === "locked" ? "default" : "pointer" }}>
+        <rect x={lx - width / 2} y={ly - 14} width={width} height={19} rx="9" fill="#14122c" opacity="0.94" />
+        <text
+          x={lx}
+          y={ly}
+          textAnchor="middle"
+          fontSize="12.5"
+          fontWeight="600"
+          fontFamily="Fredoka, Inter, sans-serif"
+          fill={state === "locked" ? "#aeb4d0" : "#ffffff"}
+        >
+          {name}
+        </text>
+      </g>
     </g>
   );
-}
-
-function City() {
-  const blocks = [
-    [18, 40, 36, 70], [70, 24, 28, 50], [250, 30, 40, 80], [300, 70, 34, 60],
-    [20, 180, 30, 54], [300, 200, 36, 70], [30, 340, 40, 48], [300, 360, 32, 64],
-    [40, 470, 28, 40], [290, 480, 40, 50],
-  ];
-  return (
-    <g className="city">
-      <defs>
-        <linearGradient id="path-glow" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0" stopColor="#7C3AED" />
-          <stop offset="1" stopColor="#22D3EE" />
-        </linearGradient>
-      </defs>
-      {blocks.map(([x, y, w, h]) => (
-        <g key={`${x}-${y}`}>
-          <rect x={x} y={y} width={w} height={h} rx="4" fill="#15132E" stroke="#312E81" />
-          {windows(x!, y!, w!, h!)}
-        </g>
-      ))}
-    </g>
-  );
-}
-
-function windows(x: number, y: number, w: number, h: number) {
-  const dots = [];
-  for (let row = y + 8; row < y + h - 6; row += 12) {
-    for (let col = x + 6; col < x + w - 6; col += 10) {
-      dots.push(<rect key={`${row}-${col}`} x={col} y={row} width="4" height="5" rx="1" fill="#67E8F9" opacity="0.8" />);
-    }
-  }
-  return dots;
 }
 
 export function missionsFor(nodeId: MapNodeId, goals: Goal[]): Goal[] {
