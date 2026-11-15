@@ -1,5 +1,7 @@
 // Доменные типы + чистые функции прогрессии.
 
+import type { AvatarConfig } from "./avatarConfig.js";
+
 export type LifeSphereId =
   | "health" | "mind" | "career" | "finance" | "relationships"
   | "creativity" | "spirit" | "community";
@@ -141,6 +143,8 @@ export interface Player {
   title?: string;
   /** Optional avatar URL. Omitted when unset. */
   avatarUrl?: string;
+  /** Vector avatar parts. Omitted until the player saves a look. */
+  avatarConfig?: AvatarConfig;
   /** Stored progress. `totalXp` is the `xp` returned by the progress API. */
   progression: Progression;
 }
@@ -151,6 +155,8 @@ export interface Goal {
   id: string;
   title: string;
   sphere?: LifeSphereId;
+  /** ISO time of the first completion. Omitted for goals finished before streaks existed. */
+  completedAt?: string;
   /**
    * Activity XP granted once on the first completion. The server sets it
    * ({@link xpForGoal}); the client does not. Not a mastery score.
@@ -222,3 +228,31 @@ export {
   AVATAR_STYLE_PROMPT,
   clampAvatarCount,
 } from "./avatar.js";
+
+export {
+  ACCESSORIES,
+  DEFAULT_AVATAR_CONFIG,
+  EMOTIONS,
+  EYE_STYLES,
+  HAIR_COLORS,
+  HAIR_STYLES,
+  OUTFITS,
+  SKIN_TONES,
+  lookFromPhoto,
+  looksFromPhoto,
+  parseAvatarConfig,
+} from "./avatarConfig.js";
+export type {
+  Accessory,
+  AvatarConfig,
+  Emotion,
+  EyeStyle,
+  HairColor,
+  HairStyle,
+  Outfit,
+  SkinTone,
+} from "./avatarConfig.js";
+
+export { ENERGY_MAX, ENERGY_PER_COMPLETION, energyForDay, streakDays, utcDay } from "./streak.js";
+export { MAP_NODES, mapNodeStates } from "./map.js";
+export type { MapNode, MapNodeId, MapNodeState } from "./map.js";

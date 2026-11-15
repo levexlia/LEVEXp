@@ -18,6 +18,7 @@ import {
   type Artifact,
   type Goal,
   type LifeSphereId,
+  parseAvatarConfig,
   type Player,
   type PlayerProgress,
   type Progression,
@@ -159,6 +160,11 @@ export function setClockForTests(fn: (() => Date) | null): void {
 
 function currentDay(): string {
   return clock().toISOString().slice(0, 10);
+}
+
+/** The clock used for streaks, energy, and the avatar day limit. */
+export function currentTime(): Date {
+  return clock();
 }
 
 function emptyAvatar(): AvatarBook {
@@ -310,6 +316,23 @@ export function recordAvatarGeneration(input: {
   return avatarQuota(input.limit);
 }
 
+export class InvalidAvatarConfig extends Error {
+  constructor() {
+    super("avatar config is invalid");
+    this.name = "InvalidAvatarConfig";
+  }
+}
+
+/** Replaces the vector look. Memory changes only after the file write. */
+export function setAvatarConfig(value: unknown): PlayerView {
+  const config = parseAvatarConfig(value);
+  if (!config) throw new InvalidAvatarConfig();
+  const next = cloneState();
+  next.player = { ...next.player, avatarConfig: config };
+  commitState(next);
+  return getPlayer();
+}
+
 /** Sets `player.avatarUrl` to a stored candidate. Memory changes only after the file write. */
 export function selectAvatar(candidateId: string): PlayerView {
   const candidate = avatar.candidates.find((item) => item.id === candidateId);
@@ -359,6 +382,7 @@ export function completeGoal(
     });
     nextGoal.xpReward = amount;
     nextGoal.status = "done";
+    nextGoal.completedAt = clock().toISOString();
     next.player = playerWithXp(next.player, amount, nextGoal.sphere);
   }
   if (willLink && artifact) {
@@ -539,6 +563,7 @@ function storedPlayer(): Player {
     createdAt: player.createdAt,
     ...(player.title !== undefined ? { title: player.title } : {}),
     ...(player.avatarUrl !== undefined ? { avatarUrl: player.avatarUrl } : {}),
+    ...(player.avatarConfig !== undefined ? { avatarConfig: { ...player.avatarConfig } } : {}),
     progression,
   };
 }
@@ -561,6 +586,7 @@ function snapshotFrom(state: MemoryState): StoreFile {
       createdAt: state.player.createdAt,
       ...(state.player.title !== undefined ? { title: state.player.title } : {}),
       ...(state.player.avatarUrl !== undefined ? { avatarUrl: state.player.avatarUrl } : {}),
+      ...(state.player.avatarConfig !== undefined ? { avatarConfig: { ...state.player.avatarConfig } } : {}),
       progression,
     },
     goals: [...state.goals.values()].map((goal) => ({ ...goal })),
@@ -690,6 +716,11 @@ function parsePlayer(file: string, value: unknown): Player {
     if (typeof raw.avatarUrl !== "string") throw storeError(file, "player avatarUrl invalid");
     parsed.avatarUrl = raw.avatarUrl;
   }
+  if (raw.avatarConfig != null) {
+    const config = parseAvatarConfig(raw.avatarConfig);
+    if (!config) throw storeError(file, "player avatarConfig invalid");
+    parsed.avatarConfig = config;
+  }
   return parsed;
 }
 
@@ -736,6 +767,12 @@ function parseGoal(file: string, value: unknown, index: number): Goal {
   }
   if (raw.status !== "open" && raw.status !== "done") throw storeError(file, `goal ${index} has invalid status`);
   const goal: Goal = { id: raw.id, title: raw.title, xpReward: raw.xpReward, status: raw.status };
+  if (raw.completedAt !== undefined) {
+    if (typeof raw.completedAt !== "string" || raw.completedAt.length === 0) {
+      throw storeError(file, `goal ${index} has invalid completedAt`);
+    }
+    goal.completedAt = raw.completedAt;
+  }
   if (raw.sphere !== undefined) {
     if (typeof raw.sphere !== "string" || !getLifeSphere(raw.sphere)) {
       throw storeError(file, `goal ${index} has invalid sphere`);

@@ -16,6 +16,8 @@ import {
 export interface AvatarGeneration extends AvatarQuota {
   provider: AvatarGenerator["id"];
   sourceUrl?: string;
+  /** Vector part choices read from the selfie. Omitted when the provider cannot map one. */
+  looks?: import("@levex/domain").AvatarConfig[];
 }
 
 const MEDIA: Record<string, AvatarMediaType> = {
@@ -72,6 +74,13 @@ export async function generateAvatars(input: {
       provider: input.generator.id,
     };
     if (input.keepOriginal) generation.sourceUrl = selfie.url;
+    if (input.generator.look) {
+      try {
+        generation.looks = await input.generator.look(input.bytes, count);
+      } catch (err) {
+        if (!(err instanceof AvatarProviderError)) throw err;
+      }
+    }
     return generation;
   } catch (err) {
     if (!committed) {

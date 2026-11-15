@@ -1,8 +1,21 @@
+export interface AvatarConfig {
+  skin: "peach" | "light" | "tan" | "amber" | "brown" | "deep";
+  hair: "short" | "bob" | "wavy" | "long" | "bun" | "ponytail" | "curly" | "pigtails";
+  hairColor: "black" | "brown" | "auburn" | "blonde" | "pink" | "cyan";
+  eyes: "round" | "soft" | "sharp" | "wide";
+  outfit: "hoodie" | "tee" | "jacket" | "dress";
+  accessory: "none" | "glasses" | "star" | "headphones";
+  emotion: "happy" | "proud" | "sleepy" | "surprised";
+}
+
 export interface Player {
   id: string;
   nickname: string;
   title?: string;
   avatarUrl?: string;
+  avatarConfig?: AvatarConfig;
+  streak?: number;
+  energy?: { current: number; max: number };
   progress: {
     xp: number;
     level: number;
@@ -16,6 +29,7 @@ export interface Goal {
   sphere?: string;
   xpReward: number;
   status: "open" | "done";
+  completedAt?: string;
 }
 
 export interface Artifact {
@@ -49,6 +63,7 @@ export interface AvatarStatus {
   used: number;
   remaining: number;
   candidates: AvatarCandidate[];
+  looks?: AvatarConfig[];
   sourceUrl?: string;
 }
 
@@ -89,8 +104,16 @@ export async function loadRoom(): Promise<RoomData> {
   return { player, goals, placements: room.placements };
 }
 
-export function createGoal(title: string): Promise<Goal> {
-  return sendJson<Goal>("/goals", { title, sphere: "creativity" });
+export function createGoal(title: string, sphere = "creativity"): Promise<Goal> {
+  return sendJson<Goal>("/goals", { title, sphere });
+}
+
+export function saveAvatar(config: AvatarConfig): Promise<Player> {
+  return request<Player>("/player/avatar", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(config),
+  });
 }
 
 export function createArtifact(input: { title: string; imageUrl: string; goalId: string }): Promise<Artifact> {

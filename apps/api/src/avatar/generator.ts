@@ -6,6 +6,8 @@ import {
   AVATAR_CANDIDATE_COUNT,
   AVATAR_DAILY_LIMIT_DEFAULT,
   clampAvatarCount,
+  looksFromPhoto,
+  type AvatarConfig,
 } from "@levex/domain";
 
 const FIXTURES = [0, 1, 2].map((index) =>
@@ -30,6 +32,8 @@ export interface AvatarImage {
 export interface AvatarGenerator {
   readonly id: "mock" | "openai" | "xai";
   generate(input: AvatarGeneratorInput): Promise<AvatarImage[]>;
+  /** Map a selfie onto vector parts. Image bytes stay a separate path. */
+  look?(photo: Buffer, count: number): Promise<AvatarConfig[]>;
 }
 
 /**
@@ -51,6 +55,10 @@ export class MockAvatarGenerator implements AvatarGenerator {
       const bytes = index < FIXTURES.length ? png : Buffer.concat([png, Buffer.from([index])]);
       return { mediaType: "image/png" as const, bytes };
     });
+  }
+
+  async look(photo: Buffer, count: number): Promise<AvatarConfig[]> {
+    return looksFromPhoto(photo, clampAvatarCount(count));
   }
 }
 
@@ -109,8 +117,63 @@ export function createOpenAIAvatarGenerator(opts: {
       if (images.length < input.count) throw new AvatarProviderError(new Error("openai returned too few images"));
       return images.slice(0, input.count);
     },
+    async look(photo, count) {
+      const media = photo[0] === 0xff ? "image/jpeg" : photo[0] === 0x52 ? "image/webp" : "image/png";
+      const model = process.env.OPENAI_VISION_MODEL?.trim() || "gpt-4.1-mini";
+      let response: Response;
+      try {
+        response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            response_format: { type: "json_object" },
+            messages: [{
+              role: "user",
+              content: [
+                { type: "text", text: VISION_LOOK_PROMPT },
+                { type: "image_url", image_url: { url: `data:${media};base64,${photo.toString("base64")}` } },
+              ],
+            }],
+          }),
+          signal: AbortSignal.timeout(60_000),
+        });
+      } catch (err) {
+        throw new AvatarProviderError(err);
+      }
+      if (!response.ok) throw new AvatarProviderError(new Error(`openai vision ${response.status}`));
+      const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+      const text = payload.choices?.[0]?.message?.content;
+      if (!text) throw new AvatarProviderError(new Error("openai vision returned no json"));
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch (err) {
+        throw new AvatarProviderError(err);
+      }
+      const { parseAvatarConfig: parseLook, looksFromPhoto: vary } = await import("@levex/domain");
+      const config = parseLook(parsed);
+      if (!config) throw new AvatarProviderError(new Error("openai vision json is not a look"));
+      const varied = vary(photo, count);
+      return [config, ...varied.slice(1)].slice(0, count);
+    },
   };
 }
+
+const VISION_LOOK_PROMPT = [
+  "Look at the person and answer with one JSON object only.",
+  "Keys: skin, hair, hairColor, eyes, outfit, accessory, emotion.",
+  "skin: peach light tan amber brown deep.",
+  "hair: short bob wavy long bun ponytail curly pigtails.",
+  "hairColor: black brown auburn blonde pink cyan.",
+  "eyes: round soft sharp wide.",
+  "outfit: hoodie tee jacket dress.",
+  "accessory: none glasses star headphones.",
+  "emotion: happy proud sleepy surprised.",
+].join(" ");
 
 export function createXaiAvatarGenerator(opts: {
   apiKey: string;

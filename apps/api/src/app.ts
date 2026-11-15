@@ -5,11 +5,20 @@ import {
   ARTIFACT_IMAGE_URL_MAX_LENGTH,
   ARTIFACT_KINDS,
   ARTIFACT_TITLE_MAX_LENGTH,
+  ACCESSORIES,
   AVATAR_URL_MAX_LENGTH,
+  EMOTIONS,
+  EYE_STYLES,
+  HAIR_COLORS,
+  HAIR_STYLES,
+  OUTFITS,
+  SKIN_TONES,
+  energyForDay,
   getLifeSphere,
   LIFE_SPHERE_IDS,
   listLifeSpheres,
   NICKNAME_MAX_LENGTH,
+  streakDays,
   TITLE_MAX_LENGTH,
 } from "@levex/domain";
 import {
@@ -18,14 +27,17 @@ import {
   completeGoal,
   createArtifact,
   createGoal,
+  currentTime,
   getPlayer,
   getProgress,
   getRoom,
   InvalidArtifact,
+  InvalidAvatarConfig,
   InvalidGoalUpdate,
   InvalidPlayerUpdate,
   listArtifacts,
   listGoals,
+  setAvatarConfig,
   updatePlayer,
   type ArtifactInput,
 } from "./store.js";
@@ -178,7 +190,42 @@ export function buildApp(opts: {
 
   app.get("/progress", async () => getProgress());
 
-  app.get("/player", async () => getPlayer());
+  app.get("/player", async () => {
+    const player = getPlayer();
+    const times = listGoals().map((goal) => goal.completedAt);
+    const now = currentTime();
+    return {
+      ...player,
+      streak: streakDays(times, now),
+      energy: energyForDay(times, now),
+    };
+  });
+
+  app.put("/player/avatar", {
+    schema: {
+      body: {
+        type: "object",
+        additionalProperties: false,
+        required: ["skin", "hair", "hairColor", "eyes", "outfit", "accessory", "emotion"],
+        properties: {
+          skin: { type: "string", enum: [...SKIN_TONES] },
+          hair: { type: "string", enum: [...HAIR_STYLES] },
+          hairColor: { type: "string", enum: [...HAIR_COLORS] },
+          eyes: { type: "string", enum: [...EYE_STYLES] },
+          outfit: { type: "string", enum: [...OUTFITS] },
+          accessory: { type: "string", enum: [...ACCESSORIES] },
+          emotion: { type: "string", enum: [...EMOTIONS] },
+        },
+      },
+    },
+  }, async (req, reply) => {
+    try {
+      return setAvatarConfig(req.body);
+    } catch (err) {
+      if (err instanceof InvalidAvatarConfig) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
+  });
 
   app.patch("/player", {
     schema: {

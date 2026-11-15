@@ -1,325 +1,339 @@
-import { isDisplayableImageUrl, LIFE_SPHERES, XP_PER_LEVEL } from "@levex/domain";
-import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { DEFAULT_AVATAR_CONFIG, MAP_NODES, XP_PER_LEVEL, type AvatarConfig, type MapNodeId } from "@levex/domain";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   completeGoal,
   createArtifact,
   createGoal,
   errorMessage,
+  generateAvatar,
   loadRoom,
+  saveAvatar,
   uploadImage,
   type Goal,
   type Placement,
   type Player,
 } from "./api";
-import { CharacterScreen } from "./CharacterScreen";
-import { QuestSlip, type QuestMode } from "./QuestSlip";
-import { RoomScene } from "./RoomScene";
+import { AvatarBuilder } from "./AvatarBuilder";
+import { AvatarFigure } from "./AvatarFigure";
+import { HomeMap, missionsFor } from "./HomeMap";
+import { Logo } from "./Logo";
+
+type Tab = "map" | "missions" | "resources" | "profile";
 
 export function App() {
   const [player, setPlayer] = useState<Player | null>(null);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
-  const [goalId, setGoalId] = useState("");
-  const [goalTitle, setGoalTitle] = useState("");
-  const [photoTitle, setPhotoTitle] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [fileKey, setFileKey] = useState(0);
-  const [wantNew, setWantNew] = useState(false);
+  const [tab, setTab] = useState<Tab>("map");
+  const [building, setBuilding] = useState(false);
+  const [draft, setDraft] = useState<AvatarConfig>(DEFAULT_AVATAR_CONFIG);
+  const [nodeId, setNodeId] = useState<MapNodeId | null>(null);
+  const [proof, setProof] = useState(false);
+  const [cheer, setCheer] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [broken, setBroken] = useState<Record<string, boolean>>({});
-  const [cheer, setCheer] = useState(0);
-  const [floatXp, setFloatXp] = useState<{ amount: number; id: number } | null>(null);
-  const [screen, setScreen] = useState<"room" | "avatar">(readScreen);
 
-  async function refresh(): Promise<void> {
+  async function refresh(): Promise<Player> {
     const data = await loadRoom();
     setPlayer(data.player);
     setGoals(data.goals);
     setPlacements(data.placements);
-    setGoalId((current) => keepGoal(current, data.goals));
+    if (data.player.avatarConfig) setDraft(data.player.avatarConfig);
+    return data.player;
   }
 
   useEffect(() => {
-    const onHash = () => setScreen(readScreen());
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
+    refresh().catch((err: unknown) => setError(errorMessage(err)));
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    loadRoom()
-      .then((data) => {
-        if (cancelled) return;
-        setPlayer(data.player);
-        setGoals(data.goals);
-        setPlacements(data.placements);
-        setGoalId(keepGoal("", data.goals));
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(messageOf(err));
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const creativity = goals.filter((goal) => goal.sphere === "creativity");
-  const openGoals = creativity.filter((goal) => goal.status === "open");
-  const mode: QuestMode = loading && !player
-    ? "loading"
-    : openGoals.length > 0
-      ? "photo"
-      : wantNew || creativity.length === 0
-        ? "name"
-        : "rest";
-
-  async function onCreateGoal(event: FormEvent) {
-    event.preventDefault();
-    const title = goalTitle.trim();
-    if (!title) {
-      setError("Введите название работы");
-      setNotice(null);
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-    try {
-      const created = await createGoal(title);
-      await refresh();
-      setGoalId(created.id);
-      setGoalTitle("");
-      setWantNew(false);
-      setNotice(`Квест «${created.title}» открыт. Осталось принести фото.`);
-    } catch (err) {
-      setError(messageOf(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onPlacePhoto(event: FormEvent) {
-    event.preventDefault();
-    const selected = openGoals.find((goal) => goal.id === goalId) ?? openGoals[0];
-    const title = photoTitle.trim();
-    const pasted = imageUrl.trim();
-    if (!selected) {
-      setError("Сначала назови работу");
-      setNotice(null);
-      return;
-    }
-    if (!title) {
-      setError("Подпишите фото");
-      setNotice(null);
-      return;
-    }
-    if (!file && !pasted) {
-      setError("Выберите файл или вставьте ссылку");
-      setNotice(null);
-      return;
-    }
-    if (!file && !isDisplayableImageUrl(pasted)) {
-      setError("Нужна ссылка http(s) или адрес /uploads/…");
-      setNotice(null);
-      return;
-    }
-    const before = player?.progress.xp ?? 0;
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-    let placed = false;
-    try {
-      const url = file ? await uploadImage(file) : pasted;
-      await createArtifact({ title, imageUrl: url, goalId: selected.id });
-      placed = true;
-      const done = await completeGoal(selected.id);
-      const gained = done.progress.xp - before;
-      await refresh();
-      setPhotoTitle("");
-      setImageUrl("");
-      setFile(null);
-      setFileKey((key) => key + 1);
-      setWantNew(false);
-      if (gained > 0) {
-        const id = cheer + 1;
-        setCheer(id);
-        setFloatXp({ amount: gained, id });
-        window.setTimeout(() => {
-          setFloatXp((current) => (current?.id === id ? null : current));
-        }, 1700);
-      }
-      setNotice(gained > 0
-        ? `«${title}» на стене. +${gained} XP.`
-        : `«${title}» на стене. Опыт за эту цель уже начислен.`);
-    } catch (err) {
-      if (placed) await refresh().catch(() => undefined);
-      setError(placed ? `${messageOf(err)} Фото уже в комнате.` : messageOf(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const xp = player?.progress.xp ?? 0;
   const level = player?.progress.level ?? 1;
-  const intoLevel = xp % XP_PER_LEVEL;
-  const spheres = LIFE_SPHERES.filter((sphere) => sphere.id === "creativity" || (player?.progress.xpBySphere[sphere.id] ?? 0) > 0);
+  const xp = player?.progress.xp ?? 0;
+  const into = xp % XP_PER_LEVEL;
+  const config = player?.avatarConfig ?? DEFAULT_AVATAR_CONFIG;
+  const energy = player?.energy ?? { current: 50, max: 50 };
+
+  function burst() {
+    setCheer(true);
+    window.setTimeout(() => setCheer(false), 1600);
+  }
+
+  async function finish(goalId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const before = player?.progress.xp ?? 0;
+      const done = await completeGoal(goalId);
+      await refresh();
+      if (done.progress.xp > before) {
+        setNotice(`+${done.progress.xp - before} XP`);
+        burst();
+      }
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
-    <div className="page">
-      <header className="hud">
-        <div className="hud-who">
-          <div className="who-row">
-            {avatarSrc(player?.avatarUrl) ? (
-              <img className="hud-face" src={avatarSrc(player?.avatarUrl) ?? ""} alt="" />
-            ) : null}
-            <div>
-              <p className="mark">LEVEX</p>
-              <h1>{player?.nickname ?? (loading ? "…" : "Игрок")}</h1>
-              {player?.title ? <p className="epithet">{player.title}</p> : null}
-              <button
-                type="button"
-                className="hud-create"
-                onClick={() => {
-                  if (screen === "avatar") closeAvatar(setScreen);
-                  else window.location.hash = "avatar";
-                }}
-              >
-                {screen === "avatar" ? "В комнату" : player?.avatarUrl ? "Сменить персонажа" : "Создать персонажа"}
-              </button>
-            </div>
-          </div>
+    <div className="app">
+      <header className="top">
+        <div className="brand">
+          <Logo />
+          <strong>LEVEX</strong>
         </div>
-        <div className={`hud-xp${cheer ? " hot" : ""}`}>
-          <div className="badge" aria-hidden="true">{player ? level : "–"}</div>
-          <div className="meters">
-            <p className="level">
-              Уровень {player ? level : "—"}
-              <span>{player ? `${xp} XP` : ""}</span>
-            </p>
-            <div
-              className="bar"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={XP_PER_LEVEL}
-              aria-valuenow={player ? intoLevel : 0}
-              aria-label="Опыт внутри текущего уровня"
-            >
-              <span style={{ width: `${player ? intoLevel : 0}%` }} />
-            </div>
-            <p className="next">
-              {player ? `До уровня ${level + 1}: ${XP_PER_LEVEL - intoLevel} XP` : "Ждём API"}
-            </p>
-          </div>
+        <div className="meters">
+          <span className="pill">🔥 {player?.streak ?? 0}</span>
+          <span className="pill">⚡ {energy.current}/{energy.max}</span>
+          <span className="level-badge">Ур. {level}</span>
         </div>
-        <ul className="spheres" aria-label="Опыт по сферам">
-          {spheres.map((sphere) => (
-            <li key={sphere.id}>
-              <span>{sphere.name}</span>
-              <strong>{player?.progress.xpBySphere[sphere.id] ?? 0}</strong>
-            </li>
-          ))}
-        </ul>
+        <div className="xp" role="progressbar" aria-valuenow={into} aria-valuemin={0} aria-valuemax={XP_PER_LEVEL}>
+          <span style={{ width: `${into}%` }} />
+          <em>{into} / {XP_PER_LEVEL} XP</em>
+        </div>
+        <button type="button" className="mini" onClick={() => { setDraft(config); setBuilding(true); }} aria-label="Персонаж">
+          <AvatarFigure config={config} cheer={cheer} />
+        </button>
       </header>
 
       <main>
-        {screen === "avatar" ? (
-          <CharacterScreen
-            onClose={() => closeAvatar(setScreen)}
-            onPlayer={(next) => {
-              setPlayer(next);
-              closeAvatar(setScreen);
+        {error ? <p className="banner bad" role="alert">{error}</p> : null}
+        {notice ? <p className="banner good" role="status">{notice}</p> : null}
+        {tab === "map" ? (
+          <div className="map-wrap">
+            <HomeMap level={level} goals={goals} onOpen={setNodeId} />
+            <div className={`mascot${cheer ? " cheer" : ""}`}>
+              <AvatarFigure config={config} cheer={cheer} />
+            </div>
+            <button type="button" className="proof" onClick={() => setProof(true)}>
+              <span aria-hidden="true">📷</span>
+              Proof: загрузи фото
+            </button>
+          </div>
+        ) : null}
+        {tab === "missions" ? (
+          <GoalList goals={goals} busy={busy} onDone={finish} />
+        ) : null}
+        {tab === "resources" ? <Resources player={player} /> : null}
+        {tab === "profile" ? (
+          <Profile
+            placements={placements}
+            onEdit={() => { setDraft(config); setBuilding(true); }}
+          />
+        ) : null}
+      </main>
+
+      <nav className="dock" aria-label="Разделы">
+        <Dock id="map" tab={tab} label="Карта" onPick={setTab} />
+        <Dock id="missions" tab={tab} label="Миссии" onPick={setTab} />
+        <Dock id="resources" tab={tab} label="Ресурсы" onPick={setTab} />
+        <Dock id="profile" tab={tab} label="Профиль" onPick={setTab} />
+      </nav>
+
+      {nodeId ? (
+        <Sheet title={MAP_NODES.find((node) => node.id === nodeId)?.name ?? ""} onClose={() => setNodeId(null)}>
+          <GoalList goals={missionsFor(nodeId, goals)} busy={busy} onDone={finish} />
+          {nodeId === "workshop" ? <button type="button" className="done" onClick={() => { setNodeId(null); setProof(true); }}>Загрузить фото</button> : null}
+        </Sheet>
+      ) : null}
+
+      {proof ? (
+        <Sheet title="Proof: загрузи фото" onClose={() => setProof(false)}>
+          <ProofForm
+            busy={busy}
+            onSubmit={async (title, file) => {
+              setBusy(true);
+              setError(null);
+              try {
+                const before = player?.progress.xp ?? 0;
+                const goal = await createGoal(title, "creativity");
+                const url = await uploadImage(file);
+                await createArtifact({ title, imageUrl: url, goalId: goal.id });
+                const done = await completeGoal(goal.id);
+                await refresh();
+                setProof(false);
+                if (done.progress.xp > before) {
+                  setNotice(`+${done.progress.xp - before} XP`);
+                  burst();
+                }
+              } catch (err) {
+                setError(errorMessage(err));
+              } finally {
+                setBusy(false);
+              }
             }}
           />
-        ) : (
-        <>
-        <div className="stage">
-          {floatXp ? (
-            <div className="xp-pop" key={floatXp.id} aria-hidden="true">
-              <p className="xp-float">+{floatXp.amount} XP</p>
-              {Array.from({ length: 10 }, (_, index) => (
-                <i key={index} className="spark" style={{ "--i": index } as CSSProperties} />
-              ))}
-            </div>
-          ) : null}
-          <RoomScene
-            placements={placements}
-            broken={broken}
-            cheer={cheer}
-            avatarUrl={player?.avatarUrl ?? null}
-            onImageError={(id) => setBroken((current) => ({ ...current, [id]: true }))}
-            onCreateCharacter={() => {
-              window.location.hash = "avatar";
+        </Sheet>
+      ) : null}
+
+      {building ? (
+        <div className="builder-page">
+          <AvatarBuilder
+            value={draft}
+            busy={busy}
+            onChange={setDraft}
+            onDone={async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                const saved = await saveAvatar(draft);
+                setPlayer(saved);
+                setBuilding(false);
+              } catch (err) {
+                setError(errorMessage(err));
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onPhoto={() => document.getElementById("look-form")?.scrollIntoView({ behavior: "smooth" })}
+          />
+          <PhotoLook
+            busy={busy}
+            onLook={async (file, consent) => {
+              setBusy(true);
+              setError(null);
+              try {
+                const result = await generateAvatar(file, consent, false);
+                const look = result.looks?.[0];
+                if (!look) {
+                  setError("Не удалось прочитать черты по фото");
+                  return;
+                }
+                setDraft(look);
+              } catch (err) {
+                setError(errorMessage(err));
+              } finally {
+                setBusy(false);
+              }
             }}
           />
         </div>
-        <QuestSlip
-          mode={mode}
-          busy={busy || loading}
-          error={error}
-          notice={notice}
-          placementsCount={placements.length}
-          goalTitle={goalTitle}
-          onGoalTitle={setGoalTitle}
-          openGoals={openGoals}
-          goalId={goalId}
-          onGoalId={setGoalId}
-          photoTitle={photoTitle}
-          onPhotoTitle={setPhotoTitle}
-          imageUrl={imageUrl}
-          onImageUrl={setImageUrl}
-          fileKey={fileKey}
-          fileName={file?.name ?? null}
-          onFile={setFile}
-          onCreate={onCreateGoal}
-          onPlace={onPlacePhoto}
-          onAnother={() => {
-            setWantNew(true);
-            setNotice(null);
-            setError(null);
-          }}
-          onRefresh={() => {
-            setBusy(true);
-            setError(null);
-            refresh()
-              .catch((err: unknown) => setError(messageOf(err)))
-              .finally(() => setBusy(false));
-          }}
-        />
-        </>
-        )}
-      </main>
+      ) : null}
     </div>
   );
 }
 
-function readScreen(): "room" | "avatar" {
-  return window.location.hash === "#avatar" ? "avatar" : "room";
+function Dock({ id, tab, label, onPick }: { id: Tab; tab: Tab; label: string; onPick: (id: Tab) => void }) {
+  return (
+    <button type="button" className={tab === id ? "dock-btn on" : "dock-btn"} onClick={() => onPick(id)}>
+      {label}
+    </button>
+  );
 }
 
-function closeAvatar(setScreen: (screen: "room" | "avatar") => void): void {
-  const next = window.location.pathname + window.location.search;
-  window.history.pushState(null, "", next);
-  setScreen("room");
+function GoalList({ goals, busy, onDone }: { goals: Goal[]; busy: boolean; onDone: (id: string) => void }) {
+  if (goals.length === 0) return <p className="empty">Миссий пока нет.</p>;
+  return (
+    <ul className="missions">
+      {goals.map((goal) => (
+        <li key={goal.id}>
+          <span>{goal.title}</span>
+          {goal.status === "open" ? (
+            <button type="button" disabled={busy} onClick={() => onDone(goal.id)}>Готово</button>
+          ) : <em>закрыта</em>}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
-function avatarSrc(value: string | undefined): string | null {
-  if (!value || !isDisplayableImageUrl(value)) return null;
-  return value.trim();
+function Resources({ player }: { player: Player | null }) {
+  const spheres = player?.progress.xpBySphere ?? {};
+  const rows = Object.entries(spheres);
+  return (
+    <section className="panel">
+      <h2>Ресурсы</h2>
+      {rows.length === 0 ? <p className="empty">Опыт по сферам появится после первой миссии.</p> : null}
+      <ul className="bars">
+        {rows.map(([id, value]) => (
+          <li key={id}>
+            <span>{id}</span>
+            <i><b style={{ width: `${Math.min(100, value ?? 0)}%` }} /></i>
+            <strong>{value}</strong>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
-function keepGoal(current: string, goals: Goal[]): string {
-  const open = goals.filter((goal) => goal.sphere === "creativity" && goal.status === "open");
-  if (open.some((goal) => goal.id === current)) return current;
-  return open.at(-1)?.id ?? "";
+function Profile({ placements, onEdit }: { placements: Placement[]; onEdit: () => void }) {
+  return (
+    <section className="panel">
+      <h2>Профиль</h2>
+      <button type="button" className="done" onClick={onEdit}>Собрать персонажа</button>
+      <h3>Галерея</h3>
+      {placements.length === 0 ? <p className="empty">Фото появятся после proof.</p> : null}
+      <ul className="gallery">
+        {placements.map((placement) => (
+          <li key={placement.artifactId}>
+            {placement.artifact.imageUrl ? <img src={placement.artifact.imageUrl} alt={placement.artifact.title} /> : <span>{placement.artifact.title}</span>}
+            <em>{placement.artifact.title}</em>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
-function messageOf(err: unknown): string {
-  return errorMessage(err);
+function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <div className="sheet-back" role="presentation" onClick={onClose}>
+      <section className="sheet" role="dialog" aria-label={title} onClick={(event) => event.stopPropagation()}>
+        <header>
+          <h2>{title}</h2>
+          <button type="button" className="quiet" onClick={onClose}>Закрыть</button>
+        </header>
+        {children}
+      </section>
+    </div>
+  );
+}
+
+function ProofForm({ busy, onSubmit }: { busy: boolean; onSubmit: (title: string, file: File) => void }) {
+  const [title, setTitle] = useState("Тёплый свет");
+  const [file, setFile] = useState<File | null>(null);
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!file) return;
+    onSubmit(title.trim() || "Фото", file);
+  }
+  return (
+    <form onSubmit={submit}>
+      <label htmlFor="proof-title">Подпись</label>
+      <input id="proof-title" value={title} onChange={(event) => setTitle(event.target.value)} />
+      <label htmlFor="proof-file">Фото</label>
+      <input id="proof-file" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+      <button type="submit" className="done" disabled={busy || !file}>Повесить и закрыть</button>
+    </form>
+  );
+}
+
+function PhotoLook({
+  busy,
+  onLook,
+}: {
+  busy: boolean;
+  onLook: (file: File, consent: boolean) => void;
+}) {
+  const [consent, setConsent] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  return (
+      <form
+      id="look-form"
+      className="look-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (file && consent) onLook(file, true);
+      }}
+    >
+      <label className="check">
+        <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+        <span>На фото реальный человек, и я соглашаюсь создать по нему персонажа.</span>
+      </label>
+      <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+      <button type="submit" disabled={busy || !file || !consent}>Создать по фото</button>
+    </form>
+  );
 }
