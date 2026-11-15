@@ -1,12 +1,6 @@
-export interface AvatarConfig {
-  skin: "peach" | "light" | "tan" | "amber" | "brown" | "deep";
-  hair: "short" | "bob" | "wavy" | "long" | "bun" | "ponytail" | "curly" | "pigtails";
-  hairColor: "black" | "brown" | "auburn" | "blonde" | "pink" | "cyan";
-  eyes: "round" | "soft" | "sharp" | "wide";
-  outfit: "hoodie" | "tee" | "jacket" | "dress";
-  accessory: "none" | "glasses" | "star" | "headphones";
-  emotion: "happy" | "proud" | "sleepy" | "surprised";
-}
+import type { AvatarConfig } from "@levex/domain";
+
+export type { AvatarConfig };
 
 export interface Player {
   id: string;

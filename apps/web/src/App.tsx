@@ -13,8 +13,8 @@ import {
   type Placement,
   type Player,
 } from "./api";
+import { Avatar } from "./avatar/Avatar";
 import { AvatarBuilder } from "./AvatarBuilder";
-import { AvatarFigure } from "./AvatarFigure";
 import { HomeMap, missionsFor } from "./HomeMap";
 import { Logo } from "./Logo";
 
@@ -93,7 +93,7 @@ export function App() {
           <em>{into} / {XP_PER_LEVEL} XP</em>
         </div>
         <button type="button" className="mini" onClick={() => { setDraft(config); setBuilding(true); }} aria-label="Персонаж">
-          <AvatarFigure config={config} cheer={cheer} />
+          <Avatar config={config} cheer={cheer} title="Персонаж" />
         </button>
       </header>
 
@@ -102,14 +102,21 @@ export function App() {
         {notice ? <p className="banner good" role="status">{notice}</p> : null}
         {tab === "map" ? (
           <div className="map-wrap">
-            <HomeMap level={level} goals={goals} onOpen={setNodeId} />
-            <div className={`mascot${cheer ? " cheer" : ""}`}>
-              <AvatarFigure config={config} cheer={cheer} />
+            <aside className="stage-avatar">
+              <Avatar config={config} cheer={cheer} title="Персонаж" />
+            </aside>
+            <div className="map-column">
+              <HomeMap level={level} goals={goals} onOpen={setNodeId} />
+              <button type="button" className="proof" onClick={() => setProof(true)}>
+                <span aria-hidden="true">📷</span>
+                Proof: загрузи фото
+              </button>
             </div>
-            <button type="button" className="proof" onClick={() => setProof(true)}>
-              <span aria-hidden="true">📷</span>
-              Proof: загрузи фото
-            </button>
+            <aside className="stage-side">
+              <h2>Сегодня</h2>
+              <p className="streak-line">Серия: {player?.streak ?? 0} {dayWord(player?.streak ?? 0)}</p>
+              <GoalList goals={goals.filter((goal) => goal.status === "open")} busy={busy} onDone={finish} />
+            </aside>
           </div>
         ) : null}
         {tab === "missions" ? (
@@ -169,6 +176,7 @@ export function App() {
 
       {building ? (
         <div className="builder-page">
+          {error ? <p className="banner bad" role="alert">{error}</p> : null}
           <AvatarBuilder
             value={draft}
             busy={busy}
@@ -212,6 +220,15 @@ export function App() {
       ) : null}
     </div>
   );
+}
+
+function dayWord(count: number): string {
+  const abs = Math.abs(count) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return "дней";
+  if (last === 1) return "день";
+  if (last >= 2 && last <= 4) return "дня";
+  return "дней";
 }
 
 function Dock({ id, tab, label, onPick }: { id: Tab; tab: Tab; label: string; onPick: (id: Tab) => void }) {

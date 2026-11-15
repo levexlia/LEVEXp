@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { lookFromPhoto, looksFromPhoto, parseAvatarConfig } from "./avatarConfig.js";
+import {
+  ACCESSORIES,
+  DEFAULT_AVATAR_CONFIG,
+  EXPRESSIONS,
+  HAIR_COLORS,
+  HAIR_STYLES,
+  OUTFITS,
+  SKIN_TONES,
+  lookFromPhoto,
+  looksFromPhoto,
+  normalizeAvatarConfig,
+  parseAvatarConfig,
+} from "./avatarConfig.js";
 import { mapNodeStates } from "./map.js";
 import { energyForDay, streakDays } from "./streak.js";
 
@@ -46,29 +58,55 @@ describe("map nodes", () => {
   });
 });
 
+const KIT_LOOK = {
+  hairStyle: "hair_ponytail",
+  hairColor: "cyan",
+  skinTone: "fair",
+  outfit: "outfit_cyan_jacket",
+  expression: "proud",
+  accessory: "acc_glasses",
+} as const;
+
 describe("avatar config", () => {
-  it("rejects unknown parts and extra fields", () => {
-    expect(parseAvatarConfig({
-      skin: "peach", hair: "wavy", hairColor: "brown", eyes: "round",
-      outfit: "hoodie", accessory: "none", emotion: "happy",
-    })?.hair).toBe("wavy");
-    expect(parseAvatarConfig({
-      skin: "peach", hair: "mohawk", hairColor: "brown", eyes: "round",
-      outfit: "hoodie", accessory: "none", emotion: "happy",
-    })).toBeUndefined();
-    expect(parseAvatarConfig({
-      skin: "peach", hair: "wavy", hairColor: "brown", eyes: "round",
-      outfit: "hoodie", accessory: "none", emotion: "happy", cape: "red",
-    })).toBeUndefined();
+  it("accepts kit ids and rejects unknown parts and extra fields", () => {
+    expect(parseAvatarConfig(KIT_LOOK)).toEqual(KIT_LOOK);
+    expect(parseAvatarConfig({ ...KIT_LOOK, hairStyle: "mohawk" })).toBeUndefined();
+    expect(parseAvatarConfig({ ...KIT_LOOK, cape: "red" })).toBeUndefined();
+    expect(parseAvatarConfig({ ...KIT_LOOK, accessory: "star" })).toBeUndefined();
   });
 
-  it("maps a photo to the same parts every time", () => {
+  it("normalizes a legacy hand-drawn look to the default kit", () => {
+    expect(normalizeAvatarConfig({
+      skin: "peach",
+      hair: "wavy",
+      hairColor: "brown",
+      eyes: "round",
+      outfit: "hoodie",
+      accessory: "glasses",
+      emotion: "proud",
+    })).toEqual(DEFAULT_AVATAR_CONFIG);
+    expect(normalizeAvatarConfig(KIT_LOOK)).toEqual(KIT_LOOK);
+    expect(normalizeAvatarConfig({ nope: true })).toBeUndefined();
+    expect(normalizeAvatarConfig(null)).toBeUndefined();
+  });
+
+  it("maps a photo to the same kit ids every time", () => {
     const bytes = Uint8Array.from([1, 2, 3, 9, 9, 4]);
-    expect(lookFromPhoto(bytes)).toEqual(lookFromPhoto(bytes));
+    const look = lookFromPhoto(bytes);
+    expect(look).toEqual(lookFromPhoto(bytes));
+    expect(HAIR_STYLES).toContain(look.hairStyle);
+    expect(HAIR_COLORS).toContain(look.hairColor);
+    expect(SKIN_TONES).toContain(look.skinTone);
+    expect(OUTFITS).toContain(look.outfit);
+    expect(EXPRESSIONS).toContain(look.expression);
+    expect(ACCESSORIES).toContain(look.accessory);
+    expect(look.expression).toBe("happy");
     const other = Uint8Array.from([9, 9, 9, 1]);
     const looks = looksFromPhoto(bytes, 3);
     expect(looks).toHaveLength(3);
-    expect(looks[0]).toEqual(lookFromPhoto(bytes));
-    expect(lookFromPhoto(other)).not.toEqual(lookFromPhoto(bytes));
+    expect(looks[0]).toEqual(look);
+    expect(looks[1]?.expression).toBe("proud");
+    expect(looks[2]?.expression).toBe("surprised");
+    expect(lookFromPhoto(other)).not.toEqual(look);
   });
 });

@@ -164,15 +164,16 @@ export function createOpenAIAvatarGenerator(opts: {
 }
 
 const VISION_LOOK_PROMPT = [
-  "Look at the person and answer with one JSON object only.",
-  "Keys: skin, hair, hairColor, eyes, outfit, accessory, emotion.",
-  "skin: peach light tan amber brown deep.",
-  "hair: short bob wavy long bun ponytail curly pigtails.",
-  "hairColor: black brown auburn blonde pink cyan.",
-  "eyes: round soft sharp wide.",
-  "outfit: hoodie tee jacket dress.",
-  "accessory: none glasses star headphones.",
-  "emotion: happy proud sleepy surprised.",
+  "Look at the person and answer with one JSON object only. Values are kit ids.",
+  "Keys: hairStyle, hairColor, skinTone, outfit, expression, accessory.",
+  "hairStyle: hair_long hair_bob hair_curly hair_ponytail hair_buns hair_short.",
+  "hairColor: chestnut black blonde ginger pink cyan.",
+  "skinTone: porcelain fair default tan brown deep.",
+  "outfit: outfit_hoodie outfit_cyan_jacket outfit_tshirt_shorts outfit_tracksuit.",
+  "expression: happy proud sleepy surprised.",
+  "accessory: none acc_glasses acc_headphones acc_clip.",
+  "Pick the closest id for hair length, hair color, skin tone, and whether they wear glasses, headphones, or a hair clip.",
+  "expression is happy unless the face is clearly proud, sleepy, or surprised.",
 ].join(" ");
 
 export function createXaiAvatarGenerator(opts: {

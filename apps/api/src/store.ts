@@ -18,6 +18,7 @@ import {
   type Artifact,
   type Goal,
   type LifeSphereId,
+  normalizeAvatarConfig,
   parseAvatarConfig,
   type Player,
   type PlayerProgress,
@@ -717,7 +718,7 @@ function parsePlayer(file: string, value: unknown): Player {
     parsed.avatarUrl = raw.avatarUrl;
   }
   if (raw.avatarConfig != null) {
-    const config = parseAvatarConfig(raw.avatarConfig);
+    const config = normalizeAvatarConfig(raw.avatarConfig);
     if (!config) throw storeError(file, "player avatarConfig invalid");
     parsed.avatarConfig = config;
   }

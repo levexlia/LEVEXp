@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AVATAR_STYLE_PROMPT } from "@levex/domain";
+import { ACCESSORIES, AVATAR_STYLE_PROMPT, EXPRESSIONS, HAIR_COLORS, HAIR_STYLES, OUTFITS, SKIN_TONES } from "@levex/domain";
 import { buildApp } from "./app.js";
 import {
   avatarGeneratorFromEnv,
@@ -169,6 +169,7 @@ describe("avatar from photo", () => {
     expect(body).toMatchObject({ limit: 5, used: 1, remaining: 4 });
     expect(body.sourceUrl).toBeUndefined();
     expect(seen).toEqual([AVATAR_STYLE_PROMPT]);
+    expect(body.looks).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain("sk-");
 
     const names = storedUploads();
@@ -381,6 +382,27 @@ describe("avatar from photo", () => {
     expect(storedUploads()).toEqual([]);
     expect((await a.inject({ method: "GET", url: "/avatar" })).json()).toMatchObject({ used: 0, remaining: 5 });
   });
+
+  it("returns kit ids from the mock for the same selfie every time", async () => {
+    const file = tempFile();
+    openStore(file);
+    const a = app();
+    const first = await generate(a);
+    expect(first.statusCode).toBe(201);
+    const looks = first.json().looks as Array<Record<string, string>>;
+    expect(looks).toHaveLength(3);
+    for (const look of looks) {
+      expect(HAIR_STYLES).toContain(look.hairStyle);
+      expect(HAIR_COLORS).toContain(look.hairColor);
+      expect(SKIN_TONES).toContain(look.skinTone);
+      expect(OUTFITS).toContain(look.outfit);
+      expect(EXPRESSIONS).toContain(look.expression);
+      expect(ACCESSORIES).toContain(look.accessory);
+    }
+    expect(looks[0]?.expression).toBe("happy");
+    const again = await generate(a);
+    expect(again.json().looks).toEqual(looks);
+  });
 });
 
 describe("avatar providers", () => {
@@ -464,6 +486,46 @@ describe("avatar providers", () => {
       background: "transparent",
     });
     expect(seen!.image.equals(PNG_1X1)).toBe(true);
+  });
+
+  it("asks vision for kit ids and returns that look", async () => {
+    let prompt = "";
+    const fetchImpl: typeof fetch = async (url, init) => {
+      expect(String(url)).toBe("https://api.openai.com/v1/chat/completions");
+      const body = JSON.parse(String(init?.body)) as {
+        messages: Array<{ content: Array<{ text?: string }> }>;
+      };
+      prompt = body.messages[0]?.content[0]?.text ?? "";
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              hairStyle: "hair_buns",
+              hairColor: "pink",
+              skinTone: "deep",
+              outfit: "outfit_tracksuit",
+              expression: "sleepy",
+              accessory: "acc_headphones",
+            }),
+          },
+        }],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    const generator = createOpenAIAvatarGenerator({ apiKey: "sk-test-openai", fetchImpl });
+    const looks = await generator.look!(PNG_1X1, 2);
+    expect(prompt).toContain("hair_buns");
+    expect(prompt).toContain("outfit_tracksuit");
+    expect(prompt).toContain("acc_headphones");
+    expect(looks[0]).toEqual({
+      hairStyle: "hair_buns",
+      hairColor: "pink",
+      skinTone: "deep",
+      outfit: "outfit_tracksuit",
+      expression: "sleepy",
+      accessory: "acc_headphones",
+    });
+    expect(looks).toHaveLength(2);
+    expect(looks[1]?.expression).toBe("proud");
   });
 
   it("sends the reference image as a data URL to xAI", async () => {

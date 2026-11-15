@@ -1,39 +1,45 @@
 import {
   ACCESSORIES,
-  EMOTIONS,
-  EYE_STYLES,
+  EXPRESSIONS,
   HAIR_COLORS,
   HAIR_STYLES,
   OUTFITS,
   SKIN_TONES,
+  type Accessory,
   type AvatarConfig,
+  type Expression,
+  type HairColor,
+  type SkinTone,
 } from "@levex/domain";
 import { useState, type ReactNode } from "react";
-import { AvatarFigure } from "./AvatarFigure";
+import { Avatar } from "./avatar/Avatar";
+import manifest from "./avatar/kit/manifest.json";
 
 const TABS = [
-  { id: "face", label: "Лицо" },
   { id: "hair", label: "Причёска" },
-  { id: "eyes", label: "Глаза" },
+  { id: "face", label: "Лицо" },
   { id: "outfit", label: "Одежда" },
   { id: "extra", label: "Аксессуары" },
 ] as const;
 
-const EMOTION_LABEL: Record<AvatarConfig["emotion"], string> = {
-  happy: "Радостная",
-  proud: "Гордая",
-  sleepy: "Сонная",
-  surprised: "Удивлённая",
+const PART_LABEL = Object.fromEntries(manifest.parts.map((part) => [part.id, part.label_ru]));
+
+const EXPRESSION_LABEL: Record<Expression, string> = {
+  happy: PART_LABEL.face_happy ?? "Радостная",
+  proud: PART_LABEL.face_proud ?? "Гордая",
+  sleepy: PART_LABEL.face_sleepy ?? "Сонная",
+  surprised: PART_LABEL.face_surprised ?? "Удивлённая",
 };
 
-const HAIR_COLOR: Record<AvatarConfig["hairColor"], string> = {
-  black: "#2A211C",
-  brown: "#6B3E26",
-  auburn: "#A24B2C",
-  blonde: "#E6C07B",
-  pink: "#F472B6",
-  cyan: "#22D3EE",
+const ACCESSORY_LABEL: Record<Accessory, string> = {
+  none: "Нет",
+  acc_glasses: PART_LABEL.acc_glasses ?? "Очки",
+  acc_headphones: PART_LABEL.acc_headphones ?? "Наушники",
+  acc_clip: PART_LABEL.acc_clip ?? "Заколка-звезда",
 };
+
+const skinPalettes = manifest.recolor.skin.palettes as Record<SkinTone, { main: string }>;
+const hairPalettes = manifest.recolor.hair.palettes as Record<HairColor, { main: string }>;
 
 export function AvatarBuilder({
   value,
@@ -53,91 +59,90 @@ export function AvatarBuilder({
     <section className="builder" aria-labelledby="builder-title">
       <h2 id="builder-title" className="sr-only">Собрать персонажа</h2>
       <div className="platform">
-        <AvatarFigure config={value} />
+        <Avatar config={value} title="Собранный персонаж" />
       </div>
-      <div className="tabs" role="tablist">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.id}
-            className={tab === item.id ? "tab on" : "tab"}
-            onClick={() => setTab(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-      {tab === "face" ? (
-        <Swatches
-          label="Тон кожи"
-          values={SKIN_TONES}
-          selected={value.skin}
-          color={(id) => ({ peach: "#F6C7A8", light: "#FDE7D6", tan: "#E0A878", amber: "#C68642", brown: "#8D5524", deep: "#5C3317" }[id])}
-          onPick={(skin) => onChange({ ...value, skin })}
-        />
-      ) : null}
-      {tab === "hair" ? (
-        <>
-          <Tiles
-            label="Форма"
-            values={HAIR_STYLES}
-            selected={value.hair}
-            onPick={(hair) => onChange({ ...value, hair })}
-            preview={(hair) => <AvatarFigure config={{ ...value, hair }} />}
-          />
+      <div className="controls">
+        <div className="tabs" role="tablist">
+          {TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === item.id}
+              className={tab === item.id ? "tab on" : "tab"}
+              onClick={() => setTab(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        {tab === "face" ? (
           <Swatches
-            label="Цвет"
-            values={HAIR_COLORS}
-            selected={value.hairColor}
-            color={(id) => HAIR_COLOR[id]}
-            onPick={(hairColor) => onChange({ ...value, hairColor })}
+            label="Тон кожи"
+            values={SKIN_TONES}
+            selected={value.skinTone}
+            color={(id) => skinPalettes[id].main}
+            onPick={(skinTone) => onChange({ ...value, skinTone })}
           />
-        </>
-      ) : null}
-      {tab === "eyes" ? (
-        <Tiles
-          label="Глаза"
-          values={EYE_STYLES}
-          selected={value.eyes}
-          onPick={(eyes) => onChange({ ...value, eyes })}
-          preview={(eyes) => <AvatarFigure config={{ ...value, eyes }} />}
-        />
-      ) : null}
-      {tab === "outfit" ? (
-        <Tiles
-          label="Одежда"
-          values={OUTFITS}
-          selected={value.outfit}
-          onPick={(outfit) => onChange({ ...value, outfit })}
-          preview={(outfit) => <AvatarFigure config={{ ...value, outfit }} />}
-        />
-      ) : null}
-      {tab === "extra" ? (
-        <Tiles
-          label="Аксессуар"
-          values={ACCESSORIES}
-          selected={value.accessory}
-          onPick={(accessory) => onChange({ ...value, accessory })}
-          preview={(accessory) => <AvatarFigure config={{ ...value, accessory }} />}
-        />
-      ) : null}
-      <button type="button" className="photo-look" onClick={onPhoto} disabled={busy}>Создать по фото</button>
-      <div className="emotions" role="list">
-        {EMOTIONS.map((emotion) => (
-          <button
-            key={emotion}
-            type="button"
-            className={value.emotion === emotion ? "emotion on" : "emotion"}
-            onClick={() => onChange({ ...value, emotion })}
-          >
-            <AvatarFigure config={{ ...value, emotion }} />
-            <span>{EMOTION_LABEL[emotion]}</span>
-          </button>
-        ))}
+        ) : null}
+        {tab === "hair" ? (
+          <>
+            <Tiles
+              label="Форма"
+              values={HAIR_STYLES}
+              selected={value.hairStyle}
+              onPick={(hairStyle) => onChange({ ...value, hairStyle })}
+              preview={(hairStyle) => <Avatar config={{ ...value, hairStyle }} crop="head" idle={false} decorative />}
+              name={(hairStyle) => PART_LABEL[hairStyle] ?? hairStyle}
+            />
+            <Swatches
+              label="Цвет"
+              values={HAIR_COLORS}
+              selected={value.hairColor}
+              color={(id) => hairPalettes[id].main}
+              onPick={(hairColor) => onChange({ ...value, hairColor })}
+            />
+          </>
+        ) : null}
+        {tab === "outfit" ? (
+          <Tiles
+            label="Одежда"
+            values={OUTFITS}
+            selected={value.outfit}
+            onPick={(outfit) => onChange({ ...value, outfit })}
+            preview={(outfit) => <Avatar config={{ ...value, outfit }} crop="body" idle={false} decorative />}
+            name={(outfit) => PART_LABEL[outfit] ?? outfit}
+          />
+        ) : null}
+        {tab === "extra" ? (
+          <Tiles
+            label="Аксессуар"
+            values={ACCESSORIES}
+            selected={value.accessory}
+            onPick={(accessory) => onChange({ ...value, accessory })}
+            preview={(accessory) => (
+              <Avatar config={{ ...value, accessory }} crop="head" idle={false} decorative />
+            )}
+            name={(accessory) => ACCESSORY_LABEL[accessory]}
+          />
+        ) : null}
+        <button type="button" className="photo-look" onClick={onPhoto} disabled={busy}>Создать по фото</button>
+        <div className="emotions" role="list">
+          {EXPRESSIONS.map((expression) => (
+            <button
+              key={expression}
+              type="button"
+              className={value.expression === expression ? "emotion on" : "emotion"}
+              aria-pressed={value.expression === expression}
+              onClick={() => onChange({ ...value, expression })}
+            >
+              <Avatar config={{ ...value, expression }} crop="head" idle={false} decorative />
+              <span>{EXPRESSION_LABEL[expression]}</span>
+            </button>
+          ))}
+        </div>
+        <button type="button" className="done" onClick={onDone} disabled={busy}>Готово</button>
       </div>
-      <button type="button" className="done" onClick={onDone} disabled={busy}>Готово</button>
     </section>
   );
 }
@@ -148,12 +153,14 @@ function Tiles<T extends string>({
   selected,
   onPick,
   preview,
+  name,
 }: {
   label: string;
   values: readonly T[];
   selected: T;
   onPick: (value: T) => void;
   preview: (value: T) => ReactNode;
+  name: (value: T) => string;
 }) {
   return (
     <div>
@@ -165,6 +172,7 @@ function Tiles<T extends string>({
             type="button"
             className={value === selected ? "tile on" : "tile"}
             aria-pressed={value === selected}
+            aria-label={name(value)}
             onClick={() => onPick(value)}
           >
             {preview(value)}

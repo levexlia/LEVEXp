@@ -1,7 +1,8 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { DEFAULT_AVATAR_CONFIG } from "@levex/domain";
 import { buildApp } from "./app.js";
 import { getPlayer, openStore, resetStore, setClockForTests, setStoreWriterForTests } from "./store.js";
 
@@ -29,13 +30,12 @@ describe("vector avatar and streak", () => {
   }
 
   const look = {
-    skin: "tan",
-    hair: "ponytail",
-    hairColor: "auburn",
-    eyes: "soft",
-    outfit: "jacket",
-    accessory: "glasses",
-    emotion: "proud",
+    hairStyle: "hair_ponytail",
+    hairColor: "cyan",
+    skinTone: "tan",
+    outfit: "outfit_cyan_jacket",
+    expression: "proud",
+    accessory: "acc_glasses",
   };
 
   it("rejects an unknown part and stores a valid look across a restart", async () => {
@@ -110,5 +110,44 @@ describe("vector avatar and streak", () => {
     expect(player.streak).toBe(2);
     expect(player.energy).toEqual({ current: 45, max: 50 });
     expect(player.progress).toEqual({ xp: 20, level: 1, xpBySphere: { health: 10, mind: 10 } });
+  });
+
+  it("reads a legacy avatarConfig as the default kit and still rejects garbage", () => {
+    const file = tempFile();
+    writeFileSync(file, JSON.stringify({
+      version: 1,
+      player: {
+        id: "p1",
+        nickname: "Player",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        avatarConfig: {
+          skin: "peach",
+          hair: "wavy",
+          hairColor: "brown",
+          eyes: "round",
+          outfit: "hoodie",
+          accessory: "glasses",
+          emotion: "proud",
+        },
+        progression: { level: 1, totalXp: 0, xpBySphere: {} },
+      },
+      goals: [],
+    }));
+    openStore(file);
+    expect(getPlayer().avatarConfig).toEqual(DEFAULT_AVATAR_CONFIG);
+
+    const bad = tempFile();
+    writeFileSync(bad, JSON.stringify({
+      version: 1,
+      player: {
+        id: "p1",
+        nickname: "Player",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        avatarConfig: { hairStyle: "mohawk" },
+        progression: { level: 1, totalXp: 0, xpBySphere: {} },
+      },
+      goals: [],
+    }));
+    expect(() => openStore(bad)).toThrow(/avatarConfig invalid/);
   });
 });

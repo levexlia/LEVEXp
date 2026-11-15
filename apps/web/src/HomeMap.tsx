@@ -1,13 +1,32 @@
 import { MAP_NODES, mapNodeStates, type MapNodeId } from "@levex/domain";
 import type { Goal } from "./api";
 
-const SPOTS: Record<MapNodeId, { x: number; y: number }> = {
-  center: { x: 184, y: 86 },
-  park: { x: 118, y: 210 },
-  study: { x: 214, y: 300 },
-  home: { x: 150, y: 410 },
-  workshop: { x: 230, y: 500 },
+/**
+ * The path is read from the bottom upward:
+ * Дом → Учебный центр → Парк → Мастерская → Центр LEVEX.
+ * Labels sit off the stroke and off the hex so they do not cover either.
+ */
+const SPOTS: Record<MapNodeId, {
+  x: number;
+  y: number;
+  lx: number;
+  ly: number;
+  anchor: "start" | "end" | "middle";
+}> = {
+  home: { x: 168, y: 498, lx: -60, ly: 4, anchor: "end" },
+  study: { x: 206, y: 386, lx: -62, ly: 18, anchor: "end" },
+  park: { x: 108, y: 274, lx: -54, ly: 4, anchor: "end" },
+  workshop: { x: 228, y: 162, lx: 56, ly: 4, anchor: "start" },
+  center: { x: 180, y: 72, lx: 0, ly: -44, anchor: "middle" },
 };
+
+const ROUTE = [
+  "M168 498",
+  "Q196 446 206 386",
+  "Q168 328 108 274",
+  "Q156 214 228 162",
+  "Q248 116 180 72",
+].join(" ");
 
 export function HomeMap({
   level,
@@ -21,21 +40,13 @@ export function HomeMap({
   const doneSpheres = goals.filter((goal) => goal.status === "done" && goal.sphere).map((goal) => goal.sphere as string);
   const nodes = mapNodeStates({ level, doneSpheres });
   return (
-    <svg className="district" viewBox="0 0 360 560" role="img" aria-label="Карта района">
+    <svg className="district" viewBox="0 0 360 560" role="img" aria-label="Карта района: Дом, Учебный центр, Парк, Мастерская, Центр LEVEX">
       <City />
-      <path
-        className="route"
-        d="M184 110 C120 150 90 180 118 230 C160 290 250 270 214 320 C170 380 120 390 150 430 C190 480 250 470 230 520"
-        fill="none"
-        stroke="url(#path-glow)"
-        strokeWidth="16"
-        strokeLinecap="round"
-      />
+      <path className="route" d={ROUTE} fill="none" stroke="url(#path-glow)" strokeWidth="16" strokeLinecap="round" />
       {nodes.map((node) => {
         const spot = SPOTS[node.id];
         return (
           <g key={node.id} transform={`translate(${spot.x} ${spot.y})`}>
-            <text y="46" textAnchor="middle" className="node-label">{node.name}</text>
             <g
               className={`node ${node.state}`}
               role="button"
@@ -45,7 +56,10 @@ export function HomeMap({
                 if (node.state !== "locked") onOpen(node.id);
               }}
               onKeyDown={(event) => {
-                if ((event.key === "Enter" || event.key === " ") && node.state !== "locked") onOpen(node.id);
+                if ((event.key === "Enter" || event.key === " ") && node.state !== "locked") {
+                  event.preventDefault();
+                  onOpen(node.id);
+                }
               }}
             >
               <polygon points="0,-28 24,-14 24,14 0,28 -24,14 -24,-14" />
@@ -56,8 +70,31 @@ export function HomeMap({
           </g>
         );
       })}
+      {nodes.map((node) => {
+        const spot = SPOTS[node.id];
+        const lines = labelLines(node.name);
+        return (
+          <text
+            key={`${node.id}-label`}
+            className="node-label"
+            x={spot.x + spot.lx}
+            y={spot.y + spot.ly}
+            textAnchor={spot.anchor}
+            fontSize="12"
+          >
+            {lines.map((line, index) => (
+              <tspan key={line} x={spot.x + spot.lx} dy={index === 0 ? 0 : 15}>{line}</tspan>
+            ))}
+          </text>
+        );
+      })}
     </svg>
   );
+}
+
+function labelLines(name: string): string[] {
+  if (name === "Учебный центр") return ["Учебный", "центр"];
+  return [name];
 }
 
 function Lock() {
@@ -78,9 +115,9 @@ function City() {
   return (
     <g className="city">
       <defs>
-        <linearGradient id="path-glow" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#22D3EE" />
-          <stop offset="1" stopColor="#7C3AED" />
+        <linearGradient id="path-glow" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stopColor="#7C3AED" />
+          <stop offset="1" stopColor="#22D3EE" />
         </linearGradient>
       </defs>
       {blocks.map(([x, y, w, h]) => (
