@@ -1,25 +1,11 @@
 import { MAP_NODES, type MapNodeId, type MapNodeState } from "@levex/domain";
-import manifest from "./kit/manifest.json";
+import { ART } from "./art";
 
-export const MAP_VIEW = { x: 0, y: 78, w: 390, h: 712 };
+export const MAP_VIEW = { x: 0, y: 8, w: 390, h: 760 };
 
-/** Badge art is centred on this point inside its 919 viewBox, matching the kit mock. */
+/** Visual centre of a kit badge inside its 919 viewBox. */
 export const BADGE_CENTER: [number, number] = [458.7, 431.9];
 export const BADGE_SCALE = 0.0913;
-
-interface PartInfo {
-  anchor: [number, number];
-  kind: string;
-  bbox: [number, number, number, number];
-}
-
-const parts = manifest.parts as unknown as Record<string, PartInfo>;
-
-export function partAnchor(id: string): [number, number] {
-  const part = parts[id];
-  if (!part) throw new Error(`missing map part ${id}`);
-  return part.anchor;
-}
 
 export interface ScreenBox {
   x0: number;
@@ -29,8 +15,10 @@ export interface ScreenBox {
 }
 
 export function screenBox(id: string, at: [number, number], scale: number): ScreenBox {
-  const [ax, ay] = partAnchor(id);
-  const [x0, y0, x1, y1] = parts[id]!.bbox;
+  const art = ART[id];
+  if (!art) throw new Error(`missing map art ${id}`);
+  const [ax, ay] = art.anchor;
+  const [x0, y0, x1, y1] = art.bbox;
   return {
     x0: (x0 - ax) * scale + at[0],
     y0: (y0 - ay) * scale + at[1],
@@ -42,28 +30,28 @@ export function screenBox(id: string, at: [number, number], scale: number): Scre
 export interface Place {
   id: MapNodeId;
   building: string;
-  /** Where the building's ground contact sits. */
   at: [number, number];
   scale: number;
-  /** Badge centre, beside that building. */
+  /** Badge centre, on the path side of this building. */
   badge: [number, number];
-  /** Name baseline, kept on this building rather than a neighbour. */
+  /** Chip centre. The chip names this building and no other. */
   label: [number, number];
-  /** Avatar offset from the badge, in viewBox units. */
+  chip: { w: number; h: number };
+  lines: readonly string[];
+  /** Avatar offset from the badge, away from the building. */
   avatar: [number, number];
 }
 
 /**
- * Bottom to top: Дом, Учебный центр, Парк, Мастерская, Центр LEVEX.
- * Each badge and its label sit beside that place's own building.
- * The approved mock had put several names on the opposite side of the street.
+ * Bottom to top. Each row is one building with its badge and name beside it.
+ * The ribbon joins the badges in this order.
  */
 export const PLACES: readonly Place[] = [
-  { id: "home", building: "bld_home", at: [304, 676], scale: 0.16, badge: [176, 630], label: [176, 678], avatar: [-86, 22] },
-  { id: "study", building: "bld_school", at: [98, 548], scale: 0.15, badge: [196, 500], label: [78, 488], avatar: [72, 14] },
-  { id: "park", building: "bld_park", at: [292, 448], scale: 0.125, badge: [150, 408], label: [300, 352], avatar: [78, 8] },
-  { id: "workshop", building: "bld_workshop", at: [98, 346], scale: 0.145, badge: [190, 300], label: [86, 372], avatar: [74, 12] },
-  { id: "center", building: "bld_levex", at: [292, 240], scale: 0.145, badge: [176, 188], label: [168, 140], avatar: [-74, 8] },
+  { id: "home", building: "bld_home", at: [268, 660], scale: 0.14, badge: [176, 616], label: [176, 668], chip: { w: 56, h: 22 }, lines: ["Дом"], avatar: [-78, 6] },
+  { id: "study", building: "bld_school", at: [100, 560], scale: 0.125, badge: [176, 512], label: [176, 568], chip: { w: 84, h: 34 }, lines: ["Учебный", "центр"], avatar: [78, 4] },
+  { id: "park", building: "bld_park", at: [286, 415], scale: 0.1, badge: [196, 380], label: [196, 428], chip: { w: 54, h: 22 }, lines: ["Парк"], avatar: [-78, 4] },
+  { id: "workshop", building: "bld_workshop", at: [100, 268], scale: 0.115, badge: [190, 228], label: [206, 300], chip: { w: 96, h: 22 }, lines: ["Мастерская"], avatar: [78, 4] },
+  { id: "center", building: "bld_levex", at: [278, 128], scale: 0.115, badge: [188, 84], label: [188, 40], chip: { w: 80, h: 34 }, lines: ["Центр", "LEVEX"], avatar: [-78, 2] },
 ];
 
 export function placeName(id: MapNodeId): string {
@@ -78,43 +66,21 @@ export interface Prop {
   part: string;
   at: [number, number];
   scale: number;
-  /** Future spheres. Always drawn with the locked palette. */
   locked?: boolean;
 }
 
-/** Decoration taken from the approved mock, in ground-contact order later. */
+/** A few pieces of street furniture, kept off the badges and the names. */
 export const PROPS: readonly Prop[] = [
-  { part: "tree_round", at: [208, 160], scale: 0.25 },
-  { part: "bld_gym", at: [46, 172], scale: 0.1, locked: true },
-  { part: "bld_office", at: [352, 186], scale: 0.11, locked: true },
-  { part: "tree_pine", at: [240, 215], scale: 0.26 },
-  { part: "filler_2", at: [34, 250], scale: 0.25 },
-  { part: "filler_5", at: [350, 300], scale: 0.25 },
-  { part: "bush", at: [200, 300], scale: 0.24 },
-  { part: "filler_1", at: [350, 360], scale: 0.27 },
-  { part: "bench", at: [340, 400], scale: 0.24 },
-  { part: "filler_7", at: [346, 420], scale: 0.22 },
-  { part: "tree_round", at: [232, 420], scale: 0.26 },
-  { part: "filler_8", at: [36, 455], scale: 0.25 },
-  { part: "bush", at: [56, 500], scale: 0.22 },
-  { part: "lamp", at: [346, 500], scale: 0.28 },
-  { part: "lamp", at: [40, 520], scale: 0.28 },
-  { part: "filler_9", at: [356, 560], scale: 0.27 },
-  { part: "lamp", at: [232, 590], scale: 0.3 },
-  { part: "filler_3", at: [34, 600], scale: 0.27 },
-  { part: "tree_pine", at: [370, 640], scale: 0.26 },
-  { part: "mailbox", at: [162, 646], scale: 0.24 },
-  { part: "filler_6", at: [40, 690], scale: 0.25 },
-  { part: "filler_4", at: [360, 700], scale: 0.22 },
-  { part: "tree_round", at: [170, 740], scale: 0.26 },
-  { part: "filler_4", at: [200, 745], scale: 0.2 },
-  { part: "road_ne", at: [80, 748], scale: 0.3 },
-  { part: "road_nw", at: [170, 760], scale: 0.3 },
-  { part: "road_cross", at: [270, 760], scale: 0.3 },
-  { part: "road_ne", at: [366, 770], scale: 0.3 },
+  { part: "bld_gym", at: [48, 155], scale: 0.07, locked: true },
+  { part: "bld_office", at: [352, 100], scale: 0.062, locked: true },
+  { part: "tree_pine", at: [42, 430], scale: 0.16 },
+  { part: "tree_round", at: [348, 500], scale: 0.16 },
+  { part: "bench", at: [352, 455], scale: 0.16 },
+  { part: "lamp", at: [40, 640], scale: 0.18 },
+  { part: "mailbox", at: [332, 690], scale: 0.18 },
 ];
 
-/** The ribbon up to the current node is solid cyan. Everything after it is dotted. */
+/** Cyan and solid through the node the player is on. Later nodes stay dotted. */
 export function segmentLit(destination: MapNodeState): boolean {
   return destination === "done" || destination === "current";
 }
@@ -138,4 +104,13 @@ export function gapToBox(point: [number, number], box: ScreenBox): number {
   const dx = point[0] < box.x0 ? box.x0 - point[0] : point[0] > box.x1 ? point[0] - box.x1 : 0;
   const dy = point[1] < box.y0 ? box.y0 - point[1] : point[1] > box.y1 ? point[1] - box.y1 : 0;
   return Math.hypot(dx, dy);
+}
+
+export function chipBox(place: Place): ScreenBox {
+  return {
+    x0: place.label[0] - place.chip.w / 2,
+    y0: place.label[1] - place.chip.h / 2,
+    x1: place.label[0] + place.chip.w / 2,
+    y1: place.label[1] + place.chip.h / 2,
+  };
 }

@@ -40,15 +40,25 @@ describe("streak and energy", () => {
 describe("map nodes", () => {
   it("unlocks by level and marks a sphere done only after a finished goal", () => {
     const fresh = mapNodeStates({ level: 1, doneSpheres: [] });
-    expect(fresh.map((node) => node.state)).toEqual(["current", "locked", "locked", "locked", "locked"]);
+    expect(fresh.map((node) => node.state)).toEqual(["current", "available", "locked", "locked", "locked"]);
 
     const studied = mapNodeStates({ level: 1, doneSpheres: ["health"] });
     expect(studied.find((node) => node.id === "home")?.state).toBe("done");
     expect(studied.find((node) => node.id === "study")?.state).toBe("current");
+    expect(studied.find((node) => node.id === "park")?.state).toBe("locked");
 
     const wider = mapNodeStates({ level: 2, doneSpheres: ["health", "mind"] });
+    expect(wider.find((node) => node.id === "home")?.state).toBe("done");
+    expect(wider.find((node) => node.id === "study")?.state).toBe("done");
     expect(wider.find((node) => node.id === "park")?.state).toBe("current");
+    expect(wider.find((node) => node.id === "workshop")?.state).toBe("available");
     expect(wider.find((node) => node.id === "center")?.state).toBe("locked");
+
+    const opened = mapNodeStates({ level: 2, doneSpheres: [] });
+    expect(opened.find((node) => node.id === "home")?.state).toBe("current");
+    expect(opened.find((node) => node.id === "park")?.state).toBe("available");
+    expect(opened.find((node) => node.id === "workshop")?.state).toBe("available");
+    expect(opened.find((node) => node.id === "center")?.state).toBe("locked");
 
     const all = mapNodeStates({
       level: 4,

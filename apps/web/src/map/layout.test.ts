@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   PLACES,
   PROPS,
+  chipBox,
   gapToBox,
-  labelPoint,
   screenBox,
   segmentLit,
 } from "./layout.js";
+
+function overlaps(a: { x0: number; y0: number; x1: number; y1: number }, b: { x0: number; y0: number; x1: number; y1: number }): boolean {
+  return a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+}
 
 describe("map layout", () => {
   it("pairs each place with its building, bottom to top", () => {
@@ -19,18 +23,30 @@ describe("map layout", () => {
     ]);
     const heights = PLACES.map((place) => place.badge[1]);
     expect(heights).toEqual([...heights].sort((a, b) => b - a));
-    expect(PLACES.map((place) => place.at[1])).toEqual([...PLACES.map((place) => place.at[1])].sort((a, b) => b - a));
   });
 
-  it("keeps every label nearer its own building than the other places", () => {
+  it("keeps each badge against its own building and each name on that badge", () => {
     for (const place of PLACES) {
-      const label = labelPoint(place);
-      const own = gapToBox(label, screenBox(place.building, place.at, place.scale));
-      expect(own).toBeLessThan(120);
+      const own = screenBox(place.building, place.at, place.scale);
+      const gap = gapToBox(place.badge, own);
+      expect(gap, place.id).toBeLessThan(56);
+      expect(Math.hypot(place.label[0] - place.badge[0], place.label[1] - place.badge[1]), place.id).toBeLessThan(80);
       for (const other of PLACES) {
         if (other.id === place.id) continue;
-        const gap = gapToBox(label, screenBox(other.building, other.at, other.scale));
-        expect(own, place.id).toBeLessThan(gap);
+        const otherBox = screenBox(other.building, other.at, other.scale);
+        expect(gap + 16, `${place.id} vs ${other.id}`).toBeLessThan(gapToBox(place.badge, otherBox));
+        expect(overlaps(chipBox(place), otherBox), `${place.id} label on ${other.id}`).toBe(false);
+      }
+      expect(overlaps(chipBox(place), own), `${place.id} label on itself`).toBe(false);
+    }
+  });
+
+  it("keeps street furniture off the badges and the names", () => {
+    for (const prop of PROPS) {
+      const box = screenBox(prop.part, prop.at, prop.scale);
+      for (const place of PLACES) {
+        expect(gapToBox(place.badge, box), prop.part).toBeGreaterThan(28);
+        expect(overlaps(chipBox(place), box), prop.part).toBe(false);
       }
     }
   });
@@ -38,10 +54,7 @@ describe("map layout", () => {
   it("paints the ribbon solid only through the current node", () => {
     expect(segmentLit("done")).toBe(true);
     expect(segmentLit("current")).toBe(true);
+    expect(segmentLit("available")).toBe(false);
     expect(segmentLit("locked")).toBe(false);
-  });
-
-  it("keeps the gym and the office as locked decoration", () => {
-    expect(PROPS.filter((prop) => prop.locked).map((prop) => prop.part)).toEqual(["bld_gym", "bld_office"]);
   });
 });

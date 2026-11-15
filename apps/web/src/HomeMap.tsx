@@ -1,32 +1,18 @@
 import { MAP_NODES, mapNodeStates, type MapNodeId, type MapNodeState } from "@levex/domain";
 import { useId } from "react";
 import type { Goal } from "./api";
-import { painted } from "./map/markup";
+import { ART } from "./map/art";
 import {
   BADGE_CENTER,
   BADGE_SCALE,
   MAP_VIEW,
   PLACES,
   PROPS,
-  labelPoint,
-  partAnchor,
   placeName,
   ribbonPath,
   segmentLit,
   type Place,
 } from "./map/layout";
-
-const BADGE_ART: Record<MapNodeState, string> = {
-  done: "badge_done_full",
-  current: "badge_current_full",
-  locked: "badge_locked_full",
-};
-
-const HALO_ART: Record<MapNodeState, string> = {
-  done: "badge_halo_done",
-  current: "badge_halo_current",
-  locked: "badge_halo_locked",
-};
 
 export function HomeMap({
   level,
@@ -43,7 +29,14 @@ export function HomeMap({
   const stateOf = new Map(nodes.map((node) => [node.id, node.state]));
   const scenery = [
     ...PROPS.map((prop) => ({ ...prop, y: prop.at[1], location: null as MapNodeId | null })),
-    ...PLACES.map((place) => ({ part: place.building, at: place.at, scale: place.scale, locked: false, y: place.at[1], location: place.id })),
+    ...PLACES.map((place) => ({
+      part: place.building,
+      at: place.at,
+      scale: place.scale,
+      locked: false,
+      y: place.at[1],
+      location: place.id,
+    })),
   ].sort((a, b) => a.y - b.y);
 
   return (
@@ -58,36 +51,24 @@ export function HomeMap({
           <stop offset="0" stopColor="#0B0B1F" />
           <stop offset="1" stopColor="#14123a" />
         </linearGradient>
-        <pattern id={`${uid}-ground`} width="128" height="64" patternUnits="userSpaceOnUse" patternTransform="scale(0.5)">
-          <g dangerouslySetInnerHTML={{ __html: painted("ground_tile") }} />
+        <pattern id={`${uid}-ground`} width="64" height="32" patternUnits="userSpaceOnUse" patternTransform="scale(0.5)">
+          <image href="/map/ground_tile.svg" width="128" height="64" />
         </pattern>
-        <filter id={`${uid}-glow`} x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="7" />
+        <filter id={`${uid}-glow`} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="6" />
         </filter>
       </defs>
       <rect x={MAP_VIEW.x} y={MAP_VIEW.y} width={MAP_VIEW.w} height={MAP_VIEW.h} fill={`url(#${uid}-sky)`} pointerEvents="none" />
-      <rect x={MAP_VIEW.x - 40} y={MAP_VIEW.y} width={MAP_VIEW.w + 80} height={MAP_VIEW.h} fill={`url(#${uid}-ground)`} pointerEvents="none" />
+      <rect x={MAP_VIEW.x} y={MAP_VIEW.y} width={MAP_VIEW.w} height={MAP_VIEW.h} fill={`url(#${uid}-ground)`} pointerEvents="none" />
       {scenery.map((item, index) => {
         const state = item.location ? stateOf.get(item.location) : undefined;
-        const locked = item.locked || state === "locked";
-        const [ax, ay] = partAnchor(item.part);
-        const halo = item.location && state ? `halo_${item.part}` : item.locked ? `halo_${item.part}` : null;
+        const locked = Boolean(item.locked) || state === "locked";
         return (
-          <g key={`${item.part}-${index}`}>
-            {halo ? (
-              <g
-                className={state === "current" ? "bld-halo current" : "bld-halo"}
-                filter={`url(#${uid}-glow)`}
-                opacity={state === "current" ? 0.7 : state === "done" ? 0.4 : 0.22}
-                transform={placeTransform([item.at[0], item.at[1] + 8], item.scale * 1.08, ax, ay)}
-                dangerouslySetInnerHTML={{ __html: painted(halo, locked) }}
-              />
-            ) : null}
-            <g
-              transform={placeTransform(item.at, item.scale, ax, ay)}
-              dangerouslySetInnerHTML={{ __html: painted(item.part, locked) }}
-              onClick={item.location && state !== "locked" ? () => onOpen(item.location as MapNodeId) : undefined}
-            />
+          <g
+            key={`${item.part}-${index}`}
+            onClick={item.location && state !== "locked" ? () => onOpen(item.location as MapNodeId) : undefined}
+          >
+            <Sprite part={item.part} at={item.at} scale={item.scale} locked={locked} />
           </g>
         );
       })}
@@ -96,16 +77,15 @@ export function HomeMap({
         const lit = segmentLit(stateOf.get(next.id) ?? "locked");
         const d = ribbonPath(place.badge, next.badge);
         return (
-          <g key={`path-${place.id}`}>
-            <path d={d} fill="none" stroke="#0a1c46" strokeWidth="20" strokeLinecap="round" pointerEvents="none" />
+          <g key={`path-${place.id}`} pointerEvents="none">
+            <path d={d} fill="none" stroke="#0a1c46" strokeWidth="16" strokeLinecap="round" />
             <path
               d={d}
               fill="none"
               stroke={lit ? "#25cbfd" : "#8e94ae"}
-              strokeWidth="11"
+              strokeWidth="9"
               strokeLinecap="round"
-              strokeDasharray={lit ? undefined : "1 18"}
-              pointerEvents="none"
+              strokeDasharray={lit ? undefined : "1 16"}
             />
           </g>
         );
@@ -115,6 +95,7 @@ export function HomeMap({
           key={place.id}
           place={place}
           state={stateOf.get(place.id) ?? "locked"}
+          uid={uid}
           onOpen={onOpen}
         />
       ))}
@@ -122,22 +103,44 @@ export function HomeMap({
   );
 }
 
-function placeTransform(at: [number, number], scale: number, ax: number, ay: number): string {
-  return `translate(${at[0]} ${at[1]}) scale(${scale}) translate(${-ax} ${-ay})`;
+function Sprite({
+  part,
+  at,
+  scale,
+  locked,
+}: {
+  part: string;
+  at: [number, number];
+  scale: number;
+  locked: boolean;
+}) {
+  const art = ART[part];
+  if (!art) return null;
+  const file = locked ? `${part}_locked` : part;
+  const [ax, ay] = art.anchor;
+  return (
+    <image
+      href={`/map/${file}.svg`}
+      width={art.w}
+      height={art.h}
+      transform={`translate(${at[0]} ${at[1]}) scale(${scale}) translate(${-ax} ${-ay})`}
+    />
+  );
 }
 
 function NodeBadge({
   place,
   state,
+  uid,
   onOpen,
 }: {
   place: Place;
   state: MapNodeState;
+  uid: string;
   onOpen: (id: MapNodeId) => void;
 }) {
   const name = placeName(place.id);
-  const [lx, ly] = labelPoint(place);
-  const width = Math.ceil(name.length * 7.15 + 18);
+  const [lx, ly] = place.label;
   const open = () => {
     if (state !== "locked") onOpen(place.id);
   };
@@ -156,31 +159,77 @@ function NodeBadge({
           }
         }}
       >
-        <g
-          className={state === "current" ? "badge-halo current" : "badge-halo"}
-          transform={placeTransform(place.badge, state === "current" ? 0.125 : 0.105, BADGE_CENTER[0], BADGE_CENTER[1])}
-          dangerouslySetInnerHTML={{ __html: painted(HALO_ART[state]) }}
-        />
-        <g
-          transform={placeTransform(place.badge, BADGE_SCALE, BADGE_CENTER[0], BADGE_CENTER[1])}
-          dangerouslySetInnerHTML={{ __html: painted(BADGE_ART[state]) }}
-        />
-        <circle cx={place.badge[0]} cy={place.badge[1]} r="34" fill="#fff" opacity="0" />
+        {state === "current" ? (
+          <image
+            className="badge-halo current"
+            href="/map/badge_halo_current.svg"
+            width="919"
+            height="919"
+            filter={`url(#${uid}-glow)`}
+            transform={`translate(${place.badge[0]} ${place.badge[1]}) scale(0.12) translate(${-BADGE_CENTER[0]} ${-BADGE_CENTER[1]})`}
+          />
+        ) : null}
+        {state === "available" ? (
+          <AvailableBadge x={place.badge[0]} y={place.badge[1]} />
+        ) : (
+          <image
+            href={`/map/badge_${state}_full.svg`}
+            width="919"
+            height="919"
+            transform={`translate(${place.badge[0]} ${place.badge[1]}) scale(${BADGE_SCALE}) translate(${-BADGE_CENTER[0]} ${-BADGE_CENTER[1]})`}
+          />
+        )}
+        <circle cx={place.badge[0]} cy={place.badge[1]} r="32" fill="#fff" opacity="0" />
       </g>
-      <g onClick={open} style={{ cursor: state === "locked" ? "default" : "pointer" }}>
-        <rect x={lx - width / 2} y={ly - 14} width={width} height={19} rx="9" fill="#14122c" opacity="0.94" />
+      <Chip place={place} lx={lx} ly={ly} dim={state === "locked"} onOpen={open} />
+    </g>
+  );
+}
+
+function AvailableBadge({ x, y }: { x: number; y: number }) {
+  return (
+    <polygon
+      transform={`translate(${x} ${y})`}
+      points="0,-30 26,-15 26,15 0,30 -26,15 -26,-15"
+      fill="#1b1442"
+      stroke="#c4b5fd"
+      strokeWidth="3.5"
+    />
+  );
+}
+
+function Chip({
+  place,
+  lx,
+  ly,
+  dim,
+  onOpen,
+}: {
+  place: Place;
+  lx: number;
+  ly: number;
+  dim: boolean;
+  onOpen: () => void;
+}) {
+  const { w, h } = place.chip;
+  const top = ly - h / 2;
+  return (
+    <g onClick={onOpen} style={{ cursor: dim ? "default" : "pointer" }}>
+      <rect x={lx - w / 2} y={top} width={w} height={h} rx="10" fill="#12102a" stroke="#0a1c46" strokeWidth="1.5" />
+      {place.lines.map((line, index) => (
         <text
+          key={line}
           x={lx}
-          y={ly}
+          y={top + 15 + index * 14}
           textAnchor="middle"
-          fontSize="12.5"
+          fontSize="12"
           fontWeight="600"
           fontFamily="Fredoka, Inter, sans-serif"
-          fill={state === "locked" ? "#aeb4d0" : "#ffffff"}
+          fill={dim ? "#aeb4d0" : "#ffffff"}
         >
-          {name}
+          {line}
         </text>
-      </g>
+      ))}
     </g>
   );
 }

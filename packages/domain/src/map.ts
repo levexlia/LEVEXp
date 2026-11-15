@@ -1,7 +1,7 @@
 import type { LifeSphereId } from "./index.js";
 
 export type MapNodeId = "home" | "study" | "park" | "workshop" | "center";
-export type MapNodeState = "locked" | "current" | "done";
+export type MapNodeState = "locked" | "available" | "current" | "done";
 
 export interface MapNode {
   id: MapNodeId;
@@ -16,7 +16,9 @@ export interface MapNode {
  * The home-screen path. A node unlocks at `unlockLevel`.
  * It is done when that level is reached and the player has finished a goal in `sphere`.
  * The current node is the first unlocked place that is not done.
- * If every unlocked place is done, the last unlocked place stays current.
+ * Other unlocked places that are not done are available.
+ * Only a place the player has not reached the level for is locked.
+ * A finished place stays done, including the last one.
  */
 export const MAP_NODES: readonly MapNode[] = [
   { id: "home", name: "Дом", sphere: "health", unlockLevel: 1 },
@@ -45,6 +47,6 @@ export function mapNodeStates(input: {
     if (!unlocked[index]) return { ...node, state: "locked" };
     if (index === currentIndex && !done.has(node.sphere)) return { ...node, state: "current" };
     if (done.has(node.sphere)) return { ...node, state: "done" };
-    return { ...node, state: "locked" };
+    return { ...node, state: "available" };
   });
 }
