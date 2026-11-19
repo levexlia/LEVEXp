@@ -23,6 +23,10 @@
 
 ![avatar](avatar_board.webp)
 
+Вторая партия для PR #12: рамка 96 px, гекс уровня, иконки шапки и табов, пустой гекс открытой миссии:
+
+![missing](missing_art_board.webp)
+
 Проверка 22 px (×4 nearest-neighbor):
 
 ![zoom](zoom_22px.webp) ![zoom anim](zoom_22px.gif)
