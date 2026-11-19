@@ -3,6 +3,7 @@ import type { Goal } from "./api";
 import { placeIconUrl } from "./map/placeIcons";
 import { ACTION_LABEL, placeSheet, segments, type SheetAction } from "./map/placeSheet";
 import { artSrc } from "./theme/motion";
+import { MISSION_OPEN_URL, hexFrameUrl } from "./theme/uiArt";
 
 const UI = "/art/scene14/ui";
 const ACTION_ICON: Partial<Record<SheetAction, string>> = {
@@ -52,9 +53,8 @@ export function PlaceSheet({
           <div className="grab" aria-hidden="true" />
           <header className="ps-head">
             <div className="ps-hex" aria-hidden="true">
-              <span className="ps-hex__in">
-                <img src={artSrc(placeIconUrl(id, locked), reducedMotion)} width={58} height={58} alt="" />
-              </span>
+              <img className="ps-hex__frame" src={hexFrameUrl(id, locked)} width={96} height={96} alt="" />
+              <img className="ps-hex__icon" src={artSrc(placeIconUrl(id, locked), reducedMotion)} width={58} height={58} alt="" />
               {state === "done" ? <img className="ps-stamp" src="/art/scene14/badges/done.svg" width={34} height={34} alt="" /> : null}
               {locked ? <img className="ps-stamp" src="/art/scene14/badges/locked.svg" width={34} height={34} alt="" /> : null}
             </div>
@@ -109,7 +109,7 @@ export function PlaceSheet({
               ) : (
                 <li key={mission.id} className={mission.done ? "is-done" : undefined}>
                   <img
-                    src={mission.done ? `${UI}/ic_check.svg` : "/art/scene14/badges/available.svg"}
+                    src={mission.done ? `${UI}/ic_check.svg` : MISSION_OPEN_URL}
                     width={20}
                     height={20}
                     alt={mission.done ? "Выполнена" : ""}

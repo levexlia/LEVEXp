@@ -17,6 +17,7 @@ import { AvatarBuilder } from "./AvatarBuilder";
 import { HomeMap, mapStates } from "./HomeMap";
 import { PlaceSheet } from "./PlaceSheet";
 import { segments } from "./map/placeSheet";
+import { HEX_LEVEL_URL, tabIconUrl, uiIconUrl, type HeaderIcon, type TabIcon } from "./theme/uiArt";
 import { useReducedMotion } from "./theme/useReducedMotion";
 import { avatarFeet, spotFor, toViewPercent } from "./map/spots";
 import { KitIcon, SPHERE_ICON } from "./map/KitIcon";
@@ -99,9 +100,9 @@ export function App() {
           <strong>LEVEX</strong>
         </div>
         <div className="meters">
-          <span className="cnt streak" title="Серия"><UiIcon name="flame" tone="var(--lx-place-home)" />{pad2(player?.streak ?? 0)}<small>Серия</small></span>
-          <span className="cnt energy" title="Энергия"><UiIcon name="bolt" tone="var(--lx-gold)" />{energy.current}/{energy.max}</span>
-          <span className="lvl">Уровень<span className="lvl-hex"><b>{pad2(level)}</b></span></span>
+          <span className="cnt streak" title="Серия"><UiIcon name="streak" />{pad2(player?.streak ?? 0)}<small>Серия</small></span>
+          <span className="cnt energy" title="Энергия"><UiIcon name="energy" />{energy.current}/{energy.max}</span>
+          <span className="lvl">Уровень<span className="lvl-hex"><img src={HEX_LEVEL_URL} width={40} height={40} alt="" /><b>{pad2(level)}</b></span></span>
         </div>
         <button type="button" className="mini" onClick={() => { setDraft(config); setBuilding(true); }} aria-label="Персонаж">
           <Operator cheer={cheer && !reducedMotion} />
@@ -138,7 +139,7 @@ export function App() {
             </div>
             <aside className="stage-side" aria-labelledby="today-title">
               <h2 id="today-title">Сегодня</h2>
-              <p className="streak-line"><UiIcon name="flame" tone="var(--lx-place-home)" /> Серия: {player?.streak ?? 0} {dayWord(player?.streak ?? 0)}</p>
+              <p className="streak-line"><UiIcon name="streak" /> Серия: {player?.streak ?? 0} {dayWord(player?.streak ?? 0)}</p>
               <GoalList goals={goals.filter((goal) => goal.status === "open")} busy={busy} onDone={finish} />
             </aside>
           </div>
@@ -263,31 +264,18 @@ function dayWord(count: number): string {
   return "дней";
 }
 
-function Dock({ id, tab, label, icon, onPick }: { id: Tab; tab: Tab; label: string; icon: UiIconName; onPick: (id: Tab) => void }) {
+function Dock({ id, tab, label, icon, onPick }: { id: Tab; tab: Tab; label: string; icon: TabIcon; onPick: (id: Tab) => void }) {
   return (
     <button type="button" className={tab === id ? "dock-btn on" : "dock-btn"} aria-current={tab === id ? "page" : undefined} onClick={() => onPick(id)}>
-      <UiIcon name={icon} size={26} tone={tab === id ? undefined : "#56618c"} />
+      <img className="ui-icon" src={tabIconUrl(icon, tab === id)} width={26} height={26} alt="" />
       <span>{label}</span>
     </button>
   );
 }
 
-type UiIconName = "map" | "missions" | "resources" | "profile" | "camera" | "flame" | "bolt";
-
-/**
- * A scene14 UI icon. The kit draws them in cyan; `tone` recolours one through a CSS mask
- * (same shape, no new art), as the mocks do for the flame, the bolt and inactive tabs.
- */
-function UiIcon({ name, size = 20, tone }: { name: UiIconName; size?: number; tone?: string }) {
-  const src = `/art/scene14/ui/ic_${name}.svg`;
-  if (!tone) return <img className="ui-icon" src={src} width={size} height={size} alt="" />;
-  return (
-    <span
-      className="ui-icon masked"
-      aria-hidden="true"
-      style={{ width: size, height: size, background: tone, WebkitMaskImage: `url(${src})`, maskImage: `url(${src})` }}
-    />
-  );
+/** A scene14 header / button icon, drawn in its own colour (see theme/uiArt.ts). */
+function UiIcon({ name, size = 20 }: { name: HeaderIcon; size?: number }) {
+  return <img className="ui-icon" src={uiIconUrl(name)} width={size} height={size} alt="" />;
 }
 
 const OPERATOR = "/art/scene14/avatar/operator.svg";
