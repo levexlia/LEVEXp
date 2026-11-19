@@ -199,6 +199,11 @@ function translate(message: string): string {
 }
 
 /** Ask the AI assistant. The server adds the player's context itself; the client sends only the chat. */
-export function askAssistant(message: string, history: AssistantTurn[]): Promise<AssistantReply> {
-  return sendJson<AssistantReply>("/assistant/chat", { message, history });
+export function askAssistant(message: string, history: AssistantTurn[], signal?: AbortSignal): Promise<AssistantReply> {
+  return request<AssistantReply>("/assistant/chat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message, history }),
+    signal,
+  });
 }

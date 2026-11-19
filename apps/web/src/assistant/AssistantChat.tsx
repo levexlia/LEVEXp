@@ -6,17 +6,41 @@ import {
   type AssistantReply,
   type AssistantTurn,
 } from "@levex/domain";
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type RefObject } from "react";
-import { ASSISTANT_ROBOT_SVG } from "./art";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type KeyboardEvent,
+  type RefObject,
+} from "react";
+import { CHAT_ART, robotSrc, robotStateFor, typingSrc, type RobotState } from "./art";
+import "./levex-chat.css";
 
 export const GREETING = "Привет! Я помощник LEVEX. Помогу выбрать миссию или разбить её на маленькие шаги. О чём поговорим?";
 
+/** Show the length counter from here on (the hard cap is ASSISTANT_MESSAGE_MAX_LENGTH). */
+const COUNTER_FROM = ASSISTANT_MESSAGE_MAX_LENGTH - 100;
+
 export interface ChatLine extends AssistantTurn {
   id: number;
+  at: string;
   offline?: boolean;
 }
 
-export type AskFn = (message: string, history: AssistantTurn[]) => Promise<AssistantReply>;
+export type AskFn = (message: string, history: AssistantTurn[], signal?: AbortSignal) => Promise<AssistantReply>;
+
+const STATUS: Partial<Record<RobotState, { label: string; color: string }>> = {
+  listening: { label: "СЛУШАЕТ", color: "#22e1ff" },
+  thinking: { label: "ДУМАЕТ", color: "#b47bff" },
+  speaking: { label: "ГОВОРИТ", color: "#22e1ff" },
+};
+
+function clock(): string {
+  return new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
 
 /** Last turns that fit the server limits (count, per-item and total length). */
 export function historyFor(lines: readonly ChatLine[]): AssistantTurn[] {
@@ -35,28 +59,47 @@ export function historyFor(lines: readonly ChatLine[]): AssistantTurn[] {
   return picked;
 }
 
-/** Bottom-sheet chat with the assistant. Esc or the backdrop closes it. */
+/** Bottom-sheet chat with the assistant (scene 15 layout). Esc or the backdrop closes it. */
 export function AssistantChat({
   ask,
   onClose,
   errorText,
   returnFocus,
+  onRobotState,
+  reducedMotion,
 }: {
   ask: AskFn;
   onClose: () => void;
   errorText: (err: unknown) => string;
   /** Where focus goes when the sheet closes (the robot). Defaults to what had focus before. */
   returnFocus?: RefObject<HTMLElement | null>;
+  /** The map robot mirrors the chat's state. */
+  onRobotState?: (state: RobotState) => void;
+  reducedMotion: boolean;
 }) {
   const titleId = useId();
   const counterId = useId();
+  const [openedAt] = useState(clock);
   const [lines, setLines] = useState<ChatLine[]>([]);
   const [draft, setDraft] = useState("");
+  const [focused, setFocused] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ text: string; retry: string } | null>(null);
   const nextId = useRef(1);
+  const pending = useRef<AbortController | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const log = useRef<HTMLDivElement>(null);
+
+  const state = robotStateFor({
+    open: true,
+    loading,
+    typing: focused && draft.trim().length > 0,
+    answerShown: lines.at(-1)?.role === "assistant",
+  });
+
+  useEffect(() => {
+    onRobotState?.(state);
+  }, [state, onRobotState]);
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -70,6 +113,7 @@ export function AssistantChat({
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
+      pending.current?.abort();
       (returnFocus?.current ?? previous)?.focus?.();
     };
   }, [onClose, returnFocus]);
@@ -80,30 +124,42 @@ export function AssistantChat({
   }, [lines, loading, error]);
 
   const text = draft.trim();
-  const tooLong = draft.length > ASSISTANT_MESSAGE_MAX_LENGTH;
-  const canSend = !loading && text.length > 0 && !tooLong;
+  const canSend = !loading && text.length > 0 && draft.length <= ASSISTANT_MESSAGE_MAX_LENGTH;
 
   async function send(message: string, base: ChatLine[]) {
+    const controller = new AbortController();
+    pending.current = controller;
     setLoading(true);
     setError(null);
     try {
-      const answer = await ask(message, historyFor(base));
+      const answer = await ask(message, historyFor(base), controller.signal);
+      if (controller.signal.aborted) return;
       setLines((current) => [
         ...current,
-        { id: nextId.current++, role: "assistant", content: answer.reply, offline: answer.source === "offline" },
+        { id: nextId.current++, role: "assistant", content: answer.reply, at: clock(), offline: answer.source === "offline" },
       ]);
     } catch (err) {
-      setError({ text: errorText(err), retry: message });
+      if (!controller.signal.aborted) setError({ text: errorText(err), retry: message });
     } finally {
-      setLoading(false);
+      if (pending.current === controller) {
+        pending.current = null;
+        setLoading(false);
+      }
     }
+  }
+
+  function stop() {
+    pending.current?.abort();
+    pending.current = null;
+    setLoading(false);
+    input.current?.focus();
   }
 
   function submit(event?: FormEvent) {
     event?.preventDefault();
     if (!canSend) return;
     const base = lines;
-    setLines([...lines, { id: nextId.current++, role: "user", content: text }]);
+    setLines([...lines, { id: nextId.current++, role: "user", content: text, at: clock() }]);
     setDraft("");
     void send(text, base);
   }
@@ -115,72 +171,98 @@ export function AssistantChat({
     }
   }
 
+  const status = STATUS[state];
+
   return (
-    <div className="sheet-back chat-back" role="presentation" onClick={onClose}>
-      <section
-        className="sheet chat-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="chat-head">
-          <img src={ASSISTANT_ROBOT_SVG} alt="" width={24} height={48} />
-          <div>
-            <h2 id={titleId}>ИИ-помощник</h2>
-            <p>Подсказывает и поддерживает. XP и прогресс не меняет.</p>
-          </div>
-          <button type="button" className="quiet" onClick={onClose} aria-label="Закрыть чат">Закрыть</button>
-        </header>
+    <div className="lx-chat-root" data-robot-state={state}>
+      <div className="lx-chat-dim" aria-hidden="true" onClick={onClose} />
+      <section className="lx-chat" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="lx-chat__in">
+          <div className="lx-chat__grab" aria-hidden="true" />
+          <header className="lx-chat__head">
+            <div className="lx-chat__ava" aria-hidden="true">
+              <div className="cr">
+                <img className="lx-chat__robot" src={robotSrc(state, reducedMotion)} alt="" />
+              </div>
+            </div>
+            <div>
+              <p className="lx-chat__meta">LEVEX · XP И ПРОГРЕСС НЕ МЕНЯЕТ</p>
+              <h2 className="lx-chat__ttl" id={titleId}>ИИ-помощник</h2>
+              {status ? (
+                <span className="lx-chat__st" style={{ "--sc": status.color } as CSSProperties} aria-hidden="true">
+                  <i />
+                  {status.label}
+                </span>
+              ) : null}
+            </div>
+            <button type="button" className="lx-chat__close" onClick={onClose} aria-label="Закрыть чат">
+              <img src={CHAT_ART.close} width={32} height={32} alt="" />
+            </button>
+          </header>
 
-        <div className="chat-log" ref={log} role="log" aria-live="polite" aria-busy={loading} aria-label="Сообщения">
-          <p className="bubble from-assistant">{GREETING}</p>
-          {lines.map((line) => (
-            <p key={line.id} className={`bubble from-${line.role}${line.offline ? " is-offline" : ""}`}>
-              <span className="sr-only">{line.role === "user" ? "Ты: " : "Помощник: "}</span>
-              {line.content}
-            </p>
-          ))}
-          {loading ? (
-            <p className="bubble from-assistant is-typing" role="status">
-              <span className="dots" aria-hidden="true"><i /><i /><i /></span>
-              <span className="sr-only">Помощник печатает…</span>
-            </p>
+          <div className="lx-chat__log" ref={log} role="log" aria-live="polite" aria-busy={loading} aria-label="Сообщения">
+            <div className="lx-msg lx-msg--bot">
+              <div className="lx-msg__meta" aria-hidden="true">ИИ-ПОМОЩНИК · {openedAt}</div>
+              <p className="lx-msg__b">{GREETING}</p>
+            </div>
+            {lines.map((line) => (
+              <div key={line.id} className={`lx-msg ${line.role === "user" ? "lx-msg--me" : "lx-msg--bot"}${line.offline ? " is-offline" : ""}`}>
+                <div className="lx-msg__meta" aria-hidden="true">
+                  {line.role === "user" ? "ТЫ" : "ИИ-ПОМОЩНИК"} · {line.at}
+                </div>
+                <p className="lx-msg__b">
+                  <span className="sr-only">{line.role === "user" ? "Ты: " : "Помощник: "}</span>
+                  {line.content}
+                </p>
+              </div>
+            ))}
+            {loading ? (
+              <div className="lx-typing" role="status">
+                <img src={typingSrc(reducedMotion)} width={44} height={20} alt="" />
+                <span>помощник думает…</span>
+              </div>
+            ) : null}
+          </div>
+
+          {error ? (
+            <div className="chat-error" role="alert">
+              <span>{error.text}</span>
+              <button type="button" className="quiet" disabled={loading} onClick={() => void send(error.retry, lines.slice(0, -1))}>
+                Повторить
+              </button>
+            </div>
           ) : null}
+
+          <form className="lx-chat__bar" onSubmit={submit}>
+            <label className="sr-only" htmlFor={`${titleId}-input`}>Сообщение помощнику</label>
+            <textarea
+              id={`${titleId}-input`}
+              ref={input}
+              className={`lx-chat__field${focused ? " focus" : ""}`}
+              rows={1}
+              value={draft}
+              maxLength={ASSISTANT_MESSAGE_MAX_LENGTH}
+              placeholder="Напиши помощнику…"
+              aria-describedby={counterId}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              onChange={(event) => setDraft(event.target.value.slice(0, ASSISTANT_MESSAGE_MAX_LENGTH))}
+              onKeyDown={onKeyDown}
+            />
+            {loading ? (
+              <button type="button" className="lx-chat__send" onClick={stop} aria-label="Остановить ответ">
+                <img src={CHAT_ART.stop} width={48} height={48} alt="" />
+              </button>
+            ) : (
+              <button type="submit" className="lx-chat__send" disabled={!canSend} aria-label="Отправить">
+                <img src={canSend ? CHAT_ART.send : CHAT_ART.sendDisabled} width={48} height={48} alt="" />
+              </button>
+            )}
+          </form>
+          <small id={counterId} className={`lx-chat__count${draft.length >= COUNTER_FROM ? " is-near" : " sr-only"}${draft.length >= ASSISTANT_MESSAGE_MAX_LENGTH ? " at-limit" : ""}`}>
+            {draft.length}/{ASSISTANT_MESSAGE_MAX_LENGTH}
+          </small>
         </div>
-
-        {error ? (
-          <div className="chat-error" role="alert">
-            <span>{error.text}</span>
-            <button type="button" className="quiet" disabled={loading} onClick={() => void send(error.retry, lines.slice(0, -1))}>
-              Повторить
-            </button>
-          </div>
-        ) : null}
-
-        <form className="chat-form" onSubmit={submit}>
-          <label className="sr-only" htmlFor={`${titleId}-input`}>Сообщение помощнику</label>
-          <textarea
-            id={`${titleId}-input`}
-            ref={input}
-            rows={2}
-            value={draft}
-            maxLength={ASSISTANT_MESSAGE_MAX_LENGTH}
-            placeholder="Спроси о миссиях или о том, с чего начать"
-            aria-describedby={counterId}
-            aria-invalid={tooLong}
-            onChange={(event) => setDraft(event.target.value.slice(0, ASSISTANT_MESSAGE_MAX_LENGTH))}
-            onKeyDown={onKeyDown}
-          />
-          <div className="chat-send">
-            <small id={counterId} className={draft.length >= ASSISTANT_MESSAGE_MAX_LENGTH ? "at-limit" : undefined}>
-              {draft.length}/{ASSISTANT_MESSAGE_MAX_LENGTH}
-            </small>
-            <button type="submit" className="done" disabled={!canSend}>
-              {loading ? "Жду ответ…" : "Отправить"}
-            </button>
-          </div>
-        </form>
       </section>
     </div>
   );

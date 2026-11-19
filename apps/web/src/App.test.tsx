@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { ASSISTANT_ROBOT_SVG } from "./assistant/art";
+
 
 const player = {
   id: "p1",
@@ -48,7 +48,8 @@ describe("App: avatar in Профиль, assistant on the map", () => {
   it("shows the assistant robot on the map and no player avatar there", async () => {
     const { container } = await renderApp();
     const robot = screen.getByRole("button", { name: /ИИ-помощник/ });
-    expect(robot.querySelector("img")?.getAttribute("src")).toBe(ASSISTANT_ROBOT_SVG);
+    expect(robot.querySelector("img")?.getAttribute("src")).toBe("/art/scene15/robot_idle.svg");
+    expect(container.querySelector('img[src*="tap_marker"]')).toBeNull();
     expect(robot.closest(".map-frame")).not.toBeNull();
     expect(container.querySelectorAll("svg.hero")).toHaveLength(0);
     expect(screen.queryByRole("img", { name: /Персонаж|Мой персонаж/ })).toBeNull();
@@ -74,14 +75,31 @@ describe("App: avatar in Профиль, assistant on the map", () => {
     const box = within(dialog).getByLabelText("Сообщение помощнику");
     expect(document.activeElement).toBe(box);
 
+    const mapImg = robot.querySelector("img")!;
+    fireEvent.focus(box);
     fireEvent.change(box, { target: { value: "Привет" } });
+    expect(mapImg.getAttribute("src")).toBe("/art/scene15/robot_listening.svg");
     fireEvent.click(within(dialog).getByRole("button", { name: "Отправить" }));
     expect(await within(dialog).findByText("ИИ пока не подключён.")).toBeTruthy();
+    await waitFor(() => expect(mapImg.getAttribute("src")).toBe("/art/scene15/robot_speaking.svg"));
     const call = fetchMock.mock.calls.find(([url]) => url === "/assistant/chat")!;
     expect(JSON.parse(String(call[1].body))).toEqual({ message: "Привет", history: [] });
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "ИИ-помощник" })).toBeNull();
     expect(document.activeElement).toBe(robot);
+    expect(mapImg.getAttribute("src")).toBe("/art/scene15/robot_idle.svg");
+  });
+
+  it("shows the static robot on the map with reduced motion", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("reduce"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    await renderApp();
+    const robot = screen.getByRole("button", { name: /ИИ-помощник/ });
+    expect(robot.querySelector("img")?.getAttribute("src")).toBe("/art/scene15/static/robot_idle_static.svg");
   });
 });

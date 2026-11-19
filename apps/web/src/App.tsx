@@ -17,7 +17,8 @@ import {
 import { Avatar } from "./avatar/Avatar";
 import { AvatarBuilder } from "./AvatarBuilder";
 import { AssistantChat } from "./assistant/AssistantChat";
-import { ASSISTANT_ROBOT_SIZE, ASSISTANT_ROBOT_SVG } from "./assistant/art";
+import { ASSISTANT_ROBOT_SIZE, ROBOT_STATES, robotSrc, type RobotState } from "./assistant/art";
+import { useReducedMotion } from "./assistant/useReducedMotion";
 import { HomeMap, missionsFor } from "./HomeMap";
 import { avatarFeet, spotFor, toViewPercent } from "./map/spots";
 import { KitIcon, SPHERE_ICON, type KitIconName } from "./map/KitIcon";
@@ -36,11 +37,21 @@ export function App() {
   const [proof, setProof] = useState(false);
   const [cheer, setCheer] = useState(false);
   const [chat, setChat] = useState(false);
-  const closeChat = useCallback(() => setChat(false), []);
+  const [robotState, setRobotState] = useState<RobotState>("idle");
+  const reducedMotion = useReducedMotion();
+  const closeChat = useCallback(() => {
+    setChat(false);
+    setRobotState("idle");
+  }, []);
   const robotRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Preload the robot states so switching does not flash (INTEGRATION.md).
+  useEffect(() => {
+    for (const state of ROBOT_STATES) new Image().src = robotSrc(state, reducedMotion);
+  }, [reducedMotion]);
 
   async function refresh(): Promise<Player> {
     const data = await loadRoom();
@@ -126,8 +137,13 @@ export function App() {
                   aria-haspopup="dialog"
                   aria-expanded={chat}
                 >
-                  <img src={ASSISTANT_ROBOT_SVG} alt="" width={ASSISTANT_ROBOT_SIZE.width} height={ASSISTANT_ROBOT_SIZE.height} />
-                  <span className="robot-tag" aria-hidden="true">ИИ</span>
+                  <img
+                    src={robotSrc(chat ? robotState : "idle", reducedMotion)}
+                    alt=""
+                    width={ASSISTANT_ROBOT_SIZE.width}
+                    height={ASSISTANT_ROBOT_SIZE.height}
+                    data-state={chat ? robotState : "idle"}
+                  />
                 </button>
                 <button type="button" className="proof" onClick={() => setProof(true)}>
                   <KitIcon name="camera" size={26} />
@@ -171,7 +187,16 @@ export function App() {
         </Sheet>
       ) : null}
 
-      {chat ? <AssistantChat ask={askAssistant} onClose={closeChat} errorText={errorMessage} returnFocus={robotRef} /> : null}
+      {chat ? (
+        <AssistantChat
+          ask={askAssistant}
+          onClose={closeChat}
+          errorText={errorMessage}
+          returnFocus={robotRef}
+          onRobotState={setRobotState}
+          reducedMotion={reducedMotion}
+        />
+      ) : null}
 
       {proof ? (
         <Sheet title="Proof: загрузи фото" onClose={() => setProof(false)}>

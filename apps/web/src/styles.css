@@ -149,31 +149,19 @@ button { cursor: pointer; }
 .badge-halo { opacity: 0.85; }
 .dome-glow.current { animation: dome-pulse 2.4s ease-in-out infinite; }
 
-/* AI assistant on the map: stands beside the current place, opens the chat. */
+/* AI assistant on the map (scene 15). Box 80×120, feet of the 48×96 body at (40, 116). */
 .map-robot {
   position: absolute;
+  width: 80px;
+  height: 120px;
   padding: 0;
   border: 0;
   background: none;
-  transform: translate(-50%, -104%);
+  transform: translate(-50%, -96.7%);
   z-index: 2;
-  border-radius: 14px;
 }
-.map-robot img { display: block; filter: drop-shadow(0 0 10px rgba(34, 225, 255, 0.45)); }
-.map-robot .robot-tag {
-  position: absolute;
-  top: -6px;
-  right: -16px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  border: 1px solid #22e1ff;
-  background: #0b0b1f;
-  color: #7ff3ff;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-.map-robot:focus-visible { outline: 2px solid #22e1ff; outline-offset: 4px; }
+.map-robot img { display: block; width: 80px; height: 120px; }
+.map-robot:focus-visible { outline: 2px solid #22e1ff; outline-offset: 2px; }
 
 .profile-hero {
   display: flex;
@@ -310,43 +298,6 @@ button { cursor: pointer; }
 
 .sheet header { display: flex; justify-content: space-between; align-items: center; }
 
-.chat-sheet {
-  display: flex;
-  flex-direction: column;
-  max-height: 82vh;
-  height: 82vh;
-  overflow: hidden;
-  padding-bottom: 0.8rem;
-  animation: sheet-up 0.22s ease-out;
-}
-.chat-sheet .chat-head { display: grid; grid-template-columns: auto 1fr auto; gap: 0.6rem; align-items: center; }
-.chat-head h2 { margin: 0; font-size: 1.1rem; }
-.chat-head p { margin: 0.1rem 0 0; color: #94a3b8; font-size: 0.78rem; }
-.chat-log {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin: 0.7rem 0 0.5rem;
-  padding: 0.2rem 0.1rem;
-}
-.bubble {
-  margin: 0;
-  max-width: 86%;
-  padding: 0.55rem 0.75rem;
-  border-radius: 14px;
-  line-height: 1.35;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.bubble.from-assistant { align-self: flex-start; background: #1b1a3d; border: 1px solid #2f3a8a; border-bottom-left-radius: 4px; }
-.bubble.from-user { align-self: flex-end; background: linear-gradient(90deg, #6d28d9, #7c3aed); border-bottom-right-radius: 4px; }
-.bubble.is-offline { border-style: dashed; color: #c7d2fe; }
-.bubble .dots { display: inline-flex; gap: 4px; }
-.bubble .dots i { width: 7px; height: 7px; border-radius: 50%; background: #7ff3ff; animation: dot 1s infinite ease-in-out; }
-.bubble .dots i:nth-child(2) { animation-delay: 0.15s; }
-.bubble .dots i:nth-child(3) { animation-delay: 0.3s; }
 .chat-error {
   display: flex;
   justify-content: space-between;
@@ -359,26 +310,46 @@ button { cursor: pointer; }
   border: 1px solid rgba(244, 63, 94, 0.5);
   font-size: 0.88rem;
 }
-.chat-form { display: grid; gap: 0.35rem; }
-.chat-form textarea {
-  width: 100%;
-  resize: none;
-  font: inherit;
-  color: inherit;
-  background: #0b0b1f;
-  border: 1px solid #312e81;
-  border-radius: 12px;
-  padding: 0.55rem 0.7rem;
-}
-.chat-form textarea:focus-visible { outline: 2px solid #22e1ff; outline-offset: 1px; }
-.chat-send { display: flex; justify-content: space-between; align-items: center; }
-.chat-send small { color: #8a8fb8; }
-.chat-send .done { width: auto; margin-top: 0; padding: 0.6rem 1.5rem; }
-.chat-send .done:disabled { opacity: 0.45; cursor: default; }
-.chat-send small.at-limit { color: #fda4af; }
+@font-face { font-family: "Tektur"; src: url("/art/scene14/fonts/Tektur-Variable.ttf") format("truetype"); font-weight: 400 900; font-stretch: 75% 100%; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("/art/scene14/fonts/JetBrainsMono-Variable.ttf") format("truetype"); font-weight: 100 800; font-display: swap; }
 
-@keyframes sheet-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
-@keyframes dot { 0%, 80%, 100% { opacity: 0.3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+/* Chat sheet: scene 15 levex-chat.css (assistant/levex-chat.css, unchanged) placed in the app. */
+.lx-chat-root { position: fixed; inset: 0; z-index: 5; }
+.lx-chat-dim { position: absolute; inset: 0; }
+.lx-chat {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: min(480px, 100%);
+  height: min(672px, 86vh);
+  transform: translateX(-50%);
+  animation: lx-chat-up 0.22s ease-out;
+}
+.lx-chat__ava .cr > .lx-chat__robot { left: -19px; top: -5px; width: 96px; height: 144px; }
+.lx-chat__ava .cr { background: radial-gradient(circle at 50% 40%, rgba(34, 225, 255, 0.18), rgba(10, 16, 48, 0.9) 70%); }
+.lx-chat__close { padding: 0; border: 0; background: none; }
+.lx-chat__close img, .lx-chat__send img { display: block; }
+.lx-chat__close:focus-visible, .lx-chat__send:focus-visible { outline: 2px solid #22e1ff; outline-offset: 2px; }
+.lx-chat__ttl { font-size: 20px; }
+.lx-chat__log { overflow-y: auto; justify-content: flex-start; }
+.lx-chat__log > :first-child { margin-top: auto; }
+.lx-msg__b { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lx-msg.is-offline .lx-msg__b { border-style: dashed; color: #c7d2fe; }
+.lx-typing { align-self: flex-start; }
+.lx-chat__bar { margin-top: 8px; }
+.lx-chat__field {
+  height: 48px;
+  padding: 13px 14px;
+  resize: none;
+  outline: none;
+  line-height: 1.4;
+}
+.lx-chat__field::placeholder { color: #6b7597; }
+.lx-chat__send { padding: 0; border: 0; background: none; }
+.lx-chat__send:disabled { cursor: default; }
+.lx-chat__count { align-self: flex-end; margin-top: 4px; font: 600 10px "JetBrains Mono", monospace; color: #7f8cc0; }
+.lx-chat__count.at-limit { color: #fda4af; }
+@keyframes lx-chat-up { from { transform: translate(-50%, 24px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
 
 .builder-page {
   position: fixed;
@@ -513,6 +484,5 @@ button { cursor: pointer; }
   .dome-glow.current,
   .hero.idle,
   .hero.cheer,
-  .chat-sheet,
-  .bubble .dots i { animation: none; }
+  .lx-chat { animation: none; }
 }
