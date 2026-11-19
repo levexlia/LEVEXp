@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { CHAT_ART, ROBOT_STATES, robotSrc, typingSrc } from "./art";
+import { CHAT_ART, ROBOT_STATES, avatarFrameSrc, robotSrc, typingSrc } from "./art";
 
 const PUBLIC = fileURLToPath(new URL("../../public", import.meta.url));
 const read = (url: string) => readFileSync(`${PUBLIC}${url}`, "utf8");
@@ -26,5 +26,14 @@ describe("scene 15 robot files", () => {
 
   it("does not ship the tap marker", () => {
     expect(existsSync(`${PUBLIC}/art/scene15/robot_tap_marker.svg`)).toBe(false);
+  });
+});
+
+describe("chat avatar frame", () => {
+  it("is animated by default and static with reduced motion", () => {
+    expect(avatarFrameSrc(false)).toBe("/art/scene15/chat/chat_avatar_frame.svg");
+    expect(avatarFrameSrc(true)).toBe("/art/scene15/static/chat_avatar_frame_static.svg");
+    expect(read(avatarFrameSrc(false))).toMatch(/@keyframes/);
+    expect(read(avatarFrameSrc(true))).not.toMatch(/@keyframes|animation\s*:|animation-name/);
   });
 });

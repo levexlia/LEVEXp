@@ -149,15 +149,20 @@ button { cursor: pointer; }
 .badge-halo { opacity: 0.85; }
 .dome-glow.current { animation: dome-pulse 2.4s ease-in-out infinite; }
 
-/* AI assistant on the map (scene 15). Box 80×120, feet of the 48×96 body at (40, 116). */
+/*
+ * AI assistant on the map (scene 15), 80×120 box. Fixed in the map's bottom-right corner,
+ * beside Proof: clear of the Дом dome, the badges, the place labels and Proof
+ * at 390×844 and 1280×800 (checked by measuring the rendered layout).
+ */
 .map-robot {
   position: absolute;
+  right: 5%;
+  bottom: 14px;
   width: 80px;
   height: 120px;
   padding: 0;
   border: 0;
   background: none;
-  transform: translate(-50%, -96.7%);
   z-index: 2;
 }
 .map-robot img { display: block; width: 80px; height: 120px; }
@@ -326,7 +331,6 @@ button { cursor: pointer; }
   animation: lx-chat-up 0.22s ease-out;
 }
 .lx-chat__ava .cr > .lx-chat__robot { left: -19px; top: -5px; width: 96px; height: 144px; }
-.lx-chat__ava .cr { background: radial-gradient(circle at 50% 40%, rgba(34, 225, 255, 0.18), rgba(10, 16, 48, 0.9) 70%); }
 .lx-chat__close { padding: 0; border: 0; background: none; }
 .lx-chat__close img, .lx-chat__send img { display: block; }
 .lx-chat__close:focus-visible, .lx-chat__send:focus-visible { outline: 2px solid #22e1ff; outline-offset: 2px; }

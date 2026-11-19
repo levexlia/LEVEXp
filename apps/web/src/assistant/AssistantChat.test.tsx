@@ -63,6 +63,7 @@ describe("AssistantChat", () => {
     const { box, head, send, now, states } = setup(ask);
     expect(states[0]).toBe("idle");
     expect(head().getAttribute("src")).toBe("/art/scene15/robot_idle.svg");
+    expect(document.querySelector(".lx-chat__ava img.fr")!.getAttribute("src")).toBe("/art/scene15/chat/chat_avatar_frame.svg");
     expect(send().querySelector("img")!.getAttribute("src")).toBe("/art/scene15/chat/chat_send_disabled.svg");
 
     fireEvent.focus(box);
@@ -97,6 +98,7 @@ describe("AssistantChat", () => {
     const first = deferred<AssistantReply>();
     const { box, head } = setup(vi.fn<AskFn>().mockReturnValueOnce(first.promise), true);
     expect(head().getAttribute("src")).toBe("/art/scene15/static/robot_idle_static.svg");
+    expect(document.querySelector(".lx-chat__ava img.fr")!.getAttribute("src")).toBe("/art/scene15/static/chat_avatar_frame_static.svg");
     fireEvent.focus(box);
     fireEvent.change(box, { target: { value: "Привет" } });
     expect(head().getAttribute("src")).toBe("/art/scene15/static/robot_listening_static.svg");

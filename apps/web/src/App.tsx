@@ -1,4 +1,4 @@
-import { DEFAULT_AVATAR_CONFIG, LIFE_SPHERES, MAP_NODES, XP_PER_LEVEL, mapNodeStates, type AvatarConfig, type MapNodeId } from "@levex/domain";
+import { DEFAULT_AVATAR_CONFIG, LIFE_SPHERES, MAP_NODES, XP_PER_LEVEL, type AvatarConfig, type MapNodeId } from "@levex/domain";
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   askAssistant,
@@ -20,7 +20,6 @@ import { AssistantChat } from "./assistant/AssistantChat";
 import { ASSISTANT_ROBOT_SIZE, ROBOT_STATES, robotSrc, type RobotState } from "./assistant/art";
 import { useReducedMotion } from "./assistant/useReducedMotion";
 import { HomeMap, missionsFor } from "./HomeMap";
-import { avatarFeet, spotFor, toViewPercent } from "./map/spots";
 import { KitIcon, SPHERE_ICON, type KitIconName } from "./map/KitIcon";
 import { Logo } from "./Logo";
 
@@ -71,10 +70,6 @@ export function App() {
   const into = xp % XP_PER_LEVEL;
   const config = player?.avatarConfig ?? DEFAULT_AVATAR_CONFIG;
   const energy = player?.energy ?? { current: 50, max: 50 };
-  const doneSpheres = goals.filter((goal) => goal.status === "done" && goal.sphere).map((goal) => goal.sphere as string);
-  const currentNode = mapNodeStates({ level, doneSpheres }).find((node) => node.state === "current");
-  // The assistant stands where the player's avatar used to: next to the current place.
-  const robotSpot = toViewPercent(avatarFeet(spotFor(currentNode?.id ?? "home")));
 
   function burst() {
     setCheer(true);
@@ -131,7 +126,6 @@ export function App() {
                   type="button"
                   ref={robotRef}
                   className="map-robot"
-                  style={robotSpot}
                   onClick={() => setChat(true)}
                   aria-label="ИИ-помощник: открыть чат"
                   aria-haspopup="dialog"

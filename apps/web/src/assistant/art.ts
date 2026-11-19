@@ -28,6 +28,11 @@ export const CHAT_ART = {
   stop: `${SCENE15}/chat/chat_stop.svg`,
 };
 
+/** Hex frame behind the robot in the chat header (`.lx-chat__ava .fr`), 64×64. */
+export function avatarFrameSrc(reducedMotion: boolean): string {
+  return reducedMotion ? `${SCENE15}/static/chat_avatar_frame_static.svg` : `${SCENE15}/chat/chat_avatar_frame.svg`;
+}
+
 export function typingSrc(reducedMotion: boolean): string {
   return reducedMotion ? `${SCENE15}/static/chat_typing_static.svg` : `${SCENE15}/chat/chat_typing.svg`;
 }

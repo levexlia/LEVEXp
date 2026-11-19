@@ -16,7 +16,7 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from "react";
-import { CHAT_ART, robotSrc, robotStateFor, typingSrc, type RobotState } from "./art";
+import { CHAT_ART, avatarFrameSrc, robotSrc, robotStateFor, typingSrc, type RobotState } from "./art";
 import "./levex-chat.css";
 
 export const GREETING = "Привет! Я помощник LEVEX. Помогу выбрать миссию или разбить её на маленькие шаги. О чём поговорим?";
@@ -181,6 +181,7 @@ export function AssistantChat({
           <div className="lx-chat__grab" aria-hidden="true" />
           <header className="lx-chat__head">
             <div className="lx-chat__ava" aria-hidden="true">
+              <img className="fr" src={avatarFrameSrc(reducedMotion)} width={64} height={64} alt="" />
               <div className="cr">
                 <img className="lx-chat__robot" src={robotSrc(state, reducedMotion)} alt="" />
               </div>
