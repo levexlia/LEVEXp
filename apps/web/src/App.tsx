@@ -1,4 +1,4 @@
-import { DEFAULT_AVATAR_CONFIG, LIFE_SPHERES, MAP_NODES, XP_PER_LEVEL, mapNodeStates, type AvatarConfig, type MapNodeId } from "@levex/domain";
+import { DEFAULT_AVATAR_CONFIG, LIFE_SPHERES, XP_PER_LEVEL, type AvatarConfig, type MapNodeId } from "@levex/domain";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   completeGoal,
@@ -13,11 +13,13 @@ import {
   type Placement,
   type Player,
 } from "./api";
-import { Avatar } from "./avatar/Avatar";
 import { AvatarBuilder } from "./AvatarBuilder";
-import { HomeMap, missionsFor } from "./HomeMap";
+import { HomeMap, mapStates } from "./HomeMap";
+import { PlaceSheet } from "./PlaceSheet";
+import { segments } from "./map/placeSheet";
+import { useReducedMotion } from "./theme/useReducedMotion";
 import { avatarFeet, spotFor, toViewPercent } from "./map/spots";
-import { KitIcon, SPHERE_ICON, type KitIconName } from "./map/KitIcon";
+import { KitIcon, SPHERE_ICON } from "./map/KitIcon";
 import { Logo } from "./Logo";
 
 type Tab = "map" | "missions" | "resources" | "profile";
@@ -54,9 +56,17 @@ export function App() {
   const into = xp % XP_PER_LEVEL;
   const config = player?.avatarConfig ?? DEFAULT_AVATAR_CONFIG;
   const energy = player?.energy ?? { current: 50, max: 50 };
-  const doneSpheres = goals.filter((goal) => goal.status === "done" && goal.sphere).map((goal) => goal.sphere as string);
-  const currentNode = mapNodeStates({ level, doneSpheres }).find((node) => node.state === "current");
-  const avatarSpot = toViewPercent(avatarFeet(spotFor(currentNode?.id ?? "home")));
+  const reducedMotion = useReducedMotion();
+  const states = mapStates(level, goals);
+  const currentId = [...states].find(([, state]) => state === "current")?.[0] ?? "home";
+  const avatarSpot = toViewPercent(avatarFeet(spotFor(currentId)));
+
+  /** «Начать» / «Войти» / «Повторить»: Мастерская opens the photo proof, other places the mission list. */
+  function enterPlace(id: MapNodeId) {
+    setNodeId(null);
+    if (id === "workshop") setProof(true);
+    else setTab("missions");
+  }
 
   function burst() {
     setCheer(true);
@@ -89,18 +99,19 @@ export function App() {
           <strong>LEVEX</strong>
         </div>
         <div className="meters">
-          <span className="pill streak"><KitIcon name="streak" size={18} />{player?.streak ?? 0}</span>
-          <span className="pill energy"><KitIcon name="energy" size={18} />{energy.current}/{energy.max}</span>
-          <span className="pill level"><KitIcon name="level" size={18} />Ур. {level}</span>
+          <span className="cnt streak" title="Серия"><UiIcon name="flame" tone="var(--lx-place-home)" />{pad2(player?.streak ?? 0)}<small>Серия</small></span>
+          <span className="cnt energy" title="Энергия"><UiIcon name="bolt" tone="var(--lx-gold)" />{energy.current}/{energy.max}</span>
+          <span className="lvl">Уровень<span className="lvl-hex"><b>{pad2(level)}</b></span></span>
         </div>
         <button type="button" className="mini" onClick={() => { setDraft(config); setBuilding(true); }} aria-label="Персонаж">
-          <Avatar config={config} cheer={cheer} title="Персонаж" />
+          <Operator cheer={cheer && !reducedMotion} />
         </button>
         <div className="xp-line">
-          <div className="xp" role="progressbar" aria-valuenow={into} aria-valuemin={0} aria-valuemax={XP_PER_LEVEL}>
-            <span style={{ width: `${into}%` }} />
+          <em>XP</em>
+          <div className="xp-seg" role="progressbar" aria-label="XP до следующего уровня" aria-valuenow={into} aria-valuemin={0} aria-valuemax={XP_PER_LEVEL}>
+            {segments(into, XP_PER_LEVEL, 20).map((on, index) => <i key={index} className={on ? "on" : undefined} />)}
           </div>
-          <em>XP {into} / {XP_PER_LEVEL}</em>
+          <em>{into}/{XP_PER_LEVEL}</em>
         </div>
       </header>
 
@@ -110,29 +121,24 @@ export function App() {
         {tab === "map" ? (
           <div className="map-wrap">
             <aside className="stage-avatar">
-              <Avatar config={config} cheer={cheer} title="Персонаж" />
+              <Operator cheer={cheer && !reducedMotion} size={2.4} />
             </aside>
             <div className="map-column">
               <div className="map-frame">
-                <HomeMap level={level} xp={xp} goals={goals} onOpen={setNodeId} />
-                <button
-                  type="button"
-                  className="map-avatar"
-                  style={avatarSpot}
-                  onClick={() => { setDraft(config); setBuilding(true); }}
-                  aria-label="Персонаж на карте"
-                >
-                  <Avatar config={config} cheer={cheer} decorative />
-                </button>
-                <button type="button" className="proof" onClick={() => setProof(true)}>
-                  <KitIcon name="camera" size={26} />
-                  Proof
+                <HomeMap states={states} reducedMotion={reducedMotion} onOpen={setNodeId} />
+                <div className="map-avatar" style={avatarSpot} aria-hidden="true">
+                  <Operator cheer={cheer && !reducedMotion} />
+                </div>
+              </div>
+              <div className="proof-row">
+                <button type="button" className="lx-btn proof" onClick={() => setProof(true)}>
+                  <span className="lx-btn__in"><UiIcon name="camera" />Proof</span>
                 </button>
               </div>
             </div>
             <aside className="stage-side" aria-labelledby="today-title">
               <h2 id="today-title">Сегодня</h2>
-              <p className="streak-line"><KitIcon name="streak" size={18} /> Серия: {player?.streak ?? 0} {dayWord(player?.streak ?? 0)}</p>
+              <p className="streak-line"><UiIcon name="flame" tone="var(--lx-place-home)" /> Серия: {player?.streak ?? 0} {dayWord(player?.streak ?? 0)}</p>
               <GoalList goals={goals.filter((goal) => goal.status === "open")} busy={busy} onDone={finish} />
             </aside>
           </div>
@@ -157,10 +163,18 @@ export function App() {
       </nav>
 
       {nodeId ? (
-        <Sheet title={MAP_NODES.find((node) => node.id === nodeId)?.name ?? ""} onClose={() => setNodeId(null)}>
-          <GoalList goals={missionsFor(nodeId, goals)} busy={busy} onDone={finish} />
-          {nodeId === "workshop" ? <button type="button" className="done" onClick={() => { setNodeId(null); setProof(true); }}>Загрузить фото</button> : null}
-        </Sheet>
+        <PlaceSheet
+          id={nodeId}
+          state={states.get(nodeId) ?? "locked"}
+          goals={goals}
+          level={level}
+          xp={xp}
+          busy={busy}
+          reducedMotion={reducedMotion}
+          onClose={() => setNodeId(null)}
+          onEnter={enterPlace}
+          onDone={finish}
+        />
       ) : null}
 
       {proof ? (
@@ -249,13 +263,42 @@ function dayWord(count: number): string {
   return "дней";
 }
 
-function Dock({ id, tab, label, icon, onPick }: { id: Tab; tab: Tab; label: string; icon: KitIconName; onPick: (id: Tab) => void }) {
+function Dock({ id, tab, label, icon, onPick }: { id: Tab; tab: Tab; label: string; icon: UiIconName; onPick: (id: Tab) => void }) {
   return (
-    <button type="button" className={tab === id ? "dock-btn on" : "dock-btn"} onClick={() => onPick(id)}>
-      <KitIcon name={icon} size={26} />
+    <button type="button" className={tab === id ? "dock-btn on" : "dock-btn"} aria-current={tab === id ? "page" : undefined} onClick={() => onPick(id)}>
+      <UiIcon name={icon} size={26} tone={tab === id ? undefined : "#56618c"} />
       <span>{label}</span>
     </button>
   );
+}
+
+type UiIconName = "map" | "missions" | "resources" | "profile" | "camera" | "flame" | "bolt";
+
+/**
+ * A scene14 UI icon. The kit draws them in cyan; `tone` recolours one through a CSS mask
+ * (same shape, no new art), as the mocks do for the flame, the bolt and inactive tabs.
+ */
+function UiIcon({ name, size = 20, tone }: { name: UiIconName; size?: number; tone?: string }) {
+  const src = `/art/scene14/ui/ic_${name}.svg`;
+  if (!tone) return <img className="ui-icon" src={src} width={size} height={size} alt="" />;
+  return (
+    <span
+      className="ui-icon masked"
+      aria-hidden="true"
+      style={{ width: size, height: size, background: tone, WebkitMaskImage: `url(${src})`, maskImage: `url(${src})` }}
+    />
+  );
+}
+
+const OPERATOR = "/art/scene14/avatar/operator.svg";
+
+/** The scene14 'operator' avatar (48×96). Replaces the parts-kit figure on the map, header and desktop stage. */
+function Operator({ cheer = false, size = 1 }: { cheer?: boolean; size?: number }) {
+  return <img className={cheer ? "lx-avatar operator cheer" : "lx-avatar operator"} src={OPERATOR} width={48 * size} height={96 * size} alt="" />;
+}
+
+function pad2(value: number): string {
+  return String(Math.max(0, value)).padStart(2, "0");
 }
 
 function GoalList({ goals, busy, onDone }: { goals: Goal[]; busy: boolean; onDone: (id: string) => void }) {
@@ -266,7 +309,7 @@ function GoalList({ goals, busy, onDone }: { goals: Goal[]; busy: boolean; onDon
         <li key={goal.id}>
           <span>{goal.title}</span>
           {goal.status === "open" ? (
-            <button type="button" disabled={busy} onClick={() => onDone(goal.id)}>Готово</button>
+            <button type="button" className="lx-btn lx-btn--secondary lx-btn--sm" disabled={busy} onClick={() => onDone(goal.id)}><span className="lx-btn__in">Готово</span></button>
           ) : <em>закрыта</em>}
         </li>
       ))}
@@ -301,7 +344,7 @@ function Profile({ placements, onEdit }: { placements: Placement[]; onEdit: () =
   return (
     <section className="panel">
       <h2>Профиль</h2>
-      <button type="button" className="done" onClick={onEdit}>Собрать персонажа</button>
+      <button type="button" className="lx-btn lx-btn--wide" onClick={onEdit}><span className="lx-btn__in">Собрать персонажа</span></button>
       <h3>Галерея</h3>
       {placements.length === 0 ? <p className="empty">Фото появятся после proof.</p> : null}
       <ul className="gallery">
@@ -319,12 +362,14 @@ function Profile({ placements, onEdit }: { placements: Placement[]; onEdit: () =
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="sheet-back" role="presentation" onClick={onClose}>
-      <section className="sheet" role="dialog" aria-label={title} onClick={(event) => event.stopPropagation()}>
-        <header>
-          <h2>{title}</h2>
-          <button type="button" className="quiet" onClick={onClose}>Закрыть</button>
-        </header>
-        {children}
+      <section className="lx-sheet sheet" role="dialog" aria-label={title} onClick={(event) => event.stopPropagation()}>
+        <div className="lx-sheet__in">
+          <header>
+            <h2>{title}</h2>
+            <button type="button" className="quiet" onClick={onClose}>Закрыть</button>
+          </header>
+          {children}
+        </div>
       </section>
     </div>
   );
@@ -344,7 +389,7 @@ function ProofForm({ busy, onSubmit }: { busy: boolean; onSubmit: (title: string
       <input id="proof-title" value={title} onChange={(event) => setTitle(event.target.value)} />
       <label htmlFor="proof-file">Фото</label>
       <input id="proof-file" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-      <button type="submit" className="done" disabled={busy || !file}>Повесить и закрыть</button>
+      <button type="submit" className="lx-btn lx-btn--wide" disabled={busy || !file}><span className="lx-btn__in">Повесить и закрыть</span></button>
     </form>
   );
 }
@@ -372,7 +417,7 @@ function PhotoLook({
         <span>На фото реальный человек, и я соглашаюсь создать по нему персонажа.</span>
       </label>
       <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-      <button type="submit" disabled={busy || !file || !consent}>Создать по фото</button>
+      <button type="submit" className="lx-btn lx-btn--wide" disabled={busy || !file || !consent}><span className="lx-btn__in">Создать по фото</span></button>
     </form>
   );
 }

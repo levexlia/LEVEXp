@@ -2,6 +2,7 @@ import { MAP_NODES, mapNodeStates } from "@levex/domain";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import scene14Domes from "./scene14_domes.json";
 import { PLACE_ICON_DIR, PLACE_ICON_FILE, placeIconUrl } from "./placeIcons.js";
 import {
   BADGE_FILE,
@@ -9,8 +10,6 @@ import {
   MAP_VIEW,
   SPOTS,
   avatarFeet,
-  domeEllipse,
-  domeGlow,
   lockedHint,
   spotFor,
   toViewPercent,
@@ -42,16 +41,13 @@ describe("scene 11 map spots", () => {
     }
   });
 
-  it("puts each dome ellipse over its own building and not over another badge", () => {
+  it("boxes each scene14 dome over its own building foot", () => {
     for (const spot of SPOTS) {
-      const dome = domeEllipse(spot);
-      expect(dome.cx).toBe(spot.building[0]);
-      expect(dome.cy).toBeLessThan(spot.building[1]);
-      for (const other of SPOTS) {
-        const dx = (other.badge[0] - dome.cx) / dome.rx;
-        const dy = (other.badge[1] - dome.cy) / dome.ry;
-        expect(dx * dx + dy * dy, `${other.id} badge under ${spot.id} dome`).toBeGreaterThan(1);
-      }
+      const [x, y, w, h] = scene14Domes.domes[spot.id].scene720;
+      expect(spot.building[0], spot.id).toBeGreaterThan(x);
+      expect(spot.building[0], spot.id).toBeLessThan(x + w);
+      expect(spot.building[1], spot.id).toBeGreaterThan(y);
+      expect(spot.building[1], spot.id).toBeLessThan(y + h);
     }
   });
 
@@ -94,12 +90,6 @@ describe("spot states", () => {
     ]);
   });
 
-  it("glows done cyan and current violet only", () => {
-    expect(domeGlow("done")?.color).toBe("#22d3ee");
-    expect(domeGlow("current")?.color).toBe("#a78bfa");
-    expect(domeGlow("available")).toBeNull();
-    expect(domeGlow("locked")).toBeNull();
-  });
 });
 
 describe("locked hint", () => {

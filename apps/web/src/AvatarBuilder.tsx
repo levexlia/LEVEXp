@@ -126,7 +126,7 @@ export function AvatarBuilder({
             name={(accessory) => ACCESSORY_LABEL[accessory]}
           />
         ) : null}
-        <button type="button" className="photo-look" onClick={onPhoto} disabled={busy}>Создать по фото</button>
+        <button type="button" className="lx-btn lx-btn--secondary lx-btn--wide photo-look" onClick={onPhoto} disabled={busy}><span className="lx-btn__in">Создать по фото</span></button>
         <div className="emotions" role="list">
           {EXPRESSIONS.map((expression) => (
             <button
@@ -141,7 +141,7 @@ export function AvatarBuilder({
             </button>
           ))}
         </div>
-        <button type="button" className="done" onClick={onDone} disabled={busy}>Готово</button>
+        <button type="button" className="lx-btn lx-btn--wide" onClick={onDone} disabled={busy}><span className="lx-btn__in">Готово</span></button>
       </div>
     </section>
   );
