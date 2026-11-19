@@ -5,7 +5,7 @@ import type { MapNodeId } from "@levex/domain";
  * Files live in `apps/web/public/icons/places/`. To swap the set (icons2 → icons3),
  * drop new SVGs there under the same names, or change the folder / names below.
  */
-export const PLACE_ICON_DIR = "/icons/places";
+export const PLACE_ICON_DIR = "/art/scene14/places";
 
 export const PLACE_ICON_FILE: Record<MapNodeId, string> = {
   home: "home.svg",

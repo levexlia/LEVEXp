@@ -3,7 +3,7 @@ import { MAP_NODES, XP_PER_LEVEL, type MapNodeId, type MapNodeState } from "@lev
 import scene from "./scene11/map_spots.json";
 
 /** Scene 11 map: no road, five domes on hex islands in a zigzag. */
-export const MAP_SVG = "/map/scene11_map.svg";
+export const MAP_SVG = "/art/scene14/map/map_bg_720x1280.svg";
 
 const [, , sceneW, sceneH] = scene.viewBox as [number, number, number, number];
 
@@ -66,10 +66,10 @@ export const BADGE_RADIUS = (scene.badge_diameter_css_px_at_390 / 2) * (sceneW /
 
 /** Kit badge art for each state. All four share the 919 viewBox of the map kit. */
 export const BADGE_FILE: Record<MapNodeState, string> = {
-  done: "/map/badge_done_full.svg",
-  current: "/map/badge_current_full.svg",
-  available: "/map/badge_available_full.svg",
-  locked: "/map/badge_locked_full.svg",
+  done: "/art/scene14/badges/done.svg",
+  current: "/art/scene14/badges/current.svg",
+  available: "/art/scene14/badges/available.svg",
+  locked: "/art/scene14/badges/locked.svg",
 };
 
 /** Glow over a dome: cyan when done, violet when current, none otherwise. */

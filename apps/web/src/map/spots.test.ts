@@ -129,7 +129,8 @@ describe("place icons", () => {
   });
 
   it("ships the icon license next to the icons", () => {
-    expect(existsSync(publicFile(`${PLACE_ICON_DIR}/LICENSE-lucide-ISC.txt`))).toBe(true);
+    // scene14 icons are original work; their licenses sit one level up, next to the fonts' OFL texts.
+    expect(existsSync(publicFile(`${PLACE_ICON_DIR}/../LICENSES.md`))).toBe(true);
     expect(existsSync(publicFile("/map/SCENE11_LICENSES.md"))).toBe(true);
   });
 });

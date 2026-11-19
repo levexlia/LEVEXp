@@ -2,6 +2,7 @@ import { MAP_NODES, mapNodeStates, type MapNodeId, type MapNodeState } from "@le
 import { useEffect, useId, useState } from "react";
 import type { Goal } from "./api";
 import { placeIconUrl } from "./map/placeIcons";
+import scene14Domes from "./map/scene14_domes.json";
 import {
   BADGE_FILE,
   BADGE_RADIUS,
@@ -10,15 +11,14 @@ import {
   SCENE_SIZE,
   SPOTS,
   domeEllipse,
-  domeGlow,
   lockedHint,
   toViewPercent,
   type Spot,
 } from "./map/spots";
 
 /** Kit badges are drawn in a 919 box; this is their visual centre. */
-const BADGE_CENTER: [number, number] = [458.7, 431.9];
-const BADGE_BOX = 919;
+const BADGE_CENTER: [number, number] = [24, 24];
+const BADGE_BOX = 48;
 const HINT_MS = 4200;
 
 const STATE_WORD: Record<MapNodeState, string> = {
@@ -111,7 +111,7 @@ export function HomeMap({
           style={{ top: toViewPercent([hintSpot.badge[0], hintSpot.badge[1] + BADGE_RADIUS + 70]).top }}
           onClick={() => setHintFor(null)}
         >
-          <img src="/map/badge_locked_full.svg" width={22} height={22} alt="" />
+          <img src="/art/scene14/badges/locked.svg" width={22} height={22} alt="" />
           {lockedHint(hintSpot.id, { level, xp })}
         </p>
       ) : null}
@@ -119,39 +119,15 @@ export function HomeMap({
   );
 }
 
-function DomeState({ spot, state, uid }: { spot: Spot; state: MapNodeState; uid: string }) {
-  const dome = domeEllipse(spot);
-  if (state === "locked") {
-    return (
-      <g pointerEvents="none">
-        <ellipse cx={dome.cx} cy={dome.cy} rx={dome.rx * 0.7} ry={dome.ry * 0.7} fill="#b4c8e6" opacity="0.2" filter={`url(#${uid}-blur)`} />
-        <g clipPath={`url(#${uid}-dome-${spot.id})`}>
-          <image href={MAP_SVG} x="0" y="0" width={SCENE_SIZE.w} height={SCENE_SIZE.h} filter={`url(#${uid}-grey)`} />
-        </g>
-      </g>
-    );
-  }
-  const glow = domeGlow(state);
-  if (!glow) return null;
-  return (
-    <ellipse
-      className={`dome-glow ${state}`}
-      cx={dome.cx}
-      cy={dome.cy}
-      rx={dome.rx * 0.78}
-      ry={dome.ry * 0.82}
-      fill={glow.color}
-      opacity={glow.opacity}
-      filter={`url(#${uid}-blur)`}
-      pointerEvents="none"
-      style={{ mixBlendMode: "screen" }}
-    />
-  );
+function DomeState({ spot, state }: { spot: Spot; state: MapNodeState; uid: string }) {
+  // scene14: one self-contained SVG per place and state, boxed in scene (720×1280) units.
+  const [x, y, w, h] = scene14Domes.domes[spot.id].scene720;
+  return <image href={`/art/scene14/domes/${spot.id}_${state}.svg`} x={x} y={y} width={w} height={h} pointerEvents="none" />;
 }
 
 function SpotBadge({ spot, state, uid, onTap }: { spot: Spot; state: MapNodeState; uid: string; onTap: () => void }) {
   const [x, y] = spot.badge;
-  const scale = (BADGE_RADIUS * 2) / (BADGE_BOX * 0.775);
+  const scale = (BADGE_RADIUS * 2) / (BADGE_BOX * 0.833);
   return (
     <g
       className={`map-node ${state}`}
