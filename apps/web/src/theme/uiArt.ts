@@ -26,3 +26,6 @@ export const HEX_LEVEL_URL = `${UI}/hex_level.svg`;
 
 /** Empty hex for an open mission row (the done row uses ic_check). */
 export const MISSION_OPEN_URL = "/art/scene14/badges/mission_open.svg";
+
+/** 40 px reward icon (cyan hex, gold star) for the done sheet's earned-XP row. */
+export const REWARD_ICON_URL = `${UI}/ic_reward.svg`;

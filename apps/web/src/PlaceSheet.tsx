@@ -3,7 +3,7 @@ import type { Goal } from "./api";
 import { placeIconUrl } from "./map/placeIcons";
 import { ACTION_LABEL, placeSheet, segments, type SheetAction } from "./map/placeSheet";
 import { artSrc } from "./theme/motion";
-import { MISSION_OPEN_URL, hexFrameUrl } from "./theme/uiArt";
+import { MISSION_OPEN_URL, REWARD_ICON_URL, hexFrameUrl } from "./theme/uiArt";
 
 const UI = "/art/scene14/ui";
 const ACTION_ICON: Partial<Record<SheetAction, string>> = {
@@ -85,7 +85,7 @@ export function PlaceSheet({
 
           {sheet.earnedXp !== null ? (
             <div className="ps-reward">
-              <img src={`${UI}/ic_star.svg`} width={34} height={34} alt="" />
+              <img src={REWARD_ICON_URL} width={40} height={40} alt="" />
               <div>
                 <p className="ps-label">Опыт получен</p>
                 <p className="ps-reward__v"><b>+{sheet.earnedXp} XP</b> · {sheet.progress.done} {missionWord(sheet.progress.done)}</p>

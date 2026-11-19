@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { isAnimatedSvg } from "./motion.js";
-import { HEX_LEVEL_URL, MISSION_OPEN_URL, hexFrameUrl, tabIconUrl, uiIconUrl, type TabIcon } from "./uiArt.js";
+import { HEX_LEVEL_URL, MISSION_OPEN_URL, REWARD_ICON_URL, hexFrameUrl, tabIconUrl, uiIconUrl, type TabIcon } from "./uiArt.js";
 
 const pub = fileURLToPath(new URL("../../public", import.meta.url));
 const file = (url: string) => `${pub}${url}`;
@@ -29,6 +29,7 @@ describe("scene14 UI art", () => {
       uiIconUrl("camera"),
       HEX_LEVEL_URL,
       MISSION_OPEN_URL,
+      REWARD_ICON_URL,
     ];
     for (const url of urls) {
       expect(existsSync(file(url)), url).toBe(true);
