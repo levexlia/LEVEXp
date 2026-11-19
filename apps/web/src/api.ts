@@ -1,6 +1,6 @@
-import type { AvatarConfig } from "@levex/domain";
+import type { AssistantReply, AssistantTurn, AvatarConfig } from "@levex/domain";
 
-export type { AvatarConfig };
+export type { AssistantReply, AssistantTurn, AvatarConfig };
 
 export interface Player {
   id: string;
@@ -89,6 +89,8 @@ const KNOWN: Record<string, string> = {
   "could not save avatar": "Не удалось сохранить персонажа. Попробуйте ещё раз",
 };
 
+export const NO_CONNECTION = "Нет связи с API. В другом терминале: npm run dev:api";
+
 export async function loadRoom(): Promise<RoomData> {
   const [player, goals, room] = await Promise.all([
     getJson<Player>("/player"),
@@ -164,7 +166,7 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   try {
     response = await fetch(path, { ...init, cache: "no-store" });
   } catch {
-    throw new ApiError("Нет связи с API. В другом терминале: npm run dev:api", 0);
+    throw new ApiError(NO_CONNECTION, 0);
   }
   const text = await response.text();
   let payload: unknown = null;
@@ -194,4 +196,9 @@ function translate(message: string): string {
   if (known) return known;
   if (message.includes("must be") || message.startsWith("body")) return "Проверьте поля формы";
   return message;
+}
+
+/** Ask the AI assistant. The server adds the player's context itself; the client sends only the chat. */
+export function askAssistant(message: string, history: AssistantTurn[]): Promise<AssistantReply> {
+  return sendJson<AssistantReply>("/assistant/chat", { message, history });
 }
