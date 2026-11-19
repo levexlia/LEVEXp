@@ -1,6 +1,7 @@
-import { DEFAULT_AVATAR_CONFIG, LIFE_SPHERES, MAP_NODES, XP_PER_LEVEL, mapNodeStates, type AvatarConfig, type MapNodeId } from "@levex/domain";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { DEFAULT_AVATAR_CONFIG, LIFE_SPHERES, MAP_NODES, XP_PER_LEVEL, type AvatarConfig, type MapNodeId } from "@levex/domain";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
+  askAssistant,
   completeGoal,
   createArtifact,
   createGoal,
@@ -15,8 +16,10 @@ import {
 } from "./api";
 import { Avatar } from "./avatar/Avatar";
 import { AvatarBuilder } from "./AvatarBuilder";
+import { AssistantChat } from "./assistant/AssistantChat";
+import { ASSISTANT_ROBOT_SIZE, ROBOT_STATES, robotSrc, type RobotState } from "./assistant/art";
+import { useReducedMotion } from "./assistant/useReducedMotion";
 import { HomeMap, missionsFor } from "./HomeMap";
-import { avatarFeet, spotFor, toViewPercent } from "./map/spots";
 import { KitIcon, SPHERE_ICON, type KitIconName } from "./map/KitIcon";
 import { Logo } from "./Logo";
 
@@ -32,9 +35,22 @@ export function App() {
   const [nodeId, setNodeId] = useState<MapNodeId | null>(null);
   const [proof, setProof] = useState(false);
   const [cheer, setCheer] = useState(false);
+  const [chat, setChat] = useState(false);
+  const [robotState, setRobotState] = useState<RobotState>("idle");
+  const reducedMotion = useReducedMotion();
+  const closeChat = useCallback(() => {
+    setChat(false);
+    setRobotState("idle");
+  }, []);
+  const robotRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Preload the robot states so switching does not flash (INTEGRATION.md).
+  useEffect(() => {
+    for (const state of ROBOT_STATES) new Image().src = robotSrc(state, reducedMotion);
+  }, [reducedMotion]);
 
   async function refresh(): Promise<Player> {
     const data = await loadRoom();
@@ -54,9 +70,6 @@ export function App() {
   const into = xp % XP_PER_LEVEL;
   const config = player?.avatarConfig ?? DEFAULT_AVATAR_CONFIG;
   const energy = player?.energy ?? { current: 50, max: 50 };
-  const doneSpheres = goals.filter((goal) => goal.status === "done" && goal.sphere).map((goal) => goal.sphere as string);
-  const currentNode = mapNodeStates({ level, doneSpheres }).find((node) => node.state === "current");
-  const avatarSpot = toViewPercent(avatarFeet(spotFor(currentNode?.id ?? "home")));
 
   function burst() {
     setCheer(true);
@@ -93,9 +106,6 @@ export function App() {
           <span className="pill energy"><KitIcon name="energy" size={18} />{energy.current}/{energy.max}</span>
           <span className="pill level"><KitIcon name="level" size={18} />Ур. {level}</span>
         </div>
-        <button type="button" className="mini" onClick={() => { setDraft(config); setBuilding(true); }} aria-label="Персонаж">
-          <Avatar config={config} cheer={cheer} title="Персонаж" />
-        </button>
         <div className="xp-line">
           <div className="xp" role="progressbar" aria-valuenow={into} aria-valuemin={0} aria-valuemax={XP_PER_LEVEL}>
             <span style={{ width: `${into}%` }} />
@@ -109,20 +119,25 @@ export function App() {
         {notice ? <p className="banner good" role="status">{notice}</p> : null}
         {tab === "map" ? (
           <div className="map-wrap">
-            <aside className="stage-avatar">
-              <Avatar config={config} cheer={cheer} title="Персонаж" />
-            </aside>
             <div className="map-column">
               <div className="map-frame">
                 <HomeMap level={level} xp={xp} goals={goals} onOpen={setNodeId} />
                 <button
                   type="button"
-                  className="map-avatar"
-                  style={avatarSpot}
-                  onClick={() => { setDraft(config); setBuilding(true); }}
-                  aria-label="Персонаж на карте"
+                  ref={robotRef}
+                  className="map-robot"
+                  onClick={() => setChat(true)}
+                  aria-label="ИИ-помощник: открыть чат"
+                  aria-haspopup="dialog"
+                  aria-expanded={chat}
                 >
-                  <Avatar config={config} cheer={cheer} decorative />
+                  <img
+                    src={robotSrc(chat ? robotState : "idle", reducedMotion)}
+                    alt=""
+                    width={ASSISTANT_ROBOT_SIZE.width}
+                    height={ASSISTANT_ROBOT_SIZE.height}
+                    data-state={chat ? robotState : "idle"}
+                  />
                 </button>
                 <button type="button" className="proof" onClick={() => setProof(true)}>
                   <KitIcon name="camera" size={26} />
@@ -143,6 +158,9 @@ export function App() {
         {tab === "resources" ? <Resources player={player} /> : null}
         {tab === "profile" ? (
           <Profile
+            player={player}
+            config={config}
+            cheer={cheer}
             placements={placements}
             onEdit={() => { setDraft(config); setBuilding(true); }}
           />
@@ -161,6 +179,17 @@ export function App() {
           <GoalList goals={missionsFor(nodeId, goals)} busy={busy} onDone={finish} />
           {nodeId === "workshop" ? <button type="button" className="done" onClick={() => { setNodeId(null); setProof(true); }}>Загрузить фото</button> : null}
         </Sheet>
+      ) : null}
+
+      {chat ? (
+        <AssistantChat
+          ask={askAssistant}
+          onClose={closeChat}
+          errorText={errorMessage}
+          returnFocus={robotRef}
+          onRobotState={setRobotState}
+          reducedMotion={reducedMotion}
+        />
       ) : null}
 
       {proof ? (
@@ -297,11 +326,33 @@ function Resources({ player }: { player: Player | null }) {
   );
 }
 
-function Profile({ placements, onEdit }: { placements: Placement[]; onEdit: () => void }) {
+function Profile({
+  player,
+  config,
+  cheer,
+  placements,
+  onEdit,
+}: {
+  player: Player | null;
+  config: AvatarConfig;
+  cheer: boolean;
+  placements: Placement[];
+  onEdit: () => void;
+}) {
   return (
-    <section className="panel">
+    <section className="panel profile">
       <h2>Профиль</h2>
-      <button type="button" className="done" onClick={onEdit}>Собрать персонажа</button>
+      <div className="profile-hero">
+        <div className="profile-avatar">
+          <Avatar config={config} cheer={cheer} title="Мой персонаж" />
+        </div>
+        <div className="profile-id">
+          <strong>{player?.nickname ?? "Игрок"}</strong>
+          {player?.title ? <span>{player.title}</span> : null}
+          <span>Уровень {player?.progress.level ?? 1}</span>
+          <button type="button" className="done" onClick={onEdit}>Собрать персонажа</button>
+        </div>
+      </div>
       <h3>Галерея</h3>
       {placements.length === 0 ? <p className="empty">Фото появятся после proof.</p> : null}
       <ul className="gallery">
