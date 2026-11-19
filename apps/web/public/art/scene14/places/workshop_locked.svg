@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="" width="96" height="96" viewBox="0 0 48 48" overflow="visible"><defs><filter id="xig" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="xib" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2"/></filter><filter id="xit" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><style>
+.ti{stroke-dasharray:22 78;animation:ti 2.4s linear infinite}
+@keyframes ti{from{stroke-dashoffset:0}to{stroke-dashoffset:-100}}
+.tg{animation:tg 2.4s ease-in-out infinite}
+@keyframes tg{0%,100%{opacity:.62}50%{opacity:1}}
+.tgl{animation:tgl 2.4s ease-in-out infinite}
+@keyframes tgl{0%,100%{opacity:0}50%{opacity:.6}}
+.tgl.sm{animation-name:tgls}@keyframes tgls{0%,48%{opacity:0}72%{opacity:.3}94%,100%{opacity:0}}
+.ti.sm{animation:ti 2.4s linear infinite,tis 2.4s linear infinite}@keyframes tis{0%,40%{opacity:1}46%,94%{opacity:0}100%{opacity:1}}
+.tgear{transform-box:view-box;transform-origin:24px 24px;animation:tgear 2.4s cubic-bezier(.6,0,.2,1) infinite}
+@keyframes tgear{0%,28%{transform:rotate(0)}42%,78%{transform:rotate(22.5deg)}92%,100%{transform:rotate(45deg)}}
+.tcube{animation:tcube 2.4s steps(1) infinite}
+@keyframes tcube{0%,100%{opacity:1}48%{opacity:.35}50%{opacity:1}54%{opacity:.4}56%{opacity:1}}
+</style><g class="" fill="#56607f" fill-opacity=".10" stroke="#56607f" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" ><path d="M20.38 10.48 L20.86 5.26 L27.14 5.26 L27.62 10.48 L31.00 11.88 L35.03 8.53 L39.47 12.97 L36.12 17.00 L37.52 20.38 L42.74 20.86 L42.74 27.14 L37.52 27.62 L36.12 31.00 L39.47 35.03 L35.03 39.47 L31.00 36.12 L27.62 37.52 L27.14 42.74 L20.86 42.74 L20.38 37.52 L17.00 36.12 L12.97 39.47 L8.53 35.03 L11.88 31.00 L10.48 27.62 L5.26 27.14 L5.26 20.86 L10.48 20.38 L11.88 17.00 L8.53 12.97 L12.97 8.53 L17.00 11.88Z"/><circle cx="24" cy="24" r="5.6"/></g></svg>

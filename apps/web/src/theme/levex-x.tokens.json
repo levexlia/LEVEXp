@@ -1,0 +1,64 @@
+{
+  "$schema": "levex-x design tokens v1 (scene14, направление X «Неон-кибер»)",
+  "name": "levex-x",
+  "assetsBase": "/art/scene14",
+  "color": {
+    "bg": { "deep": "#03040c", "base": "#04060f", "sky": "#0a0d2e", "panel": "#0a1030", "panelTop": "#0b1236" },
+    "outline": "#0a1c46",
+    "neon": { "violet": "#b47bff", "cyan": "#22e1ff", "cyanSoft": "#7ff3ff", "magenta": "#d26bff", "gold": "#ffd23d" },
+    "text": { "primary": "#e6f0ff", "secondary": "#8fa0d8", "muted": "#7f8cc0", "disabled": "#646d94" },
+    "place": { "home": "#ff7a45", "study": "#38bdf8", "park": "#2ef2c4", "workshop": "#ffc23d", "center": "#b47bff" },
+    "locked": "#56607f",
+    "grid": "#4b3fbf"
+  },
+  "gradient": {
+    "neon": "linear-gradient(90deg, #b47bff, #22e1ff)",
+    "buttonFill": "linear-gradient(90deg, #160b3a, #071a3a)",
+    "buttonFillPressed": "linear-gradient(90deg, rgba(180,123,255,.6), rgba(34,225,255,.5))",
+    "sky": "linear-gradient(#03040c, #0a0d2e 40%, #04061a)",
+    "sheet": "linear-gradient(#0b1236, #04060f 55%)",
+    "xp": "linear-gradient(90deg, #a855f7, #22e1ff)"
+  },
+  "shadow": {
+    "button": "drop-shadow(0 0 10px rgba(130,120,255,.5))",
+    "buttonPressed": "drop-shadow(0 0 18px rgba(34,225,255,.75))",
+    "buttonSecondary": "drop-shadow(0 0 6px rgba(132,148,232,.35))",
+    "avatar": "drop-shadow(0 0 8px rgba(34,225,255,.55))",
+    "textGlow": "0 0 8px #22e1ff"
+  },
+  "shape": { "chamferButton": 14, "chamferChip": 7, "chamferSheet": 26, "buttonHeight": 50, "chipHeight": 26, "borderWidth": 1.5 },
+  "font": {
+    "display": { "family": "Tektur", "file": "fonts/Tektur-Variable.ttf", "license": "OFL-1.1" },
+    "mono": { "family": "JetBrains Mono", "file": "fonts/JetBrainsMono-Variable.ttf", "license": "OFL-1.1" }
+  },
+  "button": {
+    "primary": {
+      "normal":   { "border": "gradient.neon", "fill": "gradient.buttonFill", "text": "#e6f0ff", "icon": "#bff6ff", "shadow": "shadow.button", "offsetY": 0 },
+      "pressed":  { "border": "gradient.neon", "fill": "gradient.buttonFillPressed", "text": "#ffffff", "icon": "#ffffff", "shadow": "shadow.buttonPressed", "offsetY": 2 },
+      "disabled": { "border": "#343c63", "fill": "repeating-linear-gradient(135deg,#070a1a 0 6px,#0b0f25 6px 12px)", "text": "#646d94", "icon": "#646d94", "shadow": "none", "offsetY": 0 }
+    },
+    "secondary": {
+      "normal":   { "border": "#8494e8", "fill": "linear-gradient(90deg,#1a2358,#121a46)", "text": "#eef2ff", "shadow": "shadow.buttonSecondary", "offsetY": 0 },
+      "pressed":  { "border": "#22e1ff", "fill": "#061e34", "text": "#dffbff", "shadow": "drop-shadow(0 0 10px rgba(34,225,255,.5))", "offsetY": 2 },
+      "disabled": { "border": "#343c63", "fill": "repeating-linear-gradient(135deg,#070a1a 0 6px,#0b0f25 6px 12px)", "text": "#646d94", "shadow": "none", "offsetY": 0 }
+    }
+  },
+  "badge": {
+    "done":      { "color": "#22e1ff", "symbol": "check", "file": "badges/done.svg" },
+    "current":   { "color": "#d26bff", "symbol": "star",  "file": "badges/current.svg", "pulse": true },
+    "available": { "color": "#8a96d6", "symbol": "play",  "file": "badges/available.svg", "dashed": true },
+    "locked":    { "color": "#56607f", "symbol": "lock",  "file": "badges/locked.svg" }
+  },
+  "place": {
+    "home":     { "label": "Дом",           "icon": "places/home.svg",     "iconLocked": "places/home_locked.svg",     "chip": "ui/chip_home.svg" },
+    "study":    { "label": "Учебный центр", "icon": "places/study.svg",    "iconLocked": "places/study_locked.svg",    "chip": "ui/chip_study.svg" },
+    "park":     { "label": "Парк",          "icon": "places/park.svg",     "iconLocked": "places/park_locked.svg",     "chip": "ui/chip_park.svg" },
+    "workshop": { "label": "Мастерская",    "icon": "places/workshop.svg", "iconLocked": "places/workshop_locked.svg", "chip": "ui/chip_workshop.svg" },
+    "center":   { "label": "Центр LEVEX",   "icon": "places/center.svg",   "iconLocked": "places/center_locked.svg",   "chip": "ui/chip_center.svg" }
+  },
+  "dome": { "states": ["done", "current", "available", "locked"], "pattern": "domes/{place}_{state}.svg" },
+  "avatar": { "map": "avatar/operator.svg", "mapSize": [48, 96], "alternates": ["avatar/hex_portrait.svg", "avatar/hologram.svg"] },
+  "map": { "file": "map/map.svg", "viewBox": [390, 844], "scene720": "map/map_720x1280.svg", "background720": "map/map_bg_720x1280.svg", "domeBoxes": "domes/domes.json" },
+  "motion": { "loop": "2.4s", "reducedMotion": "отключать бегущий след, скан-линию, пульс и вращение (prefers-reduced-motion)" },
+  "iconSizes": [22, 48, 96]
+}
