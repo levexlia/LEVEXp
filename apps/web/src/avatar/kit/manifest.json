@@ -1,0 +1,557 @@
+{
+ "name": "LEVEX avatar kit v1",
+ "viewBox": "0 0 864 1152",
+ "draw_order": "sort by z ascending: hair_back(10) body(20) head(30) face(40) hair_front(50) accessory(60). Layers are pixel-registered; stack all with identical viewBox/size.",
+ "recolor": {
+  "note": "Replace fill=\"HEX\" (lowercase, exact) across all layer SVGs of a character.",
+  "skin": {
+   "main": "#feb175",
+   "shade": "#f28f52",
+   "palettes": {
+    "porcelain": {
+     "main": "#ffd9bd",
+     "shade": "#f0b792"
+    },
+    "fair": {
+     "main": "#fcc8a0",
+     "shade": "#eaa878"
+    },
+    "default": {
+     "main": "#feb175",
+     "shade": "#f28f52"
+    },
+    "tan": {
+     "main": "#e3a36d",
+     "shade": "#c9814e"
+    },
+    "brown": {
+     "main": "#b97a4b",
+     "shade": "#9c5e34"
+    },
+    "deep": {
+     "main": "#7a4a2c",
+     "shade": "#5e3520"
+    }
+   }
+  },
+  "hair": {
+   "main": "#70432a",
+   "shade": "#53301e",
+   "brow": "#6b3d22",
+   "palettes": {
+    "chestnut": {
+     "main": "#70432a",
+     "shade": "#53301e",
+     "brow": "#6b3d22"
+    },
+    "black": {
+     "main": "#2e2e3e",
+     "shade": "#1b1b28",
+     "brow": "#232330"
+    },
+    "blonde": {
+     "main": "#e9b94f",
+     "shade": "#c9922e",
+     "brow": "#a8741f"
+    },
+    "ginger": {
+     "main": "#c4572b",
+     "shade": "#9c3f1a",
+     "brow": "#8a3516"
+    },
+    "pink": {
+     "main": "#f472b6",
+     "shade": "#c0498a",
+     "brow": "#a63a75"
+    },
+    "cyan": {
+     "main": "#22d3ee",
+     "shade": "#0ea5c4",
+     "brow": "#0b86a0"
+    }
+   }
+  },
+  "fixed": {
+   "outline": "#0a1c46",
+   "white": "#fff",
+   "pupil": "#211a1a"
+  }
+ },
+ "parts": [
+  {
+   "id": "head",
+   "type": "head",
+   "layer": "head",
+   "z": 30,
+   "file": "svg/head.svg",
+   "label_ru": "Голова (база: кожа, уши, шея-стык)",
+   "viewBox": "0 0 864 1152",
+   "bytes": 5817,
+   "fills": [
+    "#0a1c46",
+    "#f28f52",
+    "#feb175"
+   ],
+   "recolor": {
+    "skin": [
+     "#f28f52",
+     "#feb175"
+    ]
+   },
+   "note": null
+  },
+  {
+   "id": "hair_long_back",
+   "type": "hairstyle",
+   "layer": "hair_back",
+   "z": 10,
+   "file": "svg/hairB_long.svg",
+   "label_ru": "Длинные прямые (задний слой, за телом)",
+   "viewBox": "0 0 864 1152",
+   "bytes": 1697,
+   "fills": [
+    "#53301e"
+   ],
+   "recolor": {
+    "hair": [
+     "#53301e"
+    ]
+   },
+   "note": null
+  },
+  {
+   "id": "hair_long",
+   "type": "hairstyle",
+   "layer": "hair_front",
+   "z": 50,
+   "file": "svg/hairF_long.svg",
+   "label_ru": "Длинные прямые",
+   "viewBox": "0 0 864 1152",
+   "bytes": 10088,
+   "fills": [
+    "#0a1c46",
+    "#53301e",
+    "#70432a"
+   ],
+   "recolor": {
+    "hair": [
+     "#53301e",
+     "#70432a"
+    ]
+   },
+   "note": null
+  },
+  {
+   "id": "hair_bob_back",
+   "type": "hairstyle",
+   "layer": "hair_back",
+   "z": 10,
+   "file": "svg/hairB_bob.svg",
+   "label_ru": "Каре (задний слой, за телом)",
+   "viewBox": "0 0 864 1152",
+   "bytes": 1277,
+   "fills": [
+    "#53301e"
+   ],
+   "recolor": {
+    "hair": [
+     "#53301e"
+    ]
+   },
+   "note": null
+  },
+  {
+   "id": "hair_bob",
+   "type": "hairstyle",
+   "layer": "hair_front",
+   "z": 50,
+   "file": "svg/hairF_bob.svg",
+   "label_ru": "Каре",
+   "viewBox": "0 0 864 1152",
+   "bytes": 10632,
+   "fills": [
+    "#0a1c46",
+    "#53301e",
+    "#70432a"
+   ],
+   "recolor": {
+    "hair": [
+     "#53301e",
+     "#70432a"
+    ]
+   },
+   "note": null
+  },
+  {
+   "id": "hair_curly_back",
+   "type": "hairstyle",
+   "layer": "hair_back",
+   "z": 10,
+   "file": "svg/hairB_curly.svg",
+   "label_ru": "Кудрявые (задний слой, за телом)",
+   "viewBox": "0 0 864 1152",
+   "bytes": 1538,
+   "fills": [
+    "#53301e"
+   ],
+   "recolor": {
+    "hair": [
+     "#53301e"
+    ]
+   },
+   "note": null
+  },
+  {
+   "id": "hair_curly",
+   "type": "hairstyle",
+   "layer": "hair_front",
+   "z": 50,
+   "file": "svg/hairF_curly.svg",
+   "label_ru": "Кудрявые",
+   "viewBox": "0 0 864 1152",
+   "bytes": 23353,
+   "fills": [
+    "#0a1c46",
+    "#53301e",
+    "#70432a"
+   ],
+   "recolor": {
+    "hair": [
+     "#53301e",
+     "#70432a"
+    ]
+   },
+   "note": null
+  },
+  {
+   "id": "hair_ponytail",
+   "type": "hairstyle",
+   "layer": "hair_front",
+   "z": 50,
+   "file": "svg/hairF_ponytail.svg",
+   "label_ru": "Хвост",
+   "viewBox": "0 0 864 1152",
+   "bytes": 10031,
+   "fills": [
+    "#0a1c46",
+    "#53301e",
+    "#70432a",
+    "#7d33fa"
+   ],
+   "recolor": {
+    "hair": [
+     "#53301e",
+     "#70432a"
+    ]
+   },
+   "note": null
+  },
+  {
+   "id": "hair_buns",
+   "type": "hairstyle",
+   "layer": "hair_front",
+   "z": 50,
+   "file": "svg/hairF_buns.svg",
+   "label_ru": "Два пучка",
+   "viewBox": "0 0 864 1152",
+   "bytes": 15503,
+   "fills": [
+    "#0a1c46",
+    "#53301e",
+    "#70432a"
+   ],
+   "recolor": {
+    "hair": [
+     "#53301e",
+     "#70432a"
+    ]
+   },
+   "note": null
+  },
+  {
+   "id": "hair_short",
+   "type": "hairstyle",
+   "layer": "hair_front",
+   "z": 50,
+   "file": "svg/hairF_short.svg",
+   "label_ru": "Короткая",
+   "viewBox": "0 0 864 1152",
+   "bytes": 7524,
+   "fills": [
+    "#0a1c46",
+    "#70432a"
+   ],
+   "recolor": {
+    "hair": [
+     "#70432a"
+    ]
+   },
+   "note": null
+  },
+  {
+   "id": "outfit_hoodie",
+   "type": "outfit",
+   "layer": "body",
+   "z": 20,
+   "file": "svg/body_hoodie.svg",
+   "label_ru": "Фиолет. худи",
+   "viewBox": "0 0 864 1152",
+   "bytes": 34590,
+   "fills": [
+    "#0a1c46",
+    "#0c449d",
+    "#581ed2",
+    "#6a2bea",
+    "#7d33fa",
+    "#f28f52",
+    "#feb175",
+    "#fff"
+   ],
+   "recolor": {
+    "skin": [
+     "#f28f52",
+     "#feb175"
+    ]
+   },
+   "note": "шея вниз: торс, руки, кисти, ноги, обувь (кожа = skin hex)"
+  },
+  {
+   "id": "outfit_cyan_jacket",
+   "type": "outfit",
+   "layer": "body",
+   "z": 20,
+   "file": "svg/body_cyan_jacket.svg",
+   "label_ru": "Голубая куртка",
+   "viewBox": "0 0 864 1152",
+   "bytes": 34235,
+   "fills": [
+    "#00a5d0",
+    "#08dcfb",
+    "#0a1c46",
+    "#0c449d",
+    "#1351ac",
+    "#f28f52",
+    "#feb175",
+    "#fff"
+   ],
+   "recolor": {
+    "skin": [
+     "#f28f52",
+     "#feb175"
+    ]
+   },
+   "note": "шея вниз: торс, руки, кисти, ноги, обувь (кожа = skin hex)"
+  },
+  {
+   "id": "outfit_tshirt_shorts",
+   "type": "outfit",
+   "layer": "body",
+   "z": 20,
+   "file": "svg/body_tshirt_shorts.svg",
+   "label_ru": "Футболка+шорты",
+   "viewBox": "0 0 864 1152",
+   "bytes": 41095,
+   "fills": [
+    "#0a1c46",
+    "#0e3477",
+    "#1351ac",
+    "#6193dc",
+    "#6a2bea",
+    "#7d33fa",
+    "#f28f52",
+    "#feb175",
+    "#fff"
+   ],
+   "recolor": {
+    "skin": [
+     "#f28f52",
+     "#feb175"
+    ]
+   },
+   "note": "шея вниз: торс, руки, кисти, ноги, обувь (кожа = skin hex)"
+  },
+  {
+   "id": "outfit_tracksuit",
+   "type": "outfit",
+   "layer": "body",
+   "z": 20,
+   "file": "svg/body_tracksuit.svg",
+   "label_ru": "Спорт-костюм",
+   "viewBox": "0 0 864 1152",
+   "bytes": 33089,
+   "fills": [
+    "#08dcfb",
+    "#0a1c46",
+    "#0e3477",
+    "#581ed2",
+    "#7d33fa",
+    "#f28f52",
+    "#feb175",
+    "#fff"
+   ],
+   "recolor": {
+    "skin": [
+     "#f28f52",
+     "#feb175"
+    ]
+   },
+   "note": "шея вниз: торс, руки, кисти, ноги, обувь (кожа = skin hex)"
+  },
+  {
+   "id": "face_happy",
+   "type": "expression",
+   "layer": "face",
+   "z": 40,
+   "file": "svg/face_happy.svg",
+   "label_ru": "Радостная",
+   "viewBox": "0 0 864 1152",
+   "bytes": 4514,
+   "fills": [
+    "#211a1a",
+    "#5b1c12",
+    "#6b3d22",
+    "#f28f52",
+    "#fb4644",
+    "#fff"
+   ],
+   "recolor": {
+    "skin": [
+     "#f28f52"
+    ],
+    "brow": [
+     "#6b3d22"
+    ]
+   },
+   "note": "глаза+брови+нос+рот; кожа прозрачная"
+  },
+  {
+   "id": "face_proud",
+   "type": "expression",
+   "layer": "face",
+   "z": 40,
+   "file": "svg/face_proud.svg",
+   "label_ru": "Гордая",
+   "viewBox": "0 0 864 1152",
+   "bytes": 4414,
+   "fills": [
+    "#0a1c46",
+    "#211a1a",
+    "#6b3d22",
+    "#f28f52"
+   ],
+   "recolor": {
+    "skin": [
+     "#f28f52"
+    ],
+    "brow": [
+     "#6b3d22"
+    ]
+   },
+   "note": "глаза+брови+нос+рот; кожа прозрачная"
+  },
+  {
+   "id": "face_sleepy",
+   "type": "expression",
+   "layer": "face",
+   "z": 40,
+   "file": "svg/face_sleepy.svg",
+   "label_ru": "Сонная",
+   "viewBox": "0 0 864 1152",
+   "bytes": 4442,
+   "fills": [
+    "#0a1c46",
+    "#211a1a",
+    "#5b1c12",
+    "#6b3d22",
+    "#f28f52",
+    "#fb4644",
+    "#fff"
+   ],
+   "recolor": {
+    "skin": [
+     "#f28f52"
+    ],
+    "brow": [
+     "#6b3d22"
+    ]
+   },
+   "note": "глаза+брови+нос+рот; кожа прозрачная"
+  },
+  {
+   "id": "face_surprised",
+   "type": "expression",
+   "layer": "face",
+   "z": 40,
+   "file": "svg/face_surprised.svg",
+   "label_ru": "Удивлённая",
+   "viewBox": "0 0 864 1152",
+   "bytes": 4446,
+   "fills": [
+    "#211a1a",
+    "#5b1c12",
+    "#6b3d22",
+    "#f28f52",
+    "#fb4644",
+    "#fff"
+   ],
+   "recolor": {
+    "skin": [
+     "#f28f52"
+    ],
+    "brow": [
+     "#6b3d22"
+    ]
+   },
+   "note": "глаза+брови+нос+рот; кожа прозрачная"
+  },
+  {
+   "id": "acc_glasses",
+   "type": "accessory",
+   "layer": "accessory",
+   "z": 60,
+   "file": "svg/acc_glasses.svg",
+   "label_ru": "Очки",
+   "viewBox": "0 0 864 1152",
+   "bytes": 5028,
+   "fills": [
+    "#581ed2",
+    "#6a2bea"
+   ],
+   "recolor": {},
+   "note": null
+  },
+  {
+   "id": "acc_headphones",
+   "type": "accessory",
+   "layer": "accessory",
+   "z": 60,
+   "file": "svg/acc_headphones.svg",
+   "label_ru": "Наушники",
+   "viewBox": "0 0 864 1152",
+   "bytes": 10119,
+   "fills": [
+    "#08dcfb",
+    "#0a1c46",
+    "#7d33fa"
+   ],
+   "recolor": {},
+   "note": null
+  },
+  {
+   "id": "acc_clip",
+   "type": "accessory",
+   "layer": "accessory",
+   "z": 60,
+   "file": "svg/acc_clip.svg",
+   "label_ru": "Заколка-звезда",
+   "viewBox": "0 0 864 1152",
+   "bytes": 1850,
+   "fills": [
+    "#0a1c46",
+    "#fdc436"
+   ],
+   "recolor": {},
+   "note": null
+  }
+ ]
+}
