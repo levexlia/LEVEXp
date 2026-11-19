@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="" width="96" height="96" viewBox="0 0 48 48" overflow="visible"><defs><filter id="xig" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="xib" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2"/></filter><filter id="xit" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><style>
+.ti{stroke-dasharray:22 78;animation:ti 2.4s linear infinite}
+@keyframes ti{from{stroke-dashoffset:0}to{stroke-dashoffset:-100}}
+.tg{animation:tg 2.4s ease-in-out infinite}
+@keyframes tg{0%,100%{opacity:.62}50%{opacity:1}}
+.tgl{animation:tgl 2.4s ease-in-out infinite}
+@keyframes tgl{0%,100%{opacity:0}50%{opacity:.6}}
+.tgl.sm{animation-name:tgls}@keyframes tgls{0%,48%{opacity:0}72%{opacity:.3}94%,100%{opacity:0}}
+.ti.sm{animation:ti 2.4s linear infinite,tis 2.4s linear infinite}@keyframes tis{0%,40%{opacity:1}46%,94%{opacity:0}100%{opacity:1}}
+.tgear{transform-box:view-box;transform-origin:24px 24px;animation:tgear 2.4s cubic-bezier(.6,0,.2,1) infinite}
+@keyframes tgear{0%,28%{transform:rotate(0)}42%,78%{transform:rotate(22.5deg)}92%,100%{transform:rotate(45deg)}}
+.tcube{animation:tcube 2.4s steps(1) infinite}
+@keyframes tcube{0%,100%{opacity:1}48%{opacity:.35}50%{opacity:1}54%{opacity:.4}56%{opacity:1}}
+</style><g class="" fill="#56607f" fill-opacity=".10" stroke="#56607f" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" ><path d="M24 14 C19 10.5 12 9.5 5.5 10.5 V37 C12 36 19 37 24 40.5 C29 37 36 36 42.5 37 V10.5 C36 9.5 29 10.5 24 14 Z"/><path d="M24 14 V40.5"/></g><style>*,*::before,*::after{animation:none!important;transition:none!important}.ti,.xtr,.xscan,.xring,.xtok{display:none!important}</style></svg>
