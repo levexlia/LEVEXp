@@ -49,6 +49,7 @@ import {
 } from "./uploads.js";
 import { registerAvatarRoutes } from "./avatar/routes.js";
 import type { AvatarGenerator } from "./avatar/generator.js";
+import { registerAssistantRoutes, type AssistantOptions } from "./assistant/routes.js";
 
 export function buildApp(opts: {
   logger?: boolean;
@@ -57,6 +58,7 @@ export function buildApp(opts: {
   avatarGenerator?: AvatarGenerator;
   avatarDailyLimit?: number;
   avatarCandidateCount?: number;
+  assistant?: AssistantOptions;
 } = {}) {
   const app = Fastify({
     logger: opts.logger ?? true,
@@ -78,6 +80,8 @@ export function buildApp(opts: {
     dailyLimit: opts.avatarDailyLimit,
     candidateCount: opts.avatarCandidateCount,
   });
+
+  registerAssistantRoutes(app, opts.assistant);
 
   app.get("/health", async () => ({ status: "ok", service: "levex-api" }));
 

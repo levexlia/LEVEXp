@@ -255,3 +255,4 @@ export type {
 export { ENERGY_MAX, ENERGY_PER_COMPLETION, energyForDay, streakDays, utcDay } from "./streak.js";
 export { MAP_NODES, mapNodeStates } from "./map.js";
 export type { MapNode, MapNodeId, MapNodeState } from "./map.js";
+export * from "./assistant.js";
