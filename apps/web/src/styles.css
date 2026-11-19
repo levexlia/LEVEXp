@@ -88,27 +88,79 @@ button { cursor: pointer; }
 
 .stage-avatar { display: none; }
 
-.stage-side { display: none; }
+.map-stage { position: relative; }
+
+/* Below 960px the mission list sits under the map instead of beside it. */
+.stage-side {
+  display: block;
+  margin-top: 0.9rem;
+  background: #14132b;
+  border: 1px solid #312e81;
+  border-radius: 16px;
+  padding: 0.75rem 0.8rem 0.9rem;
+}
+.stage-side h2 { margin: 0 0 0.4rem; font-size: 1.1rem; }
 
 .district { width: 100%; height: auto; display: block; }
 
 .map-node { cursor: pointer; }
-.map-node.locked { cursor: default; }
-.map-node [role="button"]:focus { outline: none; }
+.map-node:focus { outline: none; }
+.map-node:focus-visible { filter: drop-shadow(0 0 6px #e9d5ff); }
+
+.spot-label {
+  position: absolute;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.18rem 0.6rem 0.18rem 0.35rem;
+  border: 1px solid #2a2f66;
+  border-radius: 999px;
+  background: rgba(10, 12, 36, 0.88);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transform: translate(0, -50%);
+}
+.spot-label.right { transform: translate(-100%, -50%); }
+.spot-label.center { transform: translate(-50%, -50%); }
+.spot-label.is-locked { color: #aeb4d0; }
+.spot-label img { display: block; flex: none; }
+
+.map-hint {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #475569;
+  border-radius: 12px;
+  background: rgba(15, 18, 44, 0.96);
+  color: #e2e8f0;
+  font-size: 0.85rem;
+  line-height: 1.25;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+}
+.map-hint img { flex: none; }
 .map-node.current { animation: node-pulse 1.7s ease-in-out infinite; }
 .badge-halo { opacity: 0.85; }
-.bld-halo.current { animation: halo-pulse 1.7s ease-in-out infinite; }
+.dome-glow.current { animation: dome-pulse 2.4s ease-in-out infinite; }
 
 .map-avatar {
   position: absolute;
-  width: 76px;
+  width: 58px;
   padding: 0;
   border: 0;
   background: none;
   transform: translate(-50%, -92%);
   z-index: 2;
 }
-.map-avatar .hero { width: 76px; }
+.map-avatar .hero { width: 58px; }
 
 .streak-line {
   display: flex;
@@ -122,11 +174,10 @@ button { cursor: pointer; }
 .sphere-name { display: inline-flex; align-items: center; gap: 0.35rem; }
 
 .proof {
-  position: absolute;
-  left: 50%;
-  bottom: 14px;
-  transform: translateX(-50%);
+  /* Below the map, not over it, so it never covers Дом. */
+  position: relative;
   z-index: 3;
+  margin: 0.45rem auto 0;
   display: flex;
   gap: 0.45rem;
   align-items: center;
@@ -302,9 +353,9 @@ button { cursor: pointer; }
   50% { filter: drop-shadow(0 0 8px #c084fc); }
 }
 
-@keyframes halo-pulse {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 0.95; }
+@keyframes dome-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.46; }
 }
 
 @keyframes breathe {
@@ -349,11 +400,8 @@ button { cursor: pointer; }
   .map-frame { width: min(100%, calc((100vh - 220px) * 0.58)); max-width: 520px; }
   .district { width: 100%; height: auto; max-height: none; }
   .stage-side {
-    display: block;
     align-self: stretch;
-    background: #14132b;
-    border: 1px solid #312e81;
-    border-radius: 16px;
+    margin-top: 0;
     padding: 0.85rem 0.9rem 1rem;
   }
   .stage-side h2 { margin-top: 0; }
@@ -372,7 +420,7 @@ button { cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
   .map-node.current,
-  .bld-halo.current,
+  .dome-glow.current,
   .hero.idle,
   .hero.cheer { animation: none; }
 }

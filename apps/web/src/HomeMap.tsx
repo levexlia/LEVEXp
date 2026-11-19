@@ -1,236 +1,203 @@
 import { MAP_NODES, mapNodeStates, type MapNodeId, type MapNodeState } from "@levex/domain";
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 import type { Goal } from "./api";
-import { ART } from "./map/art";
+import { placeIconUrl } from "./map/placeIcons";
 import {
-  BADGE_CENTER,
-  BADGE_SCALE,
+  BADGE_FILE,
+  BADGE_RADIUS,
+  MAP_SVG,
   MAP_VIEW,
-  PLACES,
-  PROPS,
-  placeName,
-  ribbonPath,
-  segmentLit,
-  type Place,
-} from "./map/layout";
+  SCENE_SIZE,
+  SPOTS,
+  domeEllipse,
+  domeGlow,
+  lockedHint,
+  toViewPercent,
+  type Spot,
+} from "./map/spots";
+
+/** Kit badges are drawn in a 919 box; this is their visual centre. */
+const BADGE_CENTER: [number, number] = [458.7, 431.9];
+const BADGE_BOX = 919;
+const HINT_MS = 4200;
+
+const STATE_WORD: Record<MapNodeState, string> = {
+  done: "пройдено",
+  current: "сейчас здесь",
+  available: "открыто",
+  locked: "закрыто",
+};
 
 export function HomeMap({
   level,
+  xp,
   goals,
   onOpen,
 }: {
   level: number;
+  xp: number;
   goals: Goal[];
   onOpen: (id: MapNodeId) => void;
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const [hintFor, setHintFor] = useState<MapNodeId | null>(null);
   const doneSpheres = goals.filter((goal) => goal.status === "done" && goal.sphere).map((goal) => goal.sphere as string);
-  const nodes = mapNodeStates({ level, doneSpheres });
-  const stateOf = new Map(nodes.map((node) => [node.id, node.state]));
-  const scenery = [
-    ...PROPS.map((prop) => ({ ...prop, y: prop.at[1], location: null as MapNodeId | null })),
-    ...PLACES.map((place) => ({
-      part: place.building,
-      at: place.at,
-      scale: place.scale,
-      locked: false,
-      y: place.at[1],
-      location: place.id,
-    })),
-  ].sort((a, b) => a.y - b.y);
+  const stateOf = new Map(mapNodeStates({ level, doneSpheres }).map((node) => [node.id, node.state]));
+  const state = (id: MapNodeId): MapNodeState => stateOf.get(id) ?? "locked";
+
+  useEffect(() => {
+    if (!hintFor) return;
+    const timer = window.setTimeout(() => setHintFor(null), HINT_MS);
+    return () => window.clearTimeout(timer);
+  }, [hintFor]);
+
+  function tap(id: MapNodeId) {
+    if (state(id) === "locked") {
+      setHintFor(id);
+      return;
+    }
+    setHintFor(null);
+    onOpen(id);
+  }
+
+  const hintSpot = hintFor ? SPOTS.find((spot) => spot.id === hintFor) : undefined;
 
   return (
-    <svg
-      className="district"
-      viewBox={`${MAP_VIEW.x} ${MAP_VIEW.y} ${MAP_VIEW.w} ${MAP_VIEW.h}`}
-      role="img"
-      aria-label="Карта района: Дом, Учебный центр, Парк, Мастерская, Центр LEVEX"
-    >
-      <defs>
-        <linearGradient id={`${uid}-sky`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#0B0B1F" />
-          <stop offset="1" stopColor="#14123a" />
-        </linearGradient>
-        <pattern id={`${uid}-ground`} width="64" height="32" patternUnits="userSpaceOnUse" patternTransform="scale(0.5)">
-          <image href="/map/ground_tile.svg" width="128" height="64" />
-        </pattern>
-        <filter id={`${uid}-glow`} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="6" />
-        </filter>
-      </defs>
-      <rect x={MAP_VIEW.x} y={MAP_VIEW.y} width={MAP_VIEW.w} height={MAP_VIEW.h} fill={`url(#${uid}-sky)`} pointerEvents="none" />
-      <rect x={MAP_VIEW.x} y={MAP_VIEW.y} width={MAP_VIEW.w} height={MAP_VIEW.h} fill={`url(#${uid}-ground)`} pointerEvents="none" />
-      {scenery.map((item, index) => {
-        const state = item.location ? stateOf.get(item.location) : undefined;
-        const locked = Boolean(item.locked) || state === "locked";
-        return (
-          <g
-            key={`${item.part}-${index}`}
-            onClick={item.location && state !== "locked" ? () => onOpen(item.location as MapNodeId) : undefined}
-          >
-            <Sprite part={item.part} at={item.at} scale={item.scale} locked={locked} />
-          </g>
-        );
-      })}
-      {PLACES.slice(0, -1).map((place, index) => {
-        const next = PLACES[index + 1]!;
-        const lit = segmentLit(stateOf.get(next.id) ?? "locked");
-        const d = ribbonPath(place.badge, next.badge);
-        return (
-          <g key={`path-${place.id}`} pointerEvents="none">
-            <path d={d} fill="none" stroke="#0a1c46" strokeWidth="16" strokeLinecap="round" />
-            <path
-              d={d}
-              fill="none"
-              stroke={lit ? "#25cbfd" : "#8e94ae"}
-              strokeWidth="9"
-              strokeLinecap="round"
-              strokeDasharray={lit ? undefined : "1 16"}
-            />
-          </g>
-        );
-      })}
-      {PLACES.map((place) => (
-        <NodeBadge
-          key={place.id}
-          place={place}
-          state={stateOf.get(place.id) ?? "locked"}
-          uid={uid}
-          onOpen={onOpen}
-        />
-      ))}
-    </svg>
-  );
-}
-
-function Sprite({
-  part,
-  at,
-  scale,
-  locked,
-}: {
-  part: string;
-  at: [number, number];
-  scale: number;
-  locked: boolean;
-}) {
-  const art = ART[part];
-  if (!art) return null;
-  const file = locked ? `${part}_locked` : part;
-  const [ax, ay] = art.anchor;
-  return (
-    <image
-      href={`/map/${file}.svg`}
-      width={art.w}
-      height={art.h}
-      transform={`translate(${at[0]} ${at[1]}) scale(${scale}) translate(${-ax} ${-ay})`}
-    />
-  );
-}
-
-function NodeBadge({
-  place,
-  state,
-  uid,
-  onOpen,
-}: {
-  place: Place;
-  state: MapNodeState;
-  uid: string;
-  onOpen: (id: MapNodeId) => void;
-}) {
-  const name = placeName(place.id);
-  const [lx, ly] = place.label;
-  const open = () => {
-    if (state !== "locked") onOpen(place.id);
-  };
-  return (
-    <g className={`map-node ${state}`} data-node={place.id}>
-      <g
-        role="button"
-        tabIndex={state === "locked" ? -1 : 0}
-        aria-disabled={state === "locked" || undefined}
-        aria-label={name}
-        onClick={open}
-        onKeyDown={(event) => {
-          if ((event.key === "Enter" || event.key === " ") && state !== "locked") {
-            event.preventDefault();
-            open();
-          }
-        }}
+    <div className="map-stage">
+      <svg
+        className="district"
+        viewBox={`${MAP_VIEW.x} ${MAP_VIEW.y} ${MAP_VIEW.w} ${MAP_VIEW.h}`}
+        role="img"
+        aria-label={`Карта: ${MAP_NODES.map((node) => node.name).join(", ")}`}
       >
-        {state === "current" ? (
-          <image
-            className="badge-halo current"
-            href="/map/badge_halo_current.svg"
-            width="919"
-            height="919"
-            filter={`url(#${uid}-glow)`}
-            transform={`translate(${place.badge[0]} ${place.badge[1]}) scale(0.12) translate(${-BADGE_CENTER[0]} ${-BADGE_CENTER[1]})`}
-          />
-        ) : null}
-        {state === "available" ? (
-          <AvailableBadge x={place.badge[0]} y={place.badge[1]} />
-        ) : (
-          <image
-            href={`/map/badge_${state}_full.svg`}
-            width="919"
-            height="919"
-            transform={`translate(${place.badge[0]} ${place.badge[1]}) scale(${BADGE_SCALE}) translate(${-BADGE_CENTER[0]} ${-BADGE_CENTER[1]})`}
-          />
-        )}
-        <circle cx={place.badge[0]} cy={place.badge[1]} r="32" fill="#fff" opacity="0" />
-      </g>
-      <Chip place={place} lx={lx} ly={ly} dim={state === "locked"} onOpen={open} />
-    </g>
+        <defs>
+          <filter id={`${uid}-blur`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="18" />
+          </filter>
+          <filter id={`${uid}-halo`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="10" />
+          </filter>
+          {/* Locked dome: cool light grey, like the scene 11 mock. */}
+          <filter id={`${uid}-grey`} colorInterpolationFilters="sRGB">
+            <feColorMatrix
+              type="matrix"
+              values="0.264 0.519 0.097 0 0.30  0.276 0.543 0.101 0 0.31  0.318 0.626 0.117 0 0.36  0 0 0 1 0"
+            />
+          </filter>
+          {SPOTS.map((spot) => {
+            const dome = domeEllipse(spot);
+            return (
+              <clipPath key={spot.id} id={`${uid}-dome-${spot.id}`}>
+                <ellipse cx={dome.cx} cy={dome.cy} rx={dome.rx} ry={dome.ry} />
+              </clipPath>
+            );
+          })}
+        </defs>
+        <image href={MAP_SVG} x="0" y="0" width={SCENE_SIZE.w} height={SCENE_SIZE.h} pointerEvents="none" />
+        {SPOTS.map((spot) => (
+          <DomeState key={spot.id} spot={spot} state={state(spot.id)} uid={uid} />
+        ))}
+        {SPOTS.map((spot) => (
+          <SpotBadge key={spot.id} spot={spot} state={state(spot.id)} uid={uid} onTap={() => tap(spot.id)} />
+        ))}
+      </svg>
+      {SPOTS.map((spot) => (
+        <SpotLabel key={spot.id} spot={spot} state={state(spot.id)} onTap={() => tap(spot.id)} />
+      ))}
+      {hintSpot ? (
+        <p
+          className="map-hint"
+          role="status"
+          style={{ top: toViewPercent([hintSpot.badge[0], hintSpot.badge[1] + BADGE_RADIUS + 70]).top }}
+          onClick={() => setHintFor(null)}
+        >
+          <img src="/map/badge_locked_full.svg" width={22} height={22} alt="" />
+          {lockedHint(hintSpot.id, { level, xp })}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
-function AvailableBadge({ x, y }: { x: number; y: number }) {
+function DomeState({ spot, state, uid }: { spot: Spot; state: MapNodeState; uid: string }) {
+  const dome = domeEllipse(spot);
+  if (state === "locked") {
+    return (
+      <g pointerEvents="none">
+        <ellipse cx={dome.cx} cy={dome.cy} rx={dome.rx * 0.7} ry={dome.ry * 0.7} fill="#b4c8e6" opacity="0.2" filter={`url(#${uid}-blur)`} />
+        <g clipPath={`url(#${uid}-dome-${spot.id})`}>
+          <image href={MAP_SVG} x="0" y="0" width={SCENE_SIZE.w} height={SCENE_SIZE.h} filter={`url(#${uid}-grey)`} />
+        </g>
+      </g>
+    );
+  }
+  const glow = domeGlow(state);
+  if (!glow) return null;
   return (
-    <polygon
-      transform={`translate(${x} ${y})`}
-      points="0,-30 26,-15 26,15 0,30 -26,15 -26,-15"
-      fill="#1b1442"
-      stroke="#c4b5fd"
-      strokeWidth="3.5"
+    <ellipse
+      className={`dome-glow ${state}`}
+      cx={dome.cx}
+      cy={dome.cy}
+      rx={dome.rx * 0.78}
+      ry={dome.ry * 0.82}
+      fill={glow.color}
+      opacity={glow.opacity}
+      filter={`url(#${uid}-blur)`}
+      pointerEvents="none"
+      style={{ mixBlendMode: "screen" }}
     />
   );
 }
 
-function Chip({
-  place,
-  lx,
-  ly,
-  dim,
-  onOpen,
-}: {
-  place: Place;
-  lx: number;
-  ly: number;
-  dim: boolean;
-  onOpen: () => void;
-}) {
-  const { w, h } = place.chip;
-  const top = ly - h / 2;
+function SpotBadge({ spot, state, uid, onTap }: { spot: Spot; state: MapNodeState; uid: string; onTap: () => void }) {
+  const [x, y] = spot.badge;
+  const scale = (BADGE_RADIUS * 2) / (BADGE_BOX * 0.775);
   return (
-    <g onClick={onOpen} style={{ cursor: dim ? "default" : "pointer" }}>
-      <rect x={lx - w / 2} y={top} width={w} height={h} rx="10" fill="#12102a" stroke="#0a1c46" strokeWidth="1.5" />
-      {place.lines.map((line, index) => (
-        <text
-          key={line}
-          x={lx}
-          y={top + 15 + index * 14}
-          textAnchor="middle"
-          fontSize="12"
-          fontWeight="600"
-          fontFamily="Fredoka, Inter, sans-serif"
-          fill={dim ? "#aeb4d0" : "#ffffff"}
-        >
-          {line}
-        </text>
-      ))}
+    <g
+      className={`map-node ${state}`}
+      data-node={spot.id}
+      data-state={state}
+      role="button"
+      tabIndex={0}
+      aria-label={`${spot.label}: ${STATE_WORD[state]}`}
+      onClick={onTap}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onTap();
+        }
+      }}
+    >
+      {state === "current" ? (
+        <circle cx={x} cy={y} r={BADGE_RADIUS * 0.95} fill="#a855f7" opacity="0.45" filter={`url(#${uid}-halo)`} />
+      ) : null}
+      <image
+        href={BADGE_FILE[state]}
+        width={BADGE_BOX}
+        height={BADGE_BOX}
+        transform={`translate(${x} ${y}) scale(${scale.toFixed(4)}) translate(${-BADGE_CENTER[0]} ${-BADGE_CENTER[1]})`}
+      />
+      <circle cx={x} cy={y} r={BADGE_RADIUS} fill="#fff" opacity="0" />
     </g>
+  );
+}
+
+function SpotLabel({ spot, state, onTap }: { spot: Spot; state: MapNodeState; onTap: () => void }) {
+  const [x, y] = spot.badge;
+  const anchorX = spot.side === "left" ? x - BADGE_RADIUS : spot.side === "right" ? x + BADGE_RADIUS : x;
+  const at = toViewPercent([anchorX, y + BADGE_RADIUS + 34]);
+  return (
+    <button
+      type="button"
+      className={`spot-label ${spot.side} is-${state}`}
+      style={{ left: at.left, top: at.top }}
+      onClick={onTap}
+      tabIndex={-1}
+      aria-hidden="true"
+    >
+      <img src={placeIconUrl(spot.id)} width={18} height={18} alt="" />
+      {spot.label}
+    </button>
   );
 }
 

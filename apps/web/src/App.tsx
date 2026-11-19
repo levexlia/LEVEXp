@@ -16,7 +16,7 @@ import {
 import { Avatar } from "./avatar/Avatar";
 import { AvatarBuilder } from "./AvatarBuilder";
 import { HomeMap, missionsFor } from "./HomeMap";
-import { avatarInView } from "./map/layout";
+import { avatarFeet, spotFor, toViewPercent } from "./map/spots";
 import { KitIcon, SPHERE_ICON, type KitIconName } from "./map/KitIcon";
 import { Logo } from "./Logo";
 
@@ -56,7 +56,7 @@ export function App() {
   const energy = player?.energy ?? { current: 50, max: 50 };
   const doneSpheres = goals.filter((goal) => goal.status === "done" && goal.sphere).map((goal) => goal.sphere as string);
   const currentNode = mapNodeStates({ level, doneSpheres }).find((node) => node.state === "current");
-  const avatarSpot = avatarInView(currentNode?.id ?? "home");
+  const avatarSpot = toViewPercent(avatarFeet(spotFor(currentNode?.id ?? "home")));
 
   function burst() {
     setCheer(true);
@@ -114,7 +114,7 @@ export function App() {
             </aside>
             <div className="map-column">
               <div className="map-frame">
-                <HomeMap level={level} goals={goals} onOpen={setNodeId} />
+                <HomeMap level={level} xp={xp} goals={goals} onOpen={setNodeId} />
                 <button
                   type="button"
                   className="map-avatar"
@@ -130,8 +130,8 @@ export function App() {
                 </button>
               </div>
             </div>
-            <aside className="stage-side">
-              <h2>Сегодня</h2>
+            <aside className="stage-side" aria-labelledby="today-title">
+              <h2 id="today-title">Сегодня</h2>
               <p className="streak-line"><KitIcon name="streak" size={18} /> Серия: {player?.streak ?? 0} {dayWord(player?.streak ?? 0)}</p>
               <GoalList goals={goals.filter((goal) => goal.status === "open")} busy={busy} onDone={finish} />
             </aside>
