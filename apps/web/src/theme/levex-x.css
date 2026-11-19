@@ -1,0 +1,111 @@
+/* LEVEX · направление X «Неон-кибер» (scene14) — дизайн-токены и базовые компоненты.
+   Подключение: import "./theme/levex-x.css";  ассеты лежат в apps/web/public/art/scene14.
+   Шрифты: Tektur, JetBrains Mono — SIL OFL 1.1 (см. public/art/scene14/fonts/OFL-*.txt). */
+
+@font-face { font-family: "Tektur"; src: url("/art/scene14/fonts/Tektur-Variable.ttf") format("truetype"); font-weight: 400 900; font-stretch: 75% 100%; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("/art/scene14/fonts/JetBrainsMono-Variable.ttf") format("truetype"); font-weight: 100 800; font-display: swap; }
+
+:root {
+  /* фон и контур */
+  --lx-bg-deep: #03040c;
+  --lx-bg: #04060f;
+  --lx-bg-sky: #0a0d2e;
+  --lx-panel: #0a1030;
+  --lx-panel-top: #0b1236;
+  --lx-outline: #0a1c46;
+  /* неон */
+  --lx-violet: #b47bff;
+  --lx-cyan: #22e1ff;
+  --lx-cyan-soft: #7ff3ff;
+  --lx-magenta: #d26bff;
+  --lx-gold: #ffd23d;
+  /* текст */
+  --lx-text: #e6f0ff;
+  --lx-text-2: #8fa0d8;
+  --lx-text-muted: #7f8cc0;
+  --lx-text-disabled: #646d94;   /* ≈3.7:1 к подложке неактивной кнопки */
+  /* места */
+  --lx-place-home: #ff7a45;
+  --lx-place-study: #38bdf8;
+  --lx-place-park: #2ef2c4;
+  --lx-place-workshop: #ffc23d;
+  --lx-place-center: #b47bff;
+  --lx-locked: #56607f;
+  /* состояния жетонов */
+  --lx-state-done: #22e1ff;
+  --lx-state-current: #d26bff;
+  --lx-state-available: #8a96d6;
+  --lx-state-locked: #56607f;
+  /* градиенты */
+  --lx-grad-neon: linear-gradient(90deg, #b47bff, #22e1ff);
+  --lx-grad-btn: linear-gradient(90deg, #160b3a, #071a3a);
+  --lx-grad-btn-pressed: linear-gradient(90deg, rgba(180,123,255,.6), rgba(34,225,255,.5));
+  --lx-grad-sky: linear-gradient(#03040c, #0a0d2e 40%, #04061a);
+  --lx-grad-sheet: linear-gradient(#0b1236, #04060f 55%);
+  --lx-hatch-disabled: repeating-linear-gradient(135deg, #070a1a 0 6px, #0b0f25 6px 12px);
+  /* тени / свечение */
+  --lx-glow-btn: drop-shadow(0 0 10px rgba(130,120,255,.5));
+  --lx-glow-btn-pressed: drop-shadow(0 0 18px rgba(34,225,255,.75));
+  --lx-glow-btn-2: drop-shadow(0 0 6px rgba(132,148,232,.35));
+  --lx-glow-avatar: drop-shadow(0 0 8px rgba(34,225,255,.55));
+  --lx-text-glow: 0 0 8px #22e1ff;
+  /* форма */
+  --lx-chamfer-btn: 14px;
+  --lx-chamfer-chip: 7px;
+  --lx-chamfer-sheet: 26px;
+  --lx-btn-h: 50px;
+  /* шрифты */
+  --lx-font-display: "Tektur", system-ui, sans-serif;
+  --lx-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* анимация */
+  --lx-loop: 2.4s;
+}
+
+/* ---------- кнопка: .lx-btn (главная) / .lx-btn--secondary; нажатое — :active или .is-pressed; неактивное — :disabled или [aria-disabled="true"] */
+.lx-btn {
+  --c: var(--lx-chamfer-btn);
+  position: relative; display: inline-block; height: var(--lx-btn-h); padding: 1.5px; border: 0; cursor: pointer;
+  background: var(--lx-grad-neon); filter: var(--lx-glow-btn);
+  clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
+  font: 700 16px/1 var(--lx-font-display); letter-spacing: .3em; text-transform: uppercase; color: var(--lx-text);
+}
+.lx-btn > .lx-btn__in {
+  height: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 0 20px;
+  background: var(--lx-grad-btn);
+  clip-path: polygon(calc(var(--c) - 1px) 0, 100% 0, 100% calc(100% - var(--c) + 1px), calc(100% - var(--c) + 1px) 100%, 0 100%, 0 calc(var(--c) - 1px));
+}
+.lx-btn:active, .lx-btn.is-pressed { transform: translateY(2px); filter: var(--lx-glow-btn-pressed); }
+.lx-btn:active > .lx-btn__in, .lx-btn.is-pressed > .lx-btn__in { background: var(--lx-grad-btn-pressed); color: #fff; text-shadow: 0 0 8px #fff; }
+.lx-btn--secondary { background: #8494e8; filter: var(--lx-glow-btn-2); font-weight: 600; font-size: 13px; letter-spacing: .24em; color: #eef2ff; }
+.lx-btn--secondary > .lx-btn__in { background: linear-gradient(90deg, #1a2358, #121a46); }
+.lx-btn--secondary:active, .lx-btn--secondary.is-pressed { background: var(--lx-cyan); filter: drop-shadow(0 0 10px rgba(34,225,255,.5)); }
+.lx-btn--secondary:active > .lx-btn__in, .lx-btn--secondary.is-pressed > .lx-btn__in { background: #061e34; color: #dffbff; text-shadow: none; }
+.lx-btn:disabled, .lx-btn[aria-disabled="true"] { background: #343c63; filter: none; transform: none; cursor: not-allowed; color: var(--lx-text-disabled); }
+.lx-btn:disabled > .lx-btn__in, .lx-btn[aria-disabled="true"] > .lx-btn__in { background: var(--lx-hatch-disabled); color: var(--lx-text-disabled); text-shadow: none; }
+
+/* ---------- чип места: .lx-chip, цвет через --place */
+.lx-chip {
+  --c: var(--lx-chamfer-chip);
+  display: inline-block; padding: 1px; background: var(--place, var(--lx-cyan));
+  clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
+}
+.lx-chip > .lx-chip__in {
+  display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 5px;
+  background: linear-gradient(90deg, rgba(10,16,48,.97), rgba(4,7,22,.97));
+  clip-path: polygon(calc(var(--c) - .5px) 0, 100% 0, 100% calc(100% - var(--c) + .5px), calc(100% - var(--c) + .5px) 100%, 0 100%, 0 calc(var(--c) - .5px));
+  font: 600 10.5px var(--lx-font-display); letter-spacing: .09em; text-transform: uppercase; white-space: nowrap; color: var(--lx-text);
+}
+.lx-chip.is-locked { background: #2f3756; }
+.lx-chip.is-locked > .lx-chip__in { color: #6b7597; }
+
+/* ---------- шторка места */
+.lx-sheet { padding: 1.5px 0 0; background: var(--lx-grad-neon);
+  clip-path: polygon(var(--lx-chamfer-sheet) 0, calc(100% - var(--lx-chamfer-sheet)) 0, 100% var(--lx-chamfer-sheet), 100% 100%, 0 100%, 0 var(--lx-chamfer-sheet)); }
+.lx-sheet > .lx-sheet__in { height: 100%; padding: 16px 20px; background: var(--lx-grad-sheet);
+  clip-path: polygon(calc(var(--lx-chamfer-sheet) - 1px) 0, calc(100% - var(--lx-chamfer-sheet) + 1px) 0, 100% calc(var(--lx-chamfer-sheet) - 1px), 100% 100%, 0 100%, 0 calc(var(--lx-chamfer-sheet) - 1px)); }
+
+.lx-avatar { filter: var(--lx-glow-avatar); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lx-btn, .lx-chip, .lx-avatar { transition: none; animation: none; }
+}
