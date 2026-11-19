@@ -16,6 +16,7 @@
 | `ui/hex_level.svg` | Шестиугольник уровня в шапке, 40 px (цифра — текстом сверху) |
 | `ui/ic_streak.svg`, `ui/ic_energy.svg` | Иконки шапки в своих цветах: пламя #ff7a45, молния #ffd23d, 18 px |
 | `ui/ic_tab_{map,missions,resources,profile}.svg`, `…_active.svg` | Иконки таб-бара: неактивные #56618c, активные #7ff3ff (свечение — CSS), 24 px |
+| `ui/ic_reward.svg` | Иконка награды в шторке «пройдено» (блок «Награда получена»): золотая звезда в голубом гексе, 40 px |
 | `badges/mission_open.svg` | Пустой гекс-контур открытой миссии в строке шторки, 20 px |
 | `avatar/operator.svg` | Аватар игрока на карте (48×96) |
 | `avatar/hex_portrait.svg`, `avatar/hologram.svg` | Запасные варианты аватара |
@@ -24,4 +25,4 @@
 Токены: `apps/web/src/theme/levex-x.css` (CSS-переменные и классы `.lx-btn`, `.lx-chip`, `.lx-sheet`)
 и `apps/web/src/theme/levex-x.tokens.json`. Превью: `docs/art/scene14/`.
 
-Все файлы из второй партии (рамки, гекс уровня, иконки шапки и табов, `mission_open`) статичные — без CSS-анимации, static-двойники им не нужны.
+Все файлы из второй партии (рамки, гекс уровня, иконки шапки и табов, `mission_open`, `ic_reward`) статичные — без CSS-анимации, static-двойники им не нужны.

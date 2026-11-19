@@ -3,7 +3,7 @@
 ## Графика — собственная работа
 Все SVG в этой папке (карта, купола на гекс-островах, иконки мест и их _locked-версии, жетоны состояний,
 кнопки, чипы, UI-иконки, аватары operator / hex_portrait / hologram, а также рамки `ui/hex_frame_96*`,
-`ui/hex_level.svg`, иконки шапки и табов `ui/ic_streak|ic_energy|ic_tab_*` и `badges/mission_open.svg`) и превью в `docs/art/scene14/`
+`ui/hex_level.svg`, иконки шапки и табов `ui/ic_streak|ic_energy|ic_tab_*` `ui/ic_reward.svg` и `badges/mission_open.svg`) и превью в `docs/art/scene14/`
 нарисованы с нуля кодом (SVG + CSS) художником LEVEX. Сторонних изображений, иконок-паков, стоков и
 ИИ-генераций нет. Права — у проекта LEVEX.
 
