@@ -2,8 +2,8 @@ import { MAP_NODES, XP_PER_LEVEL, type MapNodeId, type MapNodeState } from "@lev
 // Same file as public/map/map_spots.json (a test keeps them equal); Vite cannot import from public/.
 import scene from "./scene11/map_spots.json";
 
-/** Scene 11 map: no road, five domes on hex islands in a zigzag. */
-export const MAP_SVG = "/map/scene11_map.svg";
+/** Scene 14 map background (grid, no domes); domes are drawn per state on top. Layout is scene 11: no road, zigzag. */
+export const MAP_SVG = "/art/scene14/map/map_bg_720x1280.svg";
 
 const [, , sceneW, sceneH] = scene.viewBox as [number, number, number, number];
 
@@ -61,38 +61,27 @@ export function spotFor(id: MapNodeId): Spot {
   return spot;
 }
 
-/** Badge radius in scene units: 64 css px at a 390 px wide phone. */
+/** Tap radius around a badge in scene units: 64 css px at a 390 px wide phone. */
 export const BADGE_RADIUS = (scene.badge_diameter_css_px_at_390 / 2) * (sceneW / 390);
 
-/** Kit badge art for each state. All four share the 919 viewBox of the map kit. */
+/** Drawn badge radius in scene units. The scene14 mock draws badges at about 28 css px. */
+export const BADGE_ART_RADIUS = 28;
+
+/** scene14 badge art for each state, viewBox 48. */
 export const BADGE_FILE: Record<MapNodeState, string> = {
-  done: "/map/badge_done_full.svg",
-  current: "/map/badge_current_full.svg",
-  available: "/map/badge_available_full.svg",
-  locked: "/map/badge_locked_full.svg",
+  done: "/art/scene14/badges/done.svg",
+  current: "/art/scene14/badges/current.svg",
+  available: "/art/scene14/badges/available.svg",
+  locked: "/art/scene14/badges/locked.svg",
 };
-
-/** Glow over a dome: cyan when done, violet when current, none otherwise. */
-export function domeGlow(state: MapNodeState): { color: string; opacity: number } | null {
-  if (state === "done") return { color: "#22d3ee", opacity: 0.22 };
-  if (state === "current") return { color: "#a78bfa", opacity: 0.38 };
-  return null;
-}
-
-/** Ellipse that covers the glass dome above a spot's foot, in scene units. */
-export function domeEllipse(spot: Spot): { cx: number; cy: number; rx: number; ry: number } {
-  const equator = spot.hero ? scene.layout.hero_dome_equator : scene.layout.regular_dome_equator;
-  const rx = equator / 2 + 6;
-  const ry = equator * 0.47;
-  return { cx: spot.building[0], cy: spot.building[1] - ry * 0.9, rx, ry };
-}
 
 /** Where the avatar stands next to the current badge (feet point), in scene units. */
 export function avatarFeet(spot: Spot): [number, number] {
-  const [x, y] = spot.badge;
-  if (spot.side === "left") return [x + BADGE_RADIUS + 52, y + 62];
-  if (spot.side === "right") return [x - BADGE_RADIUS - 52, y + 62];
-  return [x + BADGE_RADIUS + 60, y + 40];
+  // scene14 mock: the operator stands on the inner side of the current dome, toward the middle.
+  const [x, y] = spot.building;
+  if (spot.side === "left") return [x + 132, y + 58];
+  if (spot.side === "right") return [x - 132, y + 58];
+  return [x + 178, y + 40];
 }
 
 /** A scene point as CSS percentages of the visible map. */

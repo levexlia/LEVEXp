@@ -1,4 +1,4 @@
-import { DEFAULT_AVATAR_CONFIG, LIFE_SPHERES, MAP_NODES, XP_PER_LEVEL, type AvatarConfig, type MapNodeId } from "@levex/domain";
+import { DEFAULT_AVATAR_CONFIG, LIFE_SPHERES, XP_PER_LEVEL, type AvatarConfig, type MapNodeId } from "@levex/domain";
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   askAssistant,
@@ -18,9 +18,12 @@ import { Avatar } from "./avatar/Avatar";
 import { AvatarBuilder } from "./AvatarBuilder";
 import { AssistantChat } from "./assistant/AssistantChat";
 import { ASSISTANT_ROBOT_SIZE, ROBOT_STATES, robotSrc, type RobotState } from "./assistant/art";
-import { useReducedMotion } from "./assistant/useReducedMotion";
-import { HomeMap, missionsFor } from "./HomeMap";
-import { KitIcon, SPHERE_ICON, type KitIconName } from "./map/KitIcon";
+import { HomeMap, mapStates } from "./HomeMap";
+import { PlaceSheet } from "./PlaceSheet";
+import { segments } from "./map/placeSheet";
+import { HEX_LEVEL_URL, tabIconUrl, uiIconUrl, type HeaderIcon, type TabIcon } from "./theme/uiArt";
+import { useReducedMotion } from "./theme/useReducedMotion";
+import { KitIcon, SPHERE_ICON } from "./map/KitIcon";
 import { Logo } from "./Logo";
 
 type Tab = "map" | "missions" | "resources" | "profile";
@@ -37,20 +40,14 @@ export function App() {
   const [cheer, setCheer] = useState(false);
   const [chat, setChat] = useState(false);
   const [robotState, setRobotState] = useState<RobotState>("idle");
-  const reducedMotion = useReducedMotion();
+  const robotRef = useRef<HTMLButtonElement>(null);
   const closeChat = useCallback(() => {
     setChat(false);
     setRobotState("idle");
   }, []);
-  const robotRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-
-  // Preload the robot states so switching does not flash (INTEGRATION.md).
-  useEffect(() => {
-    for (const state of ROBOT_STATES) new Image().src = robotSrc(state, reducedMotion);
-  }, [reducedMotion]);
 
   async function refresh(): Promise<Player> {
     const data = await loadRoom();
@@ -70,6 +67,20 @@ export function App() {
   const into = xp % XP_PER_LEVEL;
   const config = player?.avatarConfig ?? DEFAULT_AVATAR_CONFIG;
   const energy = player?.energy ?? { current: 50, max: 50 };
+  const reducedMotion = useReducedMotion();
+  const states = mapStates(level, goals);
+
+  // Preload the robot states so switching does not flash (scene15 INTEGRATION.md).
+  useEffect(() => {
+    for (const state of ROBOT_STATES) new Image().src = robotSrc(state, reducedMotion);
+  }, [reducedMotion]);
+
+  /** «Начать» / «Войти» / «Повторить»: Мастерская opens the photo proof, other places the mission list. */
+  function enterPlace(id: MapNodeId) {
+    setNodeId(null);
+    if (id === "workshop") setProof(true);
+    else setTab("missions");
+  }
 
   function burst() {
     setCheer(true);
@@ -102,15 +113,16 @@ export function App() {
           <strong>LEVEX</strong>
         </div>
         <div className="meters">
-          <span className="pill streak"><KitIcon name="streak" size={18} />{player?.streak ?? 0}</span>
-          <span className="pill energy"><KitIcon name="energy" size={18} />{energy.current}/{energy.max}</span>
-          <span className="pill level"><KitIcon name="level" size={18} />Ур. {level}</span>
+          <span className="cnt streak" title="Серия"><UiIcon name="streak" />{pad2(player?.streak ?? 0)}<small>Серия</small></span>
+          <span className="cnt energy" title="Энергия"><UiIcon name="energy" />{energy.current}/{energy.max}</span>
+          <span className="lvl">Уровень<span className="lvl-hex"><img src={HEX_LEVEL_URL} width={40} height={40} alt="" /><b>{pad2(level)}</b></span></span>
         </div>
         <div className="xp-line">
-          <div className="xp" role="progressbar" aria-valuenow={into} aria-valuemin={0} aria-valuemax={XP_PER_LEVEL}>
-            <span style={{ width: `${into}%` }} />
+          <em>XP</em>
+          <div className="xp-seg" role="progressbar" aria-label="XP до следующего уровня" aria-valuenow={into} aria-valuemin={0} aria-valuemax={XP_PER_LEVEL}>
+            {segments(into, XP_PER_LEVEL, 20).map((on, index) => <i key={index} className={on ? "on" : undefined} />)}
           </div>
-          <em>XP {into} / {XP_PER_LEVEL}</em>
+          <em>{into}/{XP_PER_LEVEL}</em>
         </div>
       </header>
 
@@ -121,10 +133,11 @@ export function App() {
           <div className="map-wrap">
             <div className="map-column">
               <div className="map-frame">
-                <HomeMap level={level} xp={xp} goals={goals} onOpen={setNodeId} />
+                <HomeMap states={states} reducedMotion={reducedMotion} onOpen={setNodeId} />
+                {/* Only the scene15 assistant stands on the map; the player's avatar lives in Профиль. */}
                 <button
-                  type="button"
                   ref={robotRef}
+                  type="button"
                   className="map-robot"
                   onClick={() => setChat(true)}
                   aria-label="ИИ-помощник: открыть чат"
@@ -139,15 +152,17 @@ export function App() {
                     data-state={chat ? robotState : "idle"}
                   />
                 </button>
-                <button type="button" className="proof" onClick={() => setProof(true)}>
-                  <KitIcon name="camera" size={26} />
-                  Proof
+              </div>
+
+              <div className="proof-row">
+                <button type="button" className="lx-btn proof" onClick={() => setProof(true)}>
+                  <span className="lx-btn__in"><UiIcon name="camera" />Proof</span>
                 </button>
               </div>
             </div>
             <aside className="stage-side" aria-labelledby="today-title">
               <h2 id="today-title">Сегодня</h2>
-              <p className="streak-line"><KitIcon name="streak" size={18} /> Серия: {player?.streak ?? 0} {dayWord(player?.streak ?? 0)}</p>
+              <p className="streak-line"><UiIcon name="streak" /> Серия: {player?.streak ?? 0} {dayWord(player?.streak ?? 0)}</p>
               <GoalList goals={goals.filter((goal) => goal.status === "open")} busy={busy} onDone={finish} />
             </aside>
           </div>
@@ -160,7 +175,7 @@ export function App() {
           <Profile
             player={player}
             config={config}
-            cheer={cheer}
+            cheer={cheer && !reducedMotion}
             placements={placements}
             onEdit={() => { setDraft(config); setBuilding(true); }}
           />
@@ -175,10 +190,18 @@ export function App() {
       </nav>
 
       {nodeId ? (
-        <Sheet title={MAP_NODES.find((node) => node.id === nodeId)?.name ?? ""} onClose={() => setNodeId(null)}>
-          <GoalList goals={missionsFor(nodeId, goals)} busy={busy} onDone={finish} />
-          {nodeId === "workshop" ? <button type="button" className="done" onClick={() => { setNodeId(null); setProof(true); }}>Загрузить фото</button> : null}
-        </Sheet>
+        <PlaceSheet
+          id={nodeId}
+          state={states.get(nodeId) ?? "locked"}
+          goals={goals}
+          level={level}
+          xp={xp}
+          busy={busy}
+          reducedMotion={reducedMotion}
+          onClose={() => setNodeId(null)}
+          onEnter={enterPlace}
+          onDone={finish}
+        />
       ) : null}
 
       {chat ? (
@@ -278,13 +301,22 @@ function dayWord(count: number): string {
   return "дней";
 }
 
-function Dock({ id, tab, label, icon, onPick }: { id: Tab; tab: Tab; label: string; icon: KitIconName; onPick: (id: Tab) => void }) {
+function Dock({ id, tab, label, icon, onPick }: { id: Tab; tab: Tab; label: string; icon: TabIcon; onPick: (id: Tab) => void }) {
   return (
-    <button type="button" className={tab === id ? "dock-btn on" : "dock-btn"} onClick={() => onPick(id)}>
-      <KitIcon name={icon} size={26} />
+    <button type="button" className={tab === id ? "dock-btn on" : "dock-btn"} aria-current={tab === id ? "page" : undefined} onClick={() => onPick(id)}>
+      <img className="ui-icon" src={tabIconUrl(icon, tab === id)} width={26} height={26} alt="" />
       <span>{label}</span>
     </button>
   );
+}
+
+/** A scene14 header / button icon, drawn in its own colour (see theme/uiArt.ts). */
+function UiIcon({ name, size = 20 }: { name: HeaderIcon; size?: number }) {
+  return <img className="ui-icon" src={uiIconUrl(name)} width={size} height={size} alt="" />;
+}
+
+function pad2(value: number): string {
+  return String(Math.max(0, value)).padStart(2, "0");
 }
 
 function GoalList({ goals, busy, onDone }: { goals: Goal[]; busy: boolean; onDone: (id: string) => void }) {
@@ -295,7 +327,7 @@ function GoalList({ goals, busy, onDone }: { goals: Goal[]; busy: boolean; onDon
         <li key={goal.id}>
           <span>{goal.title}</span>
           {goal.status === "open" ? (
-            <button type="button" disabled={busy} onClick={() => onDone(goal.id)}>Готово</button>
+            <button type="button" className="lx-btn lx-btn--secondary lx-btn--sm" disabled={busy} onClick={() => onDone(goal.id)}><span className="lx-btn__in">Готово</span></button>
           ) : <em>закрыта</em>}
         </li>
       ))}
@@ -350,7 +382,7 @@ function Profile({
           <strong>{player?.nickname ?? "Игрок"}</strong>
           {player?.title ? <span>{player.title}</span> : null}
           <span>Уровень {player?.progress.level ?? 1}</span>
-          <button type="button" className="done" onClick={onEdit}>Собрать персонажа</button>
+          <button type="button" className="lx-btn" onClick={onEdit}><span className="lx-btn__in">Собрать персонажа</span></button>
         </div>
       </div>
       <h3>Галерея</h3>
@@ -370,12 +402,14 @@ function Profile({
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="sheet-back" role="presentation" onClick={onClose}>
-      <section className="sheet" role="dialog" aria-label={title} onClick={(event) => event.stopPropagation()}>
-        <header>
-          <h2>{title}</h2>
-          <button type="button" className="quiet" onClick={onClose}>Закрыть</button>
-        </header>
-        {children}
+      <section className="lx-sheet sheet" role="dialog" aria-label={title} onClick={(event) => event.stopPropagation()}>
+        <div className="lx-sheet__in">
+          <header>
+            <h2>{title}</h2>
+            <button type="button" className="quiet" onClick={onClose}>Закрыть</button>
+          </header>
+          {children}
+        </div>
       </section>
     </div>
   );
@@ -395,7 +429,7 @@ function ProofForm({ busy, onSubmit }: { busy: boolean; onSubmit: (title: string
       <input id="proof-title" value={title} onChange={(event) => setTitle(event.target.value)} />
       <label htmlFor="proof-file">Фото</label>
       <input id="proof-file" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-      <button type="submit" className="done" disabled={busy || !file}>Повесить и закрыть</button>
+      <button type="submit" className="lx-btn lx-btn--wide" disabled={busy || !file}><span className="lx-btn__in">Повесить и закрыть</span></button>
     </form>
   );
 }
@@ -423,7 +457,7 @@ function PhotoLook({
         <span>На фото реальный человек, и я соглашаюсь создать по нему персонажа.</span>
       </label>
       <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-      <button type="submit" disabled={busy || !file || !consent}>Создать по фото</button>
+      <button type="submit" className="lx-btn lx-btn--wide" disabled={busy || !file || !consent}><span className="lx-btn__in">Создать по фото</span></button>
     </form>
   );
 }

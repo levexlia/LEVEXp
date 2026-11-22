@@ -1,0 +1,221 @@
+diff --git a/apps/web/src/HomeMap.tsx b/apps/web/src/HomeMap.tsx
+index 94fdbcc..ae37a90 100644
+--- a/apps/web/src/HomeMap.tsx
++++ b/apps/web/src/HomeMap.tsx
+@@ -2,6 +2,7 @@ import { MAP_NODES, mapNodeStates, type MapNodeId, type MapNodeState } from "@le
+ import { useEffect, useId, useState } from "react";
+ import type { Goal } from "./api";
+ import { placeIconUrl } from "./map/placeIcons";
++import scene14Domes from "./map/scene14_domes.json";
+ import {
+   BADGE_FILE,
+   BADGE_RADIUS,
+@@ -10,15 +11,14 @@ import {
+   SCENE_SIZE,
+   SPOTS,
+   domeEllipse,
+-  domeGlow,
+   lockedHint,
+   toViewPercent,
+   type Spot,
+ } from "./map/spots";
+ 
+ /** Kit badges are drawn in a 919 box; this is their visual centre. */
+-const BADGE_CENTER: [number, number] = [458.7, 431.9];
+-const BADGE_BOX = 919;
++const BADGE_CENTER: [number, number] = [24, 24];
++const BADGE_BOX = 48;
+ const HINT_MS = 4200;
+ 
+ const STATE_WORD: Record<MapNodeState, string> = {
+@@ -111,7 +111,7 @@ export function HomeMap({
+           style={{ top: toViewPercent([hintSpot.badge[0], hintSpot.badge[1] + BADGE_RADIUS + 70]).top }}
+           onClick={() => setHintFor(null)}
+         >
+-          <img src="/map/badge_locked_full.svg" width={22} height={22} alt="" />
++          <img src="/art/scene14/badges/locked.svg" width={22} height={22} alt="" />
+           {lockedHint(hintSpot.id, { level, xp })}
+         </p>
+       ) : null}
+@@ -119,39 +119,15 @@ export function HomeMap({
+   );
+ }
+ 
+-function DomeState({ spot, state, uid }: { spot: Spot; state: MapNodeState; uid: string }) {
+-  const dome = domeEllipse(spot);
+-  if (state === "locked") {
+-    return (
+-      <g pointerEvents="none">
+-        <ellipse cx={dome.cx} cy={dome.cy} rx={dome.rx * 0.7} ry={dome.ry * 0.7} fill="#b4c8e6" opacity="0.2" filter={`url(#${uid}-blur)`} />
+-        <g clipPath={`url(#${uid}-dome-${spot.id})`}>
+-          <image href={MAP_SVG} x="0" y="0" width={SCENE_SIZE.w} height={SCENE_SIZE.h} filter={`url(#${uid}-grey)`} />
+-        </g>
+-      </g>
+-    );
+-  }
+-  const glow = domeGlow(state);
+-  if (!glow) return null;
+-  return (
+-    <ellipse
+-      className={`dome-glow ${state}`}
+-      cx={dome.cx}
+-      cy={dome.cy}
+-      rx={dome.rx * 0.78}
+-      ry={dome.ry * 0.82}
+-      fill={glow.color}
+-      opacity={glow.opacity}
+-      filter={`url(#${uid}-blur)`}
+-      pointerEvents="none"
+-      style={{ mixBlendMode: "screen" }}
+-    />
+-  );
++function DomeState({ spot, state }: { spot: Spot; state: MapNodeState; uid: string }) {
++  // scene14: one self-contained SVG per place and state, boxed in scene (720×1280) units.
++  const [x, y, w, h] = scene14Domes.domes[spot.id].scene720;
++  return <image href={`/art/scene14/domes/${spot.id}_${state}.svg`} x={x} y={y} width={w} height={h} pointerEvents="none" />;
+ }
+ 
+ function SpotBadge({ spot, state, uid, onTap }: { spot: Spot; state: MapNodeState; uid: string; onTap: () => void }) {
+   const [x, y] = spot.badge;
+-  const scale = (BADGE_RADIUS * 2) / (BADGE_BOX * 0.775);
++  const scale = (BADGE_RADIUS * 2) / (BADGE_BOX * 0.833);
+   return (
+     <g
+       className={`map-node ${state}`}
+diff --git a/apps/web/src/map/placeIcons.ts b/apps/web/src/map/placeIcons.ts
+index 617adba..d78d0a2 100644
+--- a/apps/web/src/map/placeIcons.ts
++++ b/apps/web/src/map/placeIcons.ts
+@@ -5,7 +5,7 @@ import type { MapNodeId } from "@levex/domain";
+  * Files live in `apps/web/public/icons/places/`. To swap the set (icons2 → icons3),
+  * drop new SVGs there under the same names, or change the folder / names below.
+  */
+-export const PLACE_ICON_DIR = "/icons/places";
++export const PLACE_ICON_DIR = "/art/scene14/places";
+ 
+ export const PLACE_ICON_FILE: Record<MapNodeId, string> = {
+   home: "home.svg",
+diff --git a/apps/web/src/map/scene14_domes.json b/apps/web/src/map/scene14_domes.json
+new file mode 100644
+index 0000000..a0bb097
+--- /dev/null
++++ b/apps/web/src/map/scene14_domes.json
+@@ -0,0 +1,75 @@
++{
++ "note": "Box of each domes/{id}_{state}.svg. scene720 = coordinates of map_720x1280.svg / map_spots.json (scene11); css390 = map.svg.",
++ "domes": {
++  "home": {
++   "css390": [
++    43.53,
++    575.59,
++    153.25,
++    117.08
++   ],
++   "scene720": [
++    56.24,
++    950.33,
++    307.52,
++    234.95
++   ]
++  },
++  "study": {
++   "css390": [
++    203.0,
++    488.88,
++    153.25,
++    117.08
++   ],
++   "scene720": [
++    376.24,
++    776.33,
++    307.52,
++    234.95
++   ]
++  },
++  "park": {
++   "css390": [
++    43.53,
++    402.17,
++    153.25,
++    117.08
++   ],
++   "scene720": [
++    56.24,
++    602.33,
++    307.52,
++    234.95
++   ]
++  },
++  "workshop": {
++   "css390": [
++    203.0,
++    315.45,
++    153.25,
++    117.08
++   ],
++   "scene720": [
++    376.24,
++    428.33,
++    307.52,
++    234.95
++   ]
++  },
++  "center": {
++   "css390": [
++    115.19,
++    152.54,
++    159.43,
++    131.29
++   ],
++   "scene720": [
++    200.04,
++    101.42,
++    319.92,
++    263.46
++   ]
++  }
++ }
++}
+\ No newline at end of file
+diff --git a/apps/web/src/map/spots.test.ts b/apps/web/src/map/spots.test.ts
+index 6abd762..bfa3749 100644
+--- a/apps/web/src/map/spots.test.ts
++++ b/apps/web/src/map/spots.test.ts
+@@ -129,7 +129,8 @@ describe("place icons", () => {
+   });
+ 
+   it("ships the icon license next to the icons", () => {
+-    expect(existsSync(publicFile(`${PLACE_ICON_DIR}/LICENSE-lucide-ISC.txt`))).toBe(true);
++    // scene14 icons are original work; their licenses sit one level up, next to the fonts' OFL texts.
++    expect(existsSync(publicFile(`${PLACE_ICON_DIR}/../LICENSES.md`))).toBe(true);
+     expect(existsSync(publicFile("/map/SCENE11_LICENSES.md"))).toBe(true);
+   });
+ });
+diff --git a/apps/web/src/map/spots.ts b/apps/web/src/map/spots.ts
+index 182254a..e0259fb 100644
+--- a/apps/web/src/map/spots.ts
++++ b/apps/web/src/map/spots.ts
+@@ -3,7 +3,7 @@ import { MAP_NODES, XP_PER_LEVEL, type MapNodeId, type MapNodeState } from "@lev
+ import scene from "./scene11/map_spots.json";
+ 
+ /** Scene 11 map: no road, five domes on hex islands in a zigzag. */
+-export const MAP_SVG = "/map/scene11_map.svg";
++export const MAP_SVG = "/art/scene14/map/map_bg_720x1280.svg";
+ 
+ const [, , sceneW, sceneH] = scene.viewBox as [number, number, number, number];
+ 
+@@ -66,10 +66,10 @@ export const BADGE_RADIUS = (scene.badge_diameter_css_px_at_390 / 2) * (sceneW /
+ 
+ /** Kit badge art for each state. All four share the 919 viewBox of the map kit. */
+ export const BADGE_FILE: Record<MapNodeState, string> = {
+-  done: "/map/badge_done_full.svg",
+-  current: "/map/badge_current_full.svg",
+-  available: "/map/badge_available_full.svg",
+-  locked: "/map/badge_locked_full.svg",
++  done: "/art/scene14/badges/done.svg",
++  current: "/art/scene14/badges/current.svg",
++  available: "/art/scene14/badges/available.svg",
++  locked: "/art/scene14/badges/locked.svg",
+ };
+ 
+ /** Glow over a dome: cyan when done, violet when current, none otherwise. */
