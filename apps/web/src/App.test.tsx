@@ -51,7 +51,12 @@ describe("App: avatar in Профиль, assistant on the map", () => {
     expect(robot.querySelector("img")?.getAttribute("src")).toBe("/art/scene15/robot_idle.svg");
     expect(container.querySelector('img[src*="tap_marker"]')).toBeNull();
     expect(robot.closest(".map-frame")).not.toBeNull();
+    // Only the scene15 robot: no parts-kit girl and no scene14 operator on the map, header or desktop column.
     expect(container.querySelectorAll("svg.hero")).toHaveLength(0);
+    expect(container.querySelector('img[src*="operator"]')).toBeNull();
+    expect(container.querySelector(".map-avatar, .stage-avatar, .mini, .lx-avatar")).toBeNull();
+    const figures = [...container.querySelectorAll(".map-frame img")].map((img) => img.getAttribute("src") ?? "");
+    expect(figures.filter((src) => src.includes("/avatar/") || src.includes("robot_"))).toEqual(["/art/scene15/robot_idle.svg"]);
     expect(screen.queryByRole("img", { name: /Персонаж|Мой персонаж/ })).toBeNull();
   });
 
