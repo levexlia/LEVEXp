@@ -57,6 +57,11 @@ describe("robot state", () => {
 });
 
 describe("AssistantChat", () => {
+  it("says in the header that it does not change XP or progress", () => {
+    setup();
+    expect(document.querySelector(".lx-chat__meta")?.textContent).toBe("LEVEX · НЕ МЕНЯЕТ XP И ПРОГРЕСС");
+  });
+
   it("goes idle → listening → thinking → speaking → listening, with matching art", async () => {
     const first = deferred<AssistantReply>();
     const ask = vi.fn<AskFn>().mockReturnValueOnce(first.promise);

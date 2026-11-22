@@ -187,7 +187,7 @@ export function AssistantChat({
               </div>
             </div>
             <div>
-              <p className="lx-chat__meta">LEVEX · XP И ПРОГРЕСС НЕ МЕНЯЕТ</p>
+              <p className="lx-chat__meta">LEVEX · НЕ МЕНЯЕТ XP И ПРОГРЕСС</p>
               <h2 className="lx-chat__ttl" id={titleId}>ИИ-помощник</h2>
               {status ? (
                 <span className="lx-chat__st" style={{ "--sc": status.color } as CSSProperties} aria-hidden="true">
