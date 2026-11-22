@@ -12,12 +12,10 @@ import {
   HAIR_STYLES,
   OUTFITS,
   SKIN_TONES,
-  energyForDay,
   getLifeSphere,
   LIFE_SPHERE_IDS,
   listLifeSpheres,
   NICKNAME_MAX_LENGTH,
-  streakDays,
   TITLE_MAX_LENGTH,
 } from "@levex/domain";
 import {
@@ -26,7 +24,6 @@ import {
   completeGoal,
   createArtifact,
   createGoal,
-  currentTime,
   getPlayer,
   getProgress,
   getRoom,
@@ -47,6 +44,7 @@ import {
   saveImageUpload,
   UPLOAD_MAX_BYTES,
 } from "./uploads.js";
+import { playerView } from "./playerView.js";
 import { registerAvatarRoutes } from "./avatar/routes.js";
 import type { AvatarGenerator } from "./avatar/generator.js";
 import { registerAssistantRoutes, type AssistantOptions } from "./assistant/routes.js";
@@ -193,16 +191,7 @@ export function buildApp(opts: {
 
   app.get("/progress", async () => getProgress());
 
-  app.get("/player", async () => {
-    const player = getPlayer();
-    const times = listGoals().map((goal) => goal.completedAt);
-    const now = currentTime();
-    return {
-      ...player,
-      streak: streakDays(times, now),
-      energy: energyForDay(times, now),
-    };
-  });
+  app.get("/player", async () => playerView(getPlayer()));
 
   app.put("/player/avatar", {
     schema: {
@@ -222,7 +211,7 @@ export function buildApp(opts: {
     },
   }, async (req, reply) => {
     try {
-      return setAvatarConfig(req.body);
+      return playerView(setAvatarConfig(req.body));
     } catch (err) {
       if (err instanceof InvalidAvatarConfig) return reply.code(400).send({ error: err.message });
       throw err;
@@ -254,7 +243,7 @@ export function buildApp(opts: {
     },
   }, async (req, reply) => {
     try {
-      return updatePlayer(req.body as Parameters<typeof updatePlayer>[0]);
+      return playerView(updatePlayer(req.body as Parameters<typeof updatePlayer>[0]));
     } catch (err) {
       if (err instanceof InvalidPlayerUpdate) return reply.code(400).send({ error: err.message });
       throw err;

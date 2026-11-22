@@ -5,6 +5,7 @@ import {
   avatarQuota,
   selectAvatar,
 } from "../store.js";
+import { playerView } from "../playerView.js";
 import { InvalidUpload } from "../uploads.js";
 import { generateAvatars } from "./generate.js";
 import {
@@ -83,7 +84,7 @@ export function registerAvatarRoutes(
     },
   }, async (req, reply) => {
     try {
-      return selectAvatar((req.body as { candidateId: string }).candidateId);
+      return playerView(selectAvatar((req.body as { candidateId: string }).candidateId));
     } catch (err) {
       if (err instanceof AvatarCandidateNotFound) return reply.code(404).send({ error: err.message });
       req.log.error({ err }, "avatar save failed");
