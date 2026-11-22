@@ -46,13 +46,14 @@ export function AvatarBuilder({
   busy,
   onChange,
   onDone,
-  onPhoto,
+  extra,
 }: {
   value: AvatarConfig;
   busy: boolean;
   onChange: (next: AvatarConfig) => void;
   onDone: () => void;
-  onPhoto: () => void;
+  /** Shown under «Готово» in the controls column (the photo form). */
+  extra?: ReactNode;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("hair");
   return (
@@ -126,7 +127,6 @@ export function AvatarBuilder({
             name={(accessory) => ACCESSORY_LABEL[accessory]}
           />
         ) : null}
-        <button type="button" className="lx-btn lx-btn--secondary lx-btn--wide photo-look" onClick={onPhoto} disabled={busy}><span className="lx-btn__in">Создать по фото</span></button>
         <div className="emotions" role="list">
           {EXPRESSIONS.map((expression) => (
             <button
@@ -142,6 +142,7 @@ export function AvatarBuilder({
           ))}
         </div>
         <button type="button" className="lx-btn lx-btn--wide" onClick={onDone} disabled={busy}><span className="lx-btn__in">Готово</span></button>
+        {extra}
       </div>
     </section>
   );

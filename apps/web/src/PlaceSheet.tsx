@@ -1,4 +1,5 @@
 import type { MapNodeId, MapNodeState } from "@levex/domain";
+import { useEffect } from "react";
 import type { Goal } from "./api";
 import { placeIconUrl } from "./map/placeIcons";
 import { ACTION_LABEL, placeSheet, segments, type SheetAction } from "./map/placeSheet";
@@ -9,7 +10,7 @@ const UI = "/art/scene14/ui";
 const ACTION_ICON: Partial<Record<SheetAction, string>> = {
   start: `${UI}/ic_play.svg`,
   enter: `${UI}/ic_play.svg`,
-  repeat: `${UI}/ic_replay.svg`,
+  repeat: `${UI}/ic_missions.svg`,
 };
 
 export function PlaceSheet({
@@ -20,9 +21,12 @@ export function PlaceSheet({
   xp,
   busy,
   reducedMotion,
+  hint,
   onClose,
   onEnter,
+  onMissions,
   onDone,
+  onProof,
 }: {
   id: MapNodeId;
   state: MapNodeState;
@@ -31,10 +35,23 @@ export function PlaceSheet({
   xp: number;
   busy: boolean;
   reducedMotion: boolean;
+  /** Locked places: a calm pointer to where XP comes from now (map/missions.ts xpHint). */
+  hint?: { text: string; place: MapNodeId };
   onClose: () => void;
   onEnter: (id: MapNodeId) => void;
+  /** Opens the Missions tab filtered to a place. */
+  onMissions?: (id: MapNodeId) => void;
   onDone: (goalId: string) => void;
+  /** Мастерская: missions are finished with a photo (Proof sheet). */
+  onProof?: (goalId: string) => void;
 }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   const sheet = placeSheet({ id, state, goals, level, xp });
   const locked = state === "locked";
   const titleId = `sheet-title-${id}`;
@@ -75,6 +92,14 @@ export function PlaceSheet({
               <p className="ps-cond__text" role="status">{sheet.condition.text}</p>
               <p className="ps-row"><span>Уровень</span><span>{sheet.condition.level} / {sheet.condition.needLevel}</span></p>
               <Segments lit={segments(sheet.condition.level, sheet.condition.needLevel)} tone="locked" />
+              {hint ? (
+                <p className="ps-hint">
+                  <span>{hint.text}</span>
+                  {onMissions ? (
+                    <button type="button" className="quiet" onClick={() => onMissions(hint.place)}>К миссиям</button>
+                  ) : null}
+                </p>
+              ) : null}
             </div>
           ) : (
             <>
@@ -98,6 +123,7 @@ export function PlaceSheet({
             {sheet.missionsHidden ? <span>Скрыты до открытия</span> : null}
           </p>
           {sheet.missions.length === 0 ? <p className="empty">Миссий пока нет.</p> : null}
+          {state === "done" ? <p className="ps-note">Пройденные миссии повторно XP не дают.</p> : null}
           <ul className="ps-missions">
             {sheet.missions.map((mission) =>
               sheet.missionsHidden ? (
@@ -116,9 +142,13 @@ export function PlaceSheet({
                   />
                   <span className="ttl">{mission.title}</span>
                   <span className="xpv">+{mission.xp} XP</span>
-                  {!mission.done ? (
-                    <button type="button" className="lx-btn lx-btn--secondary lx-btn--sm" disabled={busy} onClick={() => onDone(mission.id)}>
-                      <span className="lx-btn__in">Готово</span>
+                  {!mission.done && id === "workshop" && onProof ? (
+                    <button type="button" className="lx-btn lx-btn--secondary lx-btn--sm" disabled={busy} onClick={() => onProof(mission.id)} aria-label={`Proof: ${mission.title}`}>
+                      <span className="lx-btn__in">Proof</span>
+                    </button>
+                  ) : !mission.done ? (
+                    <button type="button" className="lx-btn lx-btn--secondary lx-btn--sm" disabled={busy} onClick={() => onDone(mission.id)} aria-label={`Выполнить: ${mission.title}`}>
+                      <span className="lx-btn__in">Выполнить</span>
                     </button>
                   ) : null}
                 </li>
@@ -137,7 +167,7 @@ export function PlaceSheet({
                   type="button"
                   className={primary ? "lx-btn ps-primary" : "lx-btn lx-btn--secondary ps-later"}
                   disabled={disabled}
-                  onClick={action === "later" ? onClose : () => onEnter(id)}
+                  onClick={action === "later" ? onClose : action === "repeat" && onMissions ? () => onMissions(id) : () => onEnter(id)}
                 >
                   <span className="lx-btn__in">
                     {icon ? <img src={icon} width={18} height={18} alt="" /> : null}

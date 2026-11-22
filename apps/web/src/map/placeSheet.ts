@@ -46,7 +46,8 @@ export const ACTION_LABEL: Record<SheetAction, string> = {
   later: "Позже",
   start: "Начать",
   enter: "Войти",
-  repeat: "Повторить",
+  /** Done place: opens this place's missions. A finished mission gives no XP again (domain completeGoal). */
+  repeat: "Миссии места",
 };
 
 const ACTIONS: Record<MapNodeState, SheetAction[]> = {

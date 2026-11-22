@@ -87,6 +87,7 @@ const KNOWN: Record<string, string> = {
   "avatar provider failed": "Не удалось нарисовать персонажа. Попробуйте ещё раз",
   "candidate not found": "Этот вариант уже недоступен",
   "could not save avatar": "Не удалось сохранить персонажа. Попробуйте ещё раз",
+  "nickname must be 1-32 characters": "Ник: от 1 до 32 символов",
 };
 
 export const NO_CONNECTION = "Нет связи с API. В другом терминале: npm run dev:api";
@@ -110,6 +111,27 @@ export function saveAvatar(config: AvatarConfig): Promise<Player> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(config),
   });
+}
+
+/** PATCH /player with a new nickname (1–32 characters after trimming, checked by the server too). */
+export function updateNickname(nickname: string): Promise<Player> {
+  return request<Player>("/player", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ nickname }),
+  });
+}
+
+/**
+ * Take a player the server sent back after a change. Streak and energy are derived from
+ * completions; an answer without them keeps the ones we had instead of showing 0 and 50/50.
+ */
+export function mergePlayer(previous: Player | null, next: Player): Player {
+  return {
+    ...next,
+    streak: next.streak ?? previous?.streak,
+    energy: next.energy ?? previous?.energy,
+  };
 }
 
 export function createArtifact(input: { title: string; imageUrl: string; goalId: string }): Promise<Artifact> {
