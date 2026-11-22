@@ -27,12 +27,24 @@ import {
 } from "@levex/domain";
 
 export const DEFAULT_DATA_FILE = "./data/levexp.json";
-export const DEFAULT_PLAYER_NICKNAME = "Player";
+export const DEFAULT_PLAYER_NICKNAME = "Игрок";
 
 const DEMO_GOALS: Array<{ title: string; sphere: LifeSphereId }> = [
-  { title: "Morning walk 20 min", sphere: "health" },
-  { title: "Read 10 pages", sphere: "mind" },
+  { title: "Утренняя прогулка 20 мин", sphere: "health" },
+  { title: "Прочитать 10 страниц", sphere: "mind" },
 ];
+
+/**
+ * Text the store used to seed in English. On load these exact strings are replaced by the Russian
+ * ones; ids, statuses, rewards, dates and XP stay as they are. Other titles and nicknames are untouched.
+ */
+export const LEGACY_SEED_TEXT = {
+  nickname: { from: "Player", to: DEFAULT_PLAYER_NICKNAME },
+  goals: new Map<string, string>([
+    ["Morning walk 20 min", "Утренняя прогулка 20 мин"],
+    ["Read 10 pages", "Прочитать 10 страниц"],
+  ]),
+} as const;
 
 export class InvalidPlayerUpdate extends Error {
   constructor(message: string) {
@@ -198,7 +210,7 @@ export function openStore(filePath: string | null): void {
   }
   const loaded = readState(filePath);
   const previous = dataFile;
-  if (loaded.seededPlayer) {
+  if (loaded.seededPlayer || loaded.migrated) {
     dataFile = filePath;
     try {
       commitState({
@@ -645,6 +657,7 @@ function readState(file: string): {
   room: Room;
   avatar: AvatarBook;
   seededPlayer: boolean;
+  migrated: boolean;
 } {
   const raw = readFileSync(file, "utf8");
   let parsed: unknown;
@@ -673,6 +686,15 @@ function readState(file: string): {
   const loadedRoom = parseRoom(file, data.room, loadedArtifacts);
   const loadedAvatar = parseAvatar(file, data.avatar);
 
+  let migrated = false;
+  for (const goal of loadedGoals.values()) {
+    const title = LEGACY_SEED_TEXT.goals.get(goal.title);
+    if (title) {
+      goal.title = title;
+      migrated = true;
+    }
+  }
+
   if (data.player == null) {
     return {
       player: makePlayer(),
@@ -681,15 +703,22 @@ function readState(file: string): {
       room: loadedRoom,
       avatar: loadedAvatar,
       seededPlayer: true,
+      migrated,
     };
   }
+  const loadedPlayer = parsePlayer(file, data.player);
+  if (loadedPlayer.nickname === LEGACY_SEED_TEXT.nickname.from) {
+    loadedPlayer.nickname = LEGACY_SEED_TEXT.nickname.to;
+    migrated = true;
+  }
   return {
-    player: parsePlayer(file, data.player),
+    player: loadedPlayer,
     goals: loadedGoals,
     artifacts: loadedArtifacts,
     room: loadedRoom,
     avatar: loadedAvatar,
     seededPlayer: false,
+    migrated,
   };
 }
 

@@ -168,7 +168,7 @@ describe("JSON persistence", () => {
     expect(first.progress).toEqual({ xp: 0, level: 1, xpBySphere: {} });
     const titles = listGoals().map((goal) => goal.title).sort();
     const ids = listGoals().map((goal) => goal.id).sort();
-    expect(titles).toEqual(["Morning walk 20 min", "Read 10 pages"]);
+    expect(titles).toEqual(["Прочитать 10 страниц", "Утренняя прогулка 20 мин"].sort());
     expect(listGoals().every((goal) => goal.xpReward === 10)).toBe(true);
     expect(existsSync(file)).toBe(true);
 
