@@ -16,4 +16,4 @@ operator scene14 и собственные карта, шапка и табы sc
 puppeteer-core (Apache-2.0) и Google Chrome headless — только рендер; ffmpeg (LGPL/GPL) — кодирование GIF и MP4;
 Pillow (MIT-CMU/HPND), fontTools (MIT), Python 3 (PSF).
 
-Ничего не коммитилось и не пушилось в репозиторий.
+Ассеты закоммичены в репозиторий в ветке `cursor/ai-assistant` (PR #13, коммит 292306f и следующие) и лежат в `apps/web/public/art/scene15/`.
