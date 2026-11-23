@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "./app.js";
-import { openStore, resetStore } from "./store.js";
+import { openStore, resetStore, setUnlockLevelForTests } from "./store.js";
 import { defaultUploadsDir } from "./uploads.js";
 
 const PNG_1X1 = Buffer.from(
@@ -15,11 +15,14 @@ describe("photo upload", () => {
   const temps: string[] = [];
 
   beforeEach(() => {
+    // Photo/save mechanics from before R-XP-8: Мастерская open, XP numbers unchanged.
+    setUnlockLevelForTests(99);
     openStore(null);
     resetStore(false);
   });
 
   afterEach(() => {
+    setUnlockLevelForTests(null);
     openStore(null);
     for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true });
   });

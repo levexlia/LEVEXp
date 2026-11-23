@@ -3,7 +3,8 @@ import {
   XP_PER_LEVEL,
   mapNodeStates,
   streakDays,
-  utcDay,
+  playerDay,
+  playerDayOf,
   type Goal,
 } from "@levex/domain";
 import { currentTime, getPlayer, listGoals } from "../store.js";
@@ -29,7 +30,7 @@ export function readPlayerContext(): PlayerContext {
   const player = getPlayer();
   const goals = listGoals();
   const now = currentTime();
-  const today = utcDay(now);
+  const today = playerDay(now);
   const doneSpheres = goals.filter((goal) => goal.status === "done" && goal.sphere).map((goal) => goal.sphere as string);
   return {
     nickname: clean(player.nickname, 32),
@@ -41,7 +42,7 @@ export function readPlayerContext(): PlayerContext {
       .filter((goal) => goal.status === "open")
       .slice(0, MAX_MISSIONS)
       .map((goal) => ({ title: clean(goal.title, MAX_TITLE), sphere: sphereName(goal) })),
-    doneToday: goals.filter((goal) => goal.completedAt && goal.completedAt.slice(0, 10) === today).length,
+    doneToday: goals.filter((goal) => playerDayOf(goal.completedAt) === today).length,
     places: mapNodeStates({ level: player.progress.level, doneSpheres }).map((node) => ({
       name: node.name,
       state: node.state,

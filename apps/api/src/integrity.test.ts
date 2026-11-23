@@ -11,18 +11,24 @@ import {
   openStore,
   resetStore,
   setStoreWriterForTests,
+  setClockForTests,
+  setUnlockLevelForTests,
 } from "./store.js";
 
 describe("save integrity and legacy XP", () => {
   const temps: string[] = [];
 
   beforeEach(() => {
+    // Photo/save mechanics from before R-XP-8: Мастерская open, XP numbers unchanged.
+    setUnlockLevelForTests(99);
     setStoreWriterForTests(null);
     openStore(null);
     resetStore(false);
   });
 
   afterEach(() => {
+    setUnlockLevelForTests(null);
+    setClockForTests(null);
     setStoreWriterForTests(null);
     openStore(null);
     for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -162,6 +168,8 @@ describe("save integrity and legacy XP", () => {
         { id: "again", title: "Again", xpReward: 10000, status: "open", sphere: "finance" },
       ],
     }));
+    // Four own missions: the fourth on the next player day, so the own cap (R-XP-7, 3/day) is not hit.
+    setClockForTests(() => new Date("2026-11-20T10:00:00.000Z"));
     openStore(file);
     const a = buildApp({ logger: false });
     const shot = (await a.inject({
@@ -197,6 +205,7 @@ describe("save integrity and legacy XP", () => {
     expect(withPhoto.json().progress.xp).toBe(XP_REWARD_MAX + 30 + XP_REWARD_MAX);
     expect(withPhoto.json().progress.xpBySphere.creativity).toBe(XP_REWARD_MAX);
 
+    setClockForTests(() => new Date("2026-11-21T10:00:00.000Z"));
     const second = await a.inject({ method: "POST", url: "/goals/again/complete" });
     expect(second.json().progress).toEqual({
       xp: 180,
