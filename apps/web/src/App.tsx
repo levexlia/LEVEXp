@@ -1,4 +1,19 @@
-import { DEFAULT_AVATAR_CONFIG, LIFE_SPHERES, NICKNAME_MAX_LENGTH, XP_PER_LEVEL, type AvatarConfig, type LifeSphereId, type MapNodeId } from "@levex/domain";
+import {
+  DEFAULT_AVATAR_CONFIG,
+  LIFE_SPHERES,
+  MAP_NODES,
+  NICKNAME_MAX_LENGTH,
+  XP_PER_LEVEL,
+  lockedPlaceFor,
+  placeLockedMessage,
+  playerDay,
+  shiftDay,
+  templateKeyOf,
+  type AvatarConfig,
+  type LifeSphereId,
+  type MapNodeId,
+  type ReflectionFeeling,
+} from "@levex/domain";
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   askAssistant,
@@ -7,9 +22,12 @@ import {
   createGoal,
   errorMessage,
   generateAvatar,
+  goalFromTemplate,
   loadRoom,
   mergePlayer,
+  repeatGoal,
   saveAvatar,
+  saveReflection,
   updateNickname,
   uploadImage,
   type Goal,
@@ -24,7 +42,9 @@ import { Check, PhotoPick, Toast } from "./Controls";
 import { HomeMap, mapStates } from "./HomeMap";
 import { MissionsView, TodayPanel, type MissionActions } from "./Missions";
 import { PlaceSheet } from "./PlaceSheet";
-import { placeName, placeForSphere, xpHint } from "./map/missions";
+import { ActivityScreen } from "./daily/ActivityScreen";
+import { AfterMission, type AfterMissionInfo } from "./daily/AfterMission";
+import { availableOn, planChips, placeName, placeForSphere, xpHint, type PlanChip } from "./map/missions";
 import { segments } from "./map/placeSheet";
 import { HEX_LEVEL_URL, tabIconUrl, uiIconUrl, type HeaderIcon, type TabIcon } from "./theme/uiArt";
 import { useReducedMotion } from "./theme/useReducedMotion";
@@ -48,6 +68,12 @@ export function App() {
   const [draft, setDraft] = useState<AvatarConfig>(DEFAULT_AVATAR_CONFIG);
   const [nodeId, setNodeId] = useState<MapNodeId | null>(null);
   const [proof, setProof] = useState<ProofTarget | null>(null);
+  /** «Начать»: the mission on the activity screen (spec №2). */
+  const [activity, setActivity] = useState<Goal | null>(null);
+  /** After a completion: «Повторить завтра?» + «Как прошло?» (spec №1, №3). */
+  const [after, setAfter] = useState<AfterMissionInfo | null>(null);
+  const closeActivity = useCallback(() => setActivity(null), []);
+  const closeAfter = useCallback(() => setAfter(null), []);
   const [cheer, setCheer] = useState(false);
   const [chat, setChat] = useState(false);
   const [robotState, setRobotState] = useState<RobotState>("idle");
@@ -61,13 +87,13 @@ export function App() {
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const hideToast = useCallback(() => setToast(null), []);
 
-  async function refresh(): Promise<Player> {
+  async function refresh(): Promise<{ player: Player; goals: Goal[] }> {
     const data = await loadRoom();
     setPlayer(data.player);
     setGoals(data.goals);
     setPlacements(data.placements);
     if (data.player.avatarConfig) setDraft(data.player.avatarConfig);
-    return data.player;
+    return data;
   }
 
   useEffect(() => {
@@ -109,12 +135,31 @@ export function App() {
     window.scrollTo?.(0, 0);
   }
 
-  /** «Начать» / «Войти»: Мастерская opens the photo proof, other places their missions. */
+  /**
+   * «Начать» / «Войти»: Мастерская opens the photo proof. Other places open the activity screen for
+   * their first open mission of today (spec №2), or their missions when there is none.
+   */
   function enterPlace(id: MapNodeId) {
     if (id === "workshop" && states.get(id) !== "done") {
       setNodeId(null);
       setProof({ goal: null });
+      return;
+    }
+    const sphere = MAP_NODES.find((node) => node.id === id)?.sphere;
+    const today = playerDay(new Date());
+    const next = goals.find((goal) => goal.status === "open" && goal.sphere === sphere && availableOn(goal, today));
+    if (next) {
+      setNodeId(null);
+      setActivity(next);
     } else openMissions(id);
+  }
+
+  /** Can «Повторить завтра» make a copy? Not in a locked place, not when tomorrow already has one. */
+  function canRepeat(goal: Goal, list: readonly Goal[], lvl: number): boolean {
+    if (lockedPlaceFor(goal.sphere, lvl)) return false;
+    const key = templateKeyOf(goal) ?? `own:${goal.id}`;
+    const tomorrow = shiftDay(playerDay(new Date()), 1);
+    return !list.some((item) => item.status === "open" && item.availableFrom === tomorrow && (templateKeyOf(item) ?? "") === key);
   }
 
   function burst() {
@@ -122,9 +167,23 @@ export function App() {
     window.setTimeout(() => setCheer(false), 1600);
   }
 
-  function gained(before: number, after: number, title: string) {
-    say(after > before ? `+${after - before} XP · «${title}» выполнена` : `«${title}» выполнена`);
+  function gained(before: number, after: number, title: string, message?: string) {
+    say(after > before ? `+${after - before} XP · «${title}» выполнена` : message ?? `«${title}» выполнена`);
     if (after > before) burst();
+  }
+
+  /** After a first completion: toast, then the short «Повторить завтра? / Как прошло?» sheet. */
+  async function completed(before: number, done: Awaited<ReturnType<typeof completeGoal>>, wasOpen: boolean) {
+    const data = await refresh();
+    gained(before, done.progress.xp, done.goal.title, done.message);
+    if (!wasOpen) return;
+    setAfter({
+      goal: done.goal,
+      awarded: done.awarded,
+      gained: Math.max(0, done.progress.xp - before),
+      message: done.message,
+      canRepeat: canRepeat(done.goal, data.goals, data.player.progress.level),
+    });
   }
 
   async function finish(goalId: string) {
@@ -132,9 +191,10 @@ export function App() {
     setError(null);
     try {
       const before = player?.progress.xp ?? 0;
+      const wasOpen = goals.find((goal) => goal.id === goalId)?.status !== "done";
       const done = await completeGoal(goalId);
-      await refresh();
-      gained(before, done.progress.xp, done.goal.title);
+      setActivity(null);
+      await completed(before, done, wasOpen);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -169,9 +229,8 @@ export function App() {
       const url = await uploadImage(file);
       await createArtifact({ title, imageUrl: url, goalId: goal.id });
       const done = await completeGoal(goal.id);
-      await refresh();
       setProof(null);
-      gained(before, done.progress.xp, done.goal.title);
+      await completed(before, done, goal.status !== "done");
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -179,7 +238,64 @@ export function App() {
     }
   }
 
-  const actions: MissionActions = { busy, onDone: finish, onProof: (goal) => setProof({ goal }) };
+  /** «Да, на завтра»: a copy of the goal for the next player day (R-XP-9). */
+  async function repeatTomorrow(goalId: string): Promise<boolean> {
+    setBusy(true);
+    setError(null);
+    try {
+      await repeatGoal(goalId, true);
+      await refresh();
+      return true;
+    } catch (err) {
+      setError(errorMessage(err));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reflect(goalId: string, felt: ReflectionFeeling, note: string): Promise<boolean> {
+    setBusy(true);
+    setError(null);
+    try {
+      await saveReflection(goalId, felt, note);
+      await refresh();
+      say("Сохранено. На XP это не влияет.");
+      return true;
+    } catch (err) {
+      setError(errorMessage(err));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Empty-day plan chip: a copy of a template for today. */
+  async function addFromPlan(chip: PlanChip) {
+    setBusy(true);
+    setError(null);
+    try {
+      const goal = chip.repeatOf ? await repeatGoal(chip.repeatOf, false) : await goalFromTemplate(chip.templateId!);
+      await refresh();
+      say(`Миссия «${goal.title}» на сегодня`);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const workshopLocked = states.get("workshop") === "locked";
+  const actions: MissionActions = {
+    busy,
+    onDone: finish,
+    onProof: (goal) => setProof({ goal }),
+    onStart: (goal) => setActivity(goal),
+    lockedText: (row) => {
+      const node = row.place ? MAP_NODES.find((item) => item.id === row.place) : undefined;
+      return node && states.get(node.id) === "locked" ? placeLockedMessage(node) : null;
+    },
+  };
 
   return (
     <div className="app">
@@ -303,6 +419,9 @@ export function App() {
               actions={actions}
               reducedMotion={reducedMotion}
               onAll={() => openMissions(null)}
+              plan={planChips(goals, level)}
+              today={player?.today}
+              onPlan={addFromPlan}
             />
           </div>
         ) : null}
@@ -388,8 +507,28 @@ export function App() {
 
       {proof ? (
         <Sheet title="Proof: фото к миссии" onClose={() => setProof(null)}>
-          <ProofForm busy={busy} goal={proof.goal} error={error} onSubmit={(caption, file) => sendProof(proof, caption, file)} />
+          {workshopLocked ? (
+            // R-XP-8: no upload while Мастерская is locked; the server would refuse it too.
+            <div data-proof-locked="true">
+              <p className="proof-locked" role="status">
+                {placeLockedMessage(MAP_NODES.find((node) => node.id === "workshop")!)}. Тогда здесь можно будет прикрепить фото к миссии.
+              </p>
+              <button type="button" className="lx-btn lx-btn--secondary lx-btn--wide" onClick={() => { setProof(null); openMissions(null); }}>
+                <span className="lx-btn__in">К миссиям</span>
+              </button>
+            </div>
+          ) : (
+            <ProofForm busy={busy} goal={proof.goal} error={error} onSubmit={(caption, file) => sendProof(proof, caption, file)} />
+          )}
         </Sheet>
+      ) : null}
+
+      {activity ? (
+        <ActivityScreen goal={activity} busy={busy} reducedMotion={reducedMotion} onDone={finish} onClose={closeActivity} />
+      ) : null}
+
+      {after ? (
+        <AfterMission key={after.goal.id} info={after} busy={busy} onRepeat={repeatTomorrow} onReflect={reflect} onClose={closeAfter} />
       ) : null}
     </div>
   );

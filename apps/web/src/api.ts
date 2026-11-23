@@ -1,4 +1,4 @@
-import type { AssistantReply, AssistantTurn, AvatarConfig } from "@levex/domain";
+import type { AssistantReply, AssistantTurn, AvatarConfig, NoXpReason, Reflection, ReflectionFeeling } from "@levex/domain";
 
 export type { AssistantReply, AssistantTurn, AvatarConfig };
 
@@ -10,6 +10,8 @@ export interface Player {
   avatarConfig?: AvatarConfig;
   streak?: number;
   energy?: { current: number; max: number };
+  /** Today's XP count by the daily rules (player day in Asia/Jerusalem). */
+  today?: TodayAwards;
   progress: {
     xp: number;
     level: number;
@@ -24,6 +26,33 @@ export interface Goal {
   xpReward: number;
   status: "open" | "done";
   completedAt?: string;
+  /** XP really granted at completion; 0 = recorded without XP (daily rules). Missing on old goals. */
+  xpGranted?: number;
+  noXpReason?: NoXpReason;
+  templateId?: string;
+  repeatOf?: string;
+  /** Player day from which «Сегодня» shows it (a «Повторить завтра» copy). */
+  availableFrom?: string;
+  reflection?: Reflection;
+}
+
+export interface TodayAwards {
+  day: string;
+  awarded: number;
+  awardCap: number;
+  ownAwarded: number;
+  ownAwardCap: number;
+}
+
+export interface CompleteAnswer {
+  goal: Goal;
+  progress: Player["progress"];
+  awarded: boolean;
+  reason?: NoXpReason;
+  /** Calm Russian text when the completion was recorded without XP. */
+  message?: string;
+  awardedToday: number;
+  awardCap: number;
 }
 
 export interface Artifact {
@@ -105,6 +134,23 @@ export function createGoal(title: string, sphere = "creativity"): Promise<Goal> 
   return sendJson<Goal>("/goals", { title, sphere });
 }
 
+/** «Повторить завтра» (forTomorrow) or a plan chip for today: a copy of a goal. */
+export function repeatGoal(goalId: string, forTomorrow: boolean): Promise<Goal> {
+  return sendJson<Goal>("/goals", { repeatOf: goalId, forTomorrow });
+}
+
+/** Plan chip for a template that has no goal yet (a seed). */
+export function goalFromTemplate(templateId: string): Promise<Goal> {
+  return sendJson<Goal>("/goals", { templateId });
+}
+
+/** Micro-reflection after a mission. Does not change XP. */
+export function saveReflection(goalId: string, felt: ReflectionFeeling, note: string): Promise<Goal> {
+  const body: { felt: ReflectionFeeling; note?: string } = { felt };
+  if (note.trim()) body.note = note.trim();
+  return sendJson<Goal>(`/goals/${goalId}/reflection`, body);
+}
+
 export function saveAvatar(config: AvatarConfig): Promise<Player> {
   return request<Player>("/player/avatar", {
     method: "PUT",
@@ -131,6 +177,7 @@ export function mergePlayer(previous: Player | null, next: Player): Player {
     ...next,
     streak: next.streak ?? previous?.streak,
     energy: next.energy ?? previous?.energy,
+    today: next.today ?? previous?.today,
   };
 }
 
@@ -138,7 +185,7 @@ export function createArtifact(input: { title: string; imageUrl: string; goalId:
   return sendJson<Artifact>("/artifacts", { title: input.title, kind: "photo", imageUrl: input.imageUrl, goalId: input.goalId });
 }
 
-export function completeGoal(id: string): Promise<{ goal: Goal; progress: Player["progress"] }> {
+export function completeGoal(id: string): Promise<CompleteAnswer> {
   return sendJson(`/goals/${id}/complete`);
 }
 

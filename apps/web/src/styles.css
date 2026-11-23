@@ -575,3 +575,38 @@ button { cursor: pointer; }
 @media (min-width: 960px) {
   .missions-view { max-width: 760px; margin: 0 auto; }
 }
+
+/* ---------- usefulness v1: daily plan, activity screen, after-mission sheet */
+.mission__refl { font: 500 10.5px var(--lx-font-mono); color: var(--lx-cyan-soft); overflow-wrap: anywhere; }
+.mission__btns { display: flex; gap: 6px; }
+.today-cap, .today-later { margin: 0 0 0.6rem; font: 500 11px var(--lx-font-mono); color: var(--lx-text-2); }
+.today-plan { display: grid; gap: 0.5rem; margin-bottom: 0.4rem; }
+.today-plan .empty { margin: 0; }
+.plan-chip { opacity: 1; }
+.plan-chip:disabled { opacity: 0.5; cursor: default; }
+.activity__title { margin: 0.2rem 0 0.6rem; font-size: 1.35rem; }
+.activity__aid { display: grid; justify-items: center; gap: 0.6rem; padding: 0.8rem 0; }
+.activity__big { margin: 0; font: 700 44px var(--lx-font-mono); color: var(--lx-text); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.activity__big small { font-size: 16px; color: var(--lx-text-2); }
+.activity__row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.activity__aid .activity__row { justify-content: center; }
+.activity__note { margin: 0.4rem 0 0; font: 500 11px var(--lx-font-mono); color: var(--lx-text-muted); text-align: center; }
+.activity__bar { height: 4px; background: #1f2a5c; overflow: hidden; }
+.activity__bar > i { display: block; height: 100%; background: var(--lx-cyan); transition: width 0.25s linear; }
+.activity__bar.still > i { transition: none; }
+.after h2 { margin: 0.2rem 0 0.3rem; font-size: 1.1rem; }
+.after__result { margin: 0 0 0.6rem; font: 700 14px var(--lx-font-mono); color: var(--lx-gold); }
+.after__result.is-calm { font-weight: 500; font-size: 12px; color: var(--lx-text-2); }
+.after__block { display: grid; gap: 0.5rem; margin-top: 0.8rem; }
+.after__ok { margin: 0.8rem 0 0; font: 500 12px var(--lx-font-mono); color: var(--lx-cyan-soft); }
+.lx-field textarea {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #2c3770;
+  background: var(--lx-bg-deep);
+  color: var(--lx-text);
+  font: 500 14px var(--lx-font-display);
+  resize: vertical;
+}
+.lx-field textarea:focus { outline: none; border-color: var(--lx-cyan); box-shadow: inset 0 0 0 1px var(--lx-cyan); }
+.proof-locked { margin: 0 0 0.8rem; color: var(--lx-text-2); }

@@ -1,4 +1,4 @@
-import { MAP_NODES, type MapNodeId, type MapNodeState } from "@levex/domain";
+import { MAP_NODES, grantedXp, playerDdMm, type MapNodeId, type MapNodeState } from "@levex/domain";
 import type { Goal } from "../api";
 import { lockedHint } from "./spots";
 
@@ -57,12 +57,8 @@ const ACTIONS: Record<MapNodeState, SheetAction[]> = {
   locked: ["later", "enter"],
 };
 
-function ddmm(iso: string | undefined): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  return `${String(date.getDate()).padStart(2, "0")}.${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
+/** DD.MM in the player's zone (Asia/Jerusalem). */
+const ddmm = playerDdMm;
 
 export function placeSheet(input: {
   id: MapNodeId;
@@ -76,7 +72,12 @@ export function placeSheet(input: {
   if (!node) throw new Error(`unknown place ${input.id}`);
   const own = input.goals.filter((goal) => goal.sphere === node.sphere);
   const finished = own.filter((goal) => goal.status === "done");
-  const missions = own.map((goal) => ({ id: goal.id, title: goal.title, xp: goal.xpReward, done: goal.status === "done" }));
+  const missions = own.map((goal) => ({
+    id: goal.id,
+    title: goal.title,
+    xp: goal.status === "done" ? grantedXp(goal) : goal.xpReward,
+    done: goal.status === "done",
+  }));
   const locked = input.state === "locked";
   const done = input.state === "done";
   const last = finished
@@ -93,7 +94,8 @@ export function placeSheet(input: {
     progress: { done: finished.length, total: own.length },
     missions,
     missionsHidden: locked,
-    earnedXp: done ? finished.reduce((sum, goal) => sum + goal.xpReward, 0) : null,
+    // XP really granted: a mission recorded without XP (daily rules) adds 0.
+    earnedXp: done ? finished.reduce((sum, goal) => sum + grantedXp(goal), 0) : null,
     doneOn: done ? ddmm(last) : null,
     condition: locked
       ? { text: lockedHint(node.id, { level: input.level, xp: input.xp }), level: input.level, needLevel: node.unlockLevel }
