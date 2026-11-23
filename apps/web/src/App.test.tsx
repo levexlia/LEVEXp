@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { CHAT_OPENED_KEY } from "./assistant/tapMarker";
 
 
 const player = {
@@ -32,6 +33,7 @@ describe("App: avatar in Профиль, assistant on the map", () => {
       return json({ error: "not found" }, 404);
     });
     vi.stubGlobal("fetch", fetchMock);
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -49,14 +51,15 @@ describe("App: avatar in Профиль, assistant on the map", () => {
     const { container } = await renderApp();
     const robot = screen.getByRole("button", { name: /ИИ-помощник/ });
     expect(robot.querySelector("img")?.getAttribute("src")).toBe("/art/scene15/robot_idle.svg");
-    expect(container.querySelector('img[src*="tap_marker"]')).toBeNull();
+    // A fresh player sees the «нажми» marker over the robot.
+    expect(robot.querySelector('img[src*="tap_marker"]')?.getAttribute("src")).toBe("/art/scene15/robot_tap_marker.svg");
     expect(robot.closest(".map-frame")).not.toBeNull();
     // Only the scene15 robot: no parts-kit girl and no scene14 operator on the map, header or desktop column.
     expect(container.querySelectorAll("svg.hero")).toHaveLength(0);
     expect(container.querySelector('img[src*="operator"]')).toBeNull();
     expect(container.querySelector(".map-avatar, .stage-avatar, .mini, .lx-avatar")).toBeNull();
     const figures = [...container.querySelectorAll(".map-frame img")].map((img) => img.getAttribute("src") ?? "");
-    expect(figures.filter((src) => src.includes("/avatar/") || src.includes("robot_"))).toEqual(["/art/scene15/robot_idle.svg"]);
+    expect(figures.filter((src) => src.includes("/avatar/") || (src.includes("robot_") && !src.includes("tap_marker")))).toEqual(["/art/scene15/robot_idle.svg"]);
     expect(screen.queryByRole("img", { name: /Персонаж|Мой персонаж/ })).toBeNull();
   });
 
@@ -96,6 +99,23 @@ describe("App: avatar in Профиль, assistant on the map", () => {
     expect(mapImg.getAttribute("src")).toBe("/art/scene15/robot_idle.svg");
   });
 
+  it("hides the «нажми» marker after the first chat and remembers it in localStorage", async () => {
+    const first = await renderApp();
+    const robot = screen.getByRole("button", { name: /ИИ-помощник/ });
+    expect(robot.querySelector(".map-robot__marker")).not.toBeNull();
+    expect(localStorage.getItem(CHAT_OPENED_KEY)).toBeNull();
+    fireEvent.click(robot);
+    expect(localStorage.getItem(CHAT_OPENED_KEY)).toBe("1");
+    expect(robot.querySelector(".map-robot__marker")).toBeNull();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(robot.querySelector(".map-robot__marker")).toBeNull();
+    first.unmount();
+
+    // Next visit: still hidden.
+    await renderApp();
+    expect(screen.getByRole("button", { name: /ИИ-помощник/ }).querySelector(".map-robot__marker")).toBeNull();
+  });
+
   it("shows the static robot on the map with reduced motion", async () => {
     vi.stubGlobal("matchMedia", (query: string) => ({
       matches: query.includes("reduce"),
@@ -106,5 +126,6 @@ describe("App: avatar in Профиль, assistant on the map", () => {
     await renderApp();
     const robot = screen.getByRole("button", { name: /ИИ-помощник/ });
     expect(robot.querySelector("img")?.getAttribute("src")).toBe("/art/scene15/static/robot_idle_static.svg");
+    expect(robot.querySelector(".map-robot__marker")?.getAttribute("src")).toBe("/art/scene15/static/robot_tap_marker_static.svg");
   });
 });
