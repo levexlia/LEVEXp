@@ -403,7 +403,7 @@
    "layer": "face",
    "z": 40,
    "file": "svg/face_happy.svg",
-   "label_ru": "Радостная",
+   "label_ru": "Радость",
    "viewBox": "0 0 864 1152",
    "bytes": 4514,
    "fills": [
@@ -430,7 +430,7 @@
    "layer": "face",
    "z": 40,
    "file": "svg/face_proud.svg",
-   "label_ru": "Гордая",
+   "label_ru": "Гордость",
    "viewBox": "0 0 864 1152",
    "bytes": 4414,
    "fills": [
@@ -455,7 +455,7 @@
    "layer": "face",
    "z": 40,
    "file": "svg/face_sleepy.svg",
-   "label_ru": "Сонная",
+   "label_ru": "Сонливость",
    "viewBox": "0 0 864 1152",
    "bytes": 4442,
    "fills": [
@@ -483,7 +483,7 @@
    "layer": "face",
    "z": 40,
    "file": "svg/face_surprised.svg",
-   "label_ru": "Удивлённая",
+   "label_ru": "Удивление",
    "viewBox": "0 0 864 1152",
    "bytes": 4446,
    "fills": [

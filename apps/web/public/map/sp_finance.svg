@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+<g transform="translate(150 150) scale(.92) translate(-158 -150)">
+<path d="M138 168 L196 118 L222 140 L262 86" fill="none" stroke="#081233" stroke-width="50" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M222 48 L284 44 L280 106 Z" fill="#081233" stroke="#081233" stroke-width="26" stroke-linejoin="round"/>
+<path d="M138 168 L196 118 L222 140 L262 86" fill="none" stroke="#25cbfd" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M226 52 L280 48 L276 102 Z" fill="#25cbfd" stroke="#25cbfd" stroke-width="6" stroke-linejoin="round"/>
+<path d='M40 226 V254 A80 26 0 0 0 200 254 V226 A80 26 0 0 0 40 226 Z' fill='#081233' stroke='#081233' stroke-width='24' stroke-linejoin='round'/>
+<path d='M40 196 V224 A80 26 0 0 0 200 224 V196 A80 26 0 0 0 40 196 Z' fill='#081233' stroke='#081233' stroke-width='24' stroke-linejoin='round'/>
+<path d='M40 166 V194 A80 26 0 0 0 200 194 V166 A80 26 0 0 0 40 166 Z' fill='#081233' stroke='#081233' stroke-width='24' stroke-linejoin='round'/>
+<path d='M40 226 V254 A80 26 0 0 0 200 254 V226 Z' fill='#5f36d9' stroke='#0a1c46' stroke-width='7' stroke-linejoin='round'/><ellipse cx='120' cy='226' rx='80' ry='26' fill='#7341ed' stroke='#0a1c46' stroke-width='7'/>
+<path d='M40 196 V224 A80 26 0 0 0 200 224 V196 Z' fill='#5f36d9' stroke='#0a1c46' stroke-width='7' stroke-linejoin='round'/><ellipse cx='120' cy='196' rx='80' ry='26' fill='#7341ed' stroke='#0a1c46' stroke-width='7'/>
+<path d='M40 166 V194 A80 26 0 0 0 200 194 V166 Z' fill='#5f36d9' stroke='#0a1c46' stroke-width='7' stroke-linejoin='round'/><ellipse cx='120' cy='166' rx='80' ry='26' fill='#fec130' stroke='#0a1c46' stroke-width='7'/>
+<ellipse cx="120" cy="166" rx="50" ry="14" fill="none" stroke="#fe9e0f" stroke-width="9"/>
+</g>
+</svg>

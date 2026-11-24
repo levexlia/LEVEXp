@@ -14,6 +14,8 @@ const ICONS = {
   community: "sp_community",
   growth: "sp_growth",
   materials: "sp_materials",
+  finance: "sp_finance",
+  relationships: "sp_relationships",
 } as const;
 
 export type KitIconName = keyof typeof ICONS;
@@ -28,6 +30,8 @@ export const SPHERE_ICON: Record<string, KitIconName> = {
   health: "sport",
   mind: "knowledge",
   career: "materials",
+  finance: "finance",
+  relationships: "relationships",
   creativity: "creative",
   spirit: "growth",
   community: "community",

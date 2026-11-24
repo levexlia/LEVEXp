@@ -25,8 +25,8 @@ const TABS = [
 const PART_LABEL = Object.fromEntries(manifest.parts.map((part) => [part.id, part.label_ru]));
 
 /**
- * Gender-neutral nouns instead of the kit's feminine adjectives («Радостная», «Гордая»…): the
- * player's character has no fixed gender (manifest.json label_ru is art data and stays as drawn).
+ * Gender-neutral nouns («Радость», «Гордость»…): the player's character has no fixed gender.
+ * manifest.json label_ru for the face_* parts uses the same nouns (checked in kitLabels.test.ts).
  */
 const EXPRESSION_LABEL: Record<Expression, string> = {
   happy: "Радость",
