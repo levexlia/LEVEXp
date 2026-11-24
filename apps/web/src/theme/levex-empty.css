@@ -1,0 +1,6 @@
+/* LEVEX empty state — scene17. Dashed frame as in the client .empty-state; art + one line of text. */
+.lx-empty{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px 14px 16px;border:1px dashed #2c3770;
+  background:radial-gradient(80% 70% at 50% 40%,rgba(124,58,237,.10),transparent 70%),rgba(6,10,32,.55)}
+.lx-empty__art{display:block;width:168px;height:126px}
+.lx-empty__line{max-width:100%;font:500 13.5px Tektur,sans-serif;color:#c9d2f5;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+@media (min-width:960px){.lx-empty{gap:14px;padding:26px 20px 24px}.lx-empty__art{width:220px;height:165px}.lx-empty__line{font-size:15px}}

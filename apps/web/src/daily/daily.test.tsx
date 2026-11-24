@@ -197,7 +197,7 @@ describe("App: usefulness v1", () => {
     const api = server([{ ...WALK, status: "done", completedAt: "2026-11-20T08:00:00.000Z" }]);
     await renderApp();
     const today = screen.getByRole("complementary", { name: "Сегодня" });
-    expect(today.textContent).toContain("На сегодня дел нет.");
+    expect(today.textContent).toContain("На сегодня дел нет — день свободен.");
     expect(today.querySelector('[data-plan-block="repeat"]')?.textContent).toBe("Можно снова:+ Утренняя прогулка 20 мин");
     expect(today.querySelector('[data-plan-block="new"]')?.textContent).toContain("Можно взять:");
     expect(today.textContent).toContain("Отдых тоже нормален.");
@@ -400,7 +400,8 @@ describe("App: usefulness v1", () => {
     server([WALK]);
     await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Ресурсы" }));
-    expect(document.querySelector('[data-empty="resources"]')?.textContent).toMatch(/в каких сферах жизни копится XP/);
+    expect(document.querySelector('[data-empty="resources"]')?.textContent).toBe("Сферы заполнятся после первой миссии.");
+    expect(document.querySelector('[data-empty="resources"] img')?.getAttribute("src")).toMatch(/\/art\/scene17\/(static\/)?empty_resources(_static)?\.svg$/);
     fireEvent.click(screen.getByRole("button", { name: "Профиль" }));
     expect(document.querySelector('[data-empty="gallery"]')?.textContent).toMatch(/Галерея пока пуста.*уровне 2/s);
   });
@@ -447,7 +448,10 @@ describe("placeless sphere missions (Карьера, Финансы, Отнош�
     expect(post.body).toEqual({ templateId: "finance-spend" });
     const row = view.querySelector(`[data-mission="${api.goals.at(-1)!.id}"]`)!;
     expect(row.textContent).toContain("Финансы");
-    expect(row.querySelector("img.mission__icon")?.getAttribute("src")).toBe("/map/sp_finance.svg");
+    expect(row.querySelector(".mission__icon img")?.getAttribute("src")).toBe("/map/sp_finance.svg");
+    // scene18 B2: a mission without a map place says «где угодно» and has the anywhere card style.
+    expect(row.querySelector(".mission__meta")?.textContent).toMatch(/^Финансы · где угодно · доступна/);
+    expect(row.classList.contains("is-anywhere-b")).toBe(true);
   });
 
   it("«Начать» on a finance mission: steps, no amounts, and «Готово — отметить» closes it with +10 XP", async () => {
@@ -635,5 +639,144 @@ describe("honest XP labels at the caps (R-XP-6 / R-XP-7)", () => {
     expect(chips).toHaveLength(3);
     for (const chip of chips) expect(chip.textContent).toContain("без XP сегодня");
     expect(today.querySelectorAll('[data-plan-block="repeat"]')).toHaveLength(1);
+  });
+});
+
+describe("scene17/18 UI: B2 «где угодно», empty states, «Свои миссии», assistant hint", () => {
+  beforeEach(() => {
+    vi.useRealTimers();
+    window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
+    localStorage.clear();
+  });
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  const nowIso = () => new Date().toISOString();
+  const SPEND: Goal = { id: "f1", title: "Записать траты за день", sphere: "finance", xpReward: 10, status: "open", templateId: "finance-spend" };
+  const ownDone = (i: number): Goal => ({ id: `od${i}`, title: `Своя готовая ${i}`, sphere: "health", xpReward: 10, status: "done", completedAt: nowIso(), xpGranted: 10 });
+
+  it("«Где угодно» chip (globe only there) shows just the missions without a map place, in the B2 layout", async () => {
+    server([WALK, SPEND]);
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Миссии" }));
+    const view = screen.getByRole("region", { name: "Миссии" });
+    const chip = within(view).getByRole("button", { name: "Где угодно" });
+    expect(chip.querySelector("img")?.getAttribute("src")).toBe("/art/scene18/ic_anywhere_a_glyph.svg");
+    // Variants A and B are history: no ic_anywhere_a.svg / ic_anywhere_b.svg / .is-anywhere in the DOM.
+    expect(document.querySelector('img[src$="ic_anywhere_a.svg"], img[src$="ic_anywhere_b.svg"], .is-anywhere, .lx-anywhere')).toBeNull();
+    expect(view.querySelectorAll(".mission img[src*='anywhere']")).toHaveLength(0);
+    fireEvent.click(chip);
+    expect(chip.getAttribute("aria-pressed")).toBe("true");
+    const open = within(view).getByRole("heading", { name: "Доступны" }).nextElementSibling!;
+    expect(open.querySelector('[data-mission="g1"]')).toBeNull();
+    const row = open.querySelector('[data-mission="f1"]')!;
+    expect(row.className).toContain("is-b2");
+    expect(row.className).toContain("is-anywhere-b");
+    expect(row.querySelector(".lx-sp img")?.getAttribute("src")).toBe("/map/sp_finance.svg");
+    expect(row.querySelector(".mission__meta")?.textContent).toBe("Финансы · где угодно · доступна · +10 XP");
+    // The «Без места на карте» catalog stays under the anywhere filter.
+    expect(within(view).getByRole("region", { name: "Без места на карте" })).toBeTruthy();
+    fireEvent.click(within(view).getByRole("button", { name: "Все" }));
+    expect(view.querySelector('[data-mission="g1"] .mission__meta')?.textContent).toBe("Здоровье · Дом · доступна · +10 XP");
+    expect(view.querySelector('[data-mission="g1"]')?.className).not.toContain("is-anywhere-b");
+  });
+
+  it("empty states: day (art + one line, plan below), own missions «0 из 20», Ресурсы", async () => {
+    server([{ ...WALK, status: "done", completedAt: "2026-11-01T08:00:00.000Z", xpGranted: 10 }]);
+    await renderApp();
+    const today = screen.getByRole("complementary", { name: "Сегодня" });
+    const empty = today.querySelector('.lx-empty[data-art="empty_day"]')!;
+    expect(empty.querySelector(".lx-empty__line")?.textContent).toBe("На сегодня дел нет — день свободен.");
+    expect(empty.querySelector("img")?.getAttribute("src")).toMatch(/\/art\/scene17\/(static\/)?empty_day(_static)?\.svg$/);
+    // The plan chips stay below the art.
+    expect(empty.compareDocumentPosition(today.querySelector("[data-plan]")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Миссии" }));
+    const own = screen.getByRole("region", { name: "Свои миссии" });
+    expect(own.querySelector(".own-missions__count")?.textContent).toBe("0 из 20");
+    expect(own.querySelector('[data-empty="own"] .lx-empty__line')?.textContent).toBe("Своих миссий пока нет.");
+    fireEvent.click(screen.getByRole("button", { name: "Ресурсы" }));
+    expect(document.querySelector('.lx-empty[data-empty="resources"] .lx-empty__line')?.textContent).toBe("Сферы заполнятся после первой миссии.");
+  });
+
+  it("«Свои миссии»: counter of open own ones, trash only on open rows, violet «Да, удалить» sends DELETE /goals/:id", async () => {
+    const mine: Goal[] = [
+      { id: "o1", title: "Зарядка 10 мин", sphere: "health", xpReward: 10, status: "open" },
+      { id: "o2", title: "Разобрать стол", sphere: "health", xpReward: 10, status: "open" },
+      ownDone(1),
+      { id: "old", title: "Старая своя", sphere: "health", xpReward: 10, status: "done", completedAt: "2026-10-01T08:00:00.000Z", xpGranted: 10 },
+    ];
+    const api = server([WALK, ...mine]);
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Миссии" }));
+    const view = screen.getByRole("region", { name: "Миссии" });
+    const own = within(view).getByRole("region", { name: "Свои миссии" });
+    // Above the «Новая миссия» form.
+    expect(own.compareDocumentPosition(within(view).getByRole("form", { name: "Новая миссия" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(own.querySelector(".own-missions__count")?.textContent).toBe("2 из 20");
+    expect([...own.querySelectorAll("[data-mission]")].map((row) => row.getAttribute("data-mission"))).toEqual(["o1", "o2", "od1"]);
+    expect(own.querySelector('[data-mission="od1"] .mission__trash')).toBeNull();
+    expect(own.querySelector('[data-mission="od1"] .mission__meta')?.textContent).toBe("Дом · выполнена · +10 XP получено");
+    expect(own.querySelector('[data-mission="o1"] .mission__meta')?.textContent).toBe("Дом · доступна · +10 XP");
+    expect(own.querySelector('[data-mission="o1"] .mission__trash img')?.getAttribute("src")).toBe("/art/scene17/ic_trash.svg");
+    // The B2 list cards keep «Выполнить» and no trash: deleting lives in «Свои миссии».
+    const list = within(view).getByRole("heading", { name: "Доступны" }).nextElementSibling!;
+    expect(list.querySelector('[data-mission="o1"] .mission__trash')).toBeNull();
+    expect(list.querySelector('[data-mission="g1"] .mission__trash')).toBeNull();
+    expect(within(list as HTMLElement).getByRole("button", { name: "Выполнить: Зарядка 10 мин" })).toBeTruthy();
+    fireEvent.click(within(own).getByRole("button", { name: "Удалить: Разобрать стол" }));
+    const confirm = within(own).getByRole("group", { name: "Удалить «Разобрать стол»?" });
+    const yes = within(confirm).getByRole("button", { name: "Да, удалить" });
+    expect(yes.className).toContain("is-confirm");
+    expect(yes.className).not.toContain("is-danger");
+    expect(own.querySelector('[data-mission="o2"]')?.className).toContain("is-confirming");
+    fireEvent.click(yes);
+    await waitFor(() => expect(own.querySelector('[data-mission="o2"]')).toBeNull());
+    expect(api.calls.some((call) => call.method === "DELETE" && call.url === "/goals/o2")).toBe(true);
+    expect(own.querySelector(".own-missions__count")?.textContent).toBe("1 из 20");
+  });
+
+  it("hint «Помощник» on an empty day: robot_hint_left, no tap marker; × hides it until the next player day", async () => {
+    server([{ ...WALK, status: "done", completedAt: "2026-11-01T08:00:00.000Z", xpGranted: 10 }]);
+    const view = await renderApp();
+    await waitFor(() => expect(document.querySelector('[data-hint="empty_day"]')).not.toBeNull());
+    const hint = document.querySelector('[data-hint="empty_day"]')!;
+    expect(hint.querySelector(".lx-hint__meta")?.textContent).toBe("Помощник");
+    expect(hint.querySelector(".lx-hint__txt")?.textContent).toBe("Можно повторить миссию из плана дня.");
+    const robot = document.querySelector(".map-robot img")!;
+    expect(robot.getAttribute("src")).toMatch(/\/art\/scene17\/(static\/)?robot_hint_left(_static)?\.svg$/);
+    expect(document.querySelector(".map-robot__marker")).toBeNull();
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
+    expect(localStorage.getItem("levex.hint.empty_day")).toBe(today);
+    fireEvent.click(within(hint as HTMLElement).getByRole("button", { name: "Скрыть до завтра" }));
+    expect(document.querySelector("[data-hint]")).toBeNull();
+    expect(document.querySelector(".map-robot img")?.getAttribute("src")).toMatch(/robot_idle/);
+    // Same player day after a reload: not again.
+    view.unmount();
+    await renderApp();
+    expect(document.querySelector("[data-hint]")).toBeNull();
+    // Next player day: the hint may show once more.
+    cleanup();
+    localStorage.setItem("levex.hint.empty_day", "2000-01-01");
+    await renderApp();
+    expect(document.querySelector('[data-hint="empty_day"]')).not.toBeNull();
+  });
+
+  it("hint after own missions 3/3 with XP: the calm text, once a day; nothing on a normal day", async () => {
+    server([WALK, ownDone(1), ownDone(2), ownDone(3)]);
+    const view = await renderApp();
+    const hint = document.querySelector('[data-hint="own_cap"]')!;
+    expect(hint.querySelector(".lx-hint__txt")?.textContent).toBe("Свои миссии с XP на сегодня есть. Дальше они запишутся без XP.");
+    expect(hint.getAttribute("role")).toBe("status");
+    view.unmount();
+    await renderApp();
+    expect(document.querySelector("[data-hint]")).toBeNull();
+    cleanup();
+    localStorage.clear();
+    server([WALK, ownDone(1), ownDone(2)]);
+    await renderApp();
+    expect(document.querySelector("[data-hint]")).toBeNull();
   });
 });

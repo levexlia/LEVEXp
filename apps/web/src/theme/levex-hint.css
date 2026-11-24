@@ -1,0 +1,17 @@
+/* LEVEX hint bubble — scene17. Calm: no blinking, no red, no timer. Appears once (fade + 6px rise, 320ms). */
+.lx-hint{position:absolute;width:var(--lx-hint-w,212px);padding:1px;background:linear-gradient(90deg,#b47bff,#22e1ff);
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);filter:drop-shadow(0 0 10px rgba(110,140,255,.35))}
+.lx-hint__in{position:relative;padding:9px 12px 10px 12px;background:linear-gradient(160deg,#0d1640,#060a22 70%);
+  clip-path:polygon(9.5px 0,100% 0,100% calc(100% - 9.5px),calc(100% - 9.5px) 100%,0 100%,0 9.5px)}
+.lx-hint__meta{display:flex;align-items:center;gap:6px;font:600 10.5px Tektur,sans-serif;letter-spacing:.04em;color:#7fe9ff;margin-bottom:3px;padding-right:24px}   /* × sits in the meta row, text gets the full width */
+.lx-hint__ex{font:600 8.5px "JetBrains Mono",JBM,monospace;letter-spacing:.14em;color:#8a96d6}
+.lx-hint__meta i{width:5px;height:5px;background:#7fe9ff;transform:rotate(45deg);box-shadow:0 0 6px #22e1ff}
+.lx-hint__txt{font:500 12.5px/1.4 Tektur,sans-serif;color:#e6f0ff;letter-spacing:.01em;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}   /* slot: 1–2 lines */
+.lx-hint__x{position:absolute;right:6px;top:6px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;color:#6f7bb0}
+.lx-hint__x:before,.lx-hint__x:after{content:"";position:absolute;width:10px;height:1.4px;background:currentColor;transform:rotate(45deg)}
+.lx-hint__x:after{transform:rotate(-45deg)}
+.lx-hint__tail{position:absolute;width:14px;height:10px}
+.lx-hint-in{animation:lxHintIn .32s cubic-bezier(.2,.7,.2,1) both}
+@keyframes lxHintIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.lx-hint-in{animation:none}}

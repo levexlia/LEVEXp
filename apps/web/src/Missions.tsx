@@ -2,10 +2,8 @@ import { ACTIVE_OWN_MISSIONS_MAX, MAP_NODES, XP_REWARD_STANDARD, dailyLedger, xp
 import { useState, type FormEvent } from "react";
 import type { Goal, TodayAwards } from "./api";
 import { activityAid } from "./daily/activity";
-import { placeIconUrl } from "./map/placeIcons";
-import { MISSION_STATUS, missionBoard, placelessBoard, todayBoard, type MissionRow, type PlanChip } from "./map/missions";
+import { ANYWHERE, MISSION_STATUS, missionBoard, ownBoard, placelessBoard, rowWhere, todayBoard, type MissionFilter, type MissionRow, type PlanChip } from "./map/missions";
 import { KitIcon, SPHERE_ICON, kitIconUrl } from "./map/KitIcon";
-import { artSrc } from "./theme/motion";
 import { uiIconUrl } from "./theme/uiArt";
 
 const CHECK_URL = "/art/scene14/ui/ic_check.svg";
@@ -25,86 +23,134 @@ export interface MissionActions {
   onDelete?: (goal: Goal) => void;
 }
 
-/** One mission: place, title, status (доступна / выполнена) and its action. */
-export function MissionItem({ row, goal, actions, reducedMotion }: { row: MissionRow; goal: Goal; actions: MissionActions; reducedMotion: boolean }) {
+const TRASH_URL = "/art/scene17/ic_trash.svg";
+
+/**
+ * «Удалить» (scene17): a trash button (44×44 zone, 32×32 plate) and, after a tap, a calm confirm in the
+ * row: «Удалить миссию?» · «Да, удалить» (purple, not red) · «Отмена». Nothing is sent before «Да, удалить».
+ */
+function DeleteMission({ row, goal, actions, confirming, setConfirming }: { row: MissionRow; goal: Goal; actions: MissionActions; confirming: boolean; setConfirming: (value: boolean) => void }) {
+  if (confirming) {
+    return (
+      <div className="mission__confirm" role="group" aria-label={`Удалить «${row.title}»?`}>
+        <span className="mission__ask">Удалить миссию?</span>
+        <button type="button" className="mission__del is-confirm" disabled={actions.busy} onClick={() => { setConfirming(false); actions.onDelete!(goal); }}>
+          Да, удалить
+        </button>
+        <button type="button" className="mission__del" onClick={() => setConfirming(false)}>
+          Отмена
+        </button>
+      </div>
+    );
+  }
+  return (
+    <button type="button" className="mission__trash" disabled={actions.busy} onClick={() => setConfirming(true)} aria-label={`Удалить: ${row.title}`}>
+      <span className="mission__trash-in"><img src={TRASH_URL} width={18} height={18} alt="" /></span>
+    </button>
+  );
+}
+
+/**
+ * One mission in the scene18 B2 layout: sphere icon on the left, the title and the action in the first
+ * line, «Сфера · место · ДОСТУПНА · +10 XP» (or «Сфера · где угодно · …») under the title.
+ * `variant="own"` is a row of «Свои миссии» (scene17): place hex or ✓, trash on the right, no «Выполнить».
+ */
+export function MissionItem({
+  row,
+  goal,
+  actions,
+  reducedMotion,
+  variant = "list",
+}: {
+  row: MissionRow;
+  goal: Goal;
+  actions: MissionActions;
+  reducedMotion: boolean;
+  variant?: "list" | "own";
+}) {
+  void reducedMotion;
   const status = row.done ? MISSION_STATUS.done : MISSION_STATUS.open;
   const locked = row.done ? null : actions.lockedText?.(row) ?? null;
   const startable = !row.done && !row.proof && !locked && actions.onStart && activityAid(row.title, goal.templateId).kind !== "stopwatch";
   const [confirming, setConfirming] = useState(false);
+  const own = variant === "own";
+  // scene17/18: missions are deleted in «Свои миссии» only; the B2 list cards carry just their action.
+  const deletable = own && !row.done && !!actions.onDelete;
+  const sphereIcon = row.sphere ? SPHERE_ICON[row.sphere] : undefined;
+  const classes = ["mission", "is-b2"];
+  if (row.done) classes.push("is-done");
+  if (!row.place && !own) classes.push("is-anywhere-b");
+  if (own) classes.push("is-own");
+  if (deletable) classes.push("has-del");
+  if (confirming) classes.push("is-confirming");
   return (
     <li
-      className={row.done ? "mission is-done" : "mission"}
+      className={classes.join(" ")}
       data-mission={row.id}
       data-status={row.done ? "done" : "open"}
+      data-anywhere={row.place ? undefined : "true"}
       style={{ ["--place" as string]: row.place ? `var(--lx-place-${row.place})` : "var(--lx-cyan)" }}
     >
-      <img
-        className="mission__icon"
-        src={row.done ? CHECK_URL : row.place ? artSrc(placeIconUrl(row.place), reducedMotion) : row.sphere && SPHERE_ICON[row.sphere] ? kitIconUrl(SPHERE_ICON[row.sphere]!) : "/art/scene14/badges/mission_open.svg"}
-        width={24}
-        height={24}
-        alt=""
-      />
+      {row.done ? (
+        <img className="mission__icon mission__check" src={CHECK_URL} width={own ? 20 : 24} height={own ? 20 : 24} alt="" />
+      ) : own ? (
+        <span className="mission__hex" aria-hidden="true" />
+      ) : (
+        <span className="lx-sp mission__icon">
+          <img src={sphereIcon ? kitIconUrl(sphereIcon) : "/art/scene14/badges/mission_open.svg"} alt="" />
+        </span>
+      )}
       <div className="mission__body">
         <span className="mission__ttl">{row.title}</span>
         <span className="mission__meta">
-          {row.placeName} · <b className="mission__st">{status}</b>
-          {row.doneOn ? ` · ${row.doneOn}` : null}
+          {own ? row.placeName : rowWhere(row)} · <b className="mission__st">{status.toLowerCase()}</b>
+          {row.doneOn && !own ? ` · ${row.doneOn}` : null}
           {row.from ? ` · с ${row.from}` : null}
+          {" · "}
+          <span className="mission__xp">{row.done ? xpDoneLabel(row.noXp ? 0 : row.xp) : xpPromiseLabel(row.noXpToday, row.xp)}</span>
         </span>
-        {row.reflection ? <span className="mission__refl">{row.reflection}</span> : null}
-        {locked ? <span className="mission__refl">{locked}</span> : null}
-        {!row.done && actions.onDelete ? (
-          confirming ? (
-            <div className="mission__confirm" role="group" aria-label={`Удалить «${row.title}»?`}>
-              <span className="mission__ask">Удалить миссию?</span>
-              <button type="button" className="mission__del is-danger" disabled={actions.busy} onClick={() => { setConfirming(false); actions.onDelete!(goal); }}>
-                Да, удалить
-              </button>
-              <button type="button" className="mission__del" onClick={() => setConfirming(false)}>
-                Отмена
-              </button>
-            </div>
+        {row.reflection && !own ? <span className="mission__refl">{row.reflection}</span> : null}
+        {locked && !own ? <span className="mission__refl">{locked}</span> : null}
+        {deletable && confirming ? <DeleteMission row={row} goal={goal} actions={actions} confirming setConfirming={setConfirming} /> : null}
+      </div>
+      {own ? (
+        deletable && !confirming ? (
+          <div className="mission__act"><DeleteMission row={row} goal={goal} actions={actions} confirming={false} setConfirming={setConfirming} /></div>
+        ) : null
+      ) : (
+        <div className="mission__act">
+          {row.done ? null : locked ? (
+            <button type="button" className="lx-btn lx-btn--sm" disabled aria-label={`${locked}: ${row.title}`}>
+              <span className="lx-btn__in"><img src="/art/scene14/ui/ic_lock.svg" width={14} height={14} alt="" />Закрыто</span>
+            </button>
+          ) : row.proof ? (
+            <button type="button" className="lx-btn lx-btn--sm" disabled={actions.busy} onClick={() => actions.onProof(goal)} aria-label={`Proof: ${row.title}`}>
+              <span className="lx-btn__in"><img src={uiIconUrl("camera")} width={16} height={16} alt="" />Proof</span>
+            </button>
           ) : (
-            <button type="button" className="mission__del" disabled={actions.busy} onClick={() => setConfirming(true)} aria-label={`Удалить: ${row.title}`}>
-              <span aria-hidden="true">✕</span>Удалить
-            </button>
-          )
-        ) : null}
-      </div>
-      <div className="mission__act">
-        <span className="mission__xp">{row.done ? xpDoneLabel(row.noXp ? 0 : row.xp) : xpPromiseLabel(row.noXpToday, row.xp)}</span>
-        {row.done ? null : locked ? (
-          <button type="button" className="lx-btn lx-btn--sm" disabled aria-label={`${locked}: ${row.title}`}>
-            <span className="lx-btn__in"><img src="/art/scene14/ui/ic_lock.svg" width={14} height={14} alt="" />Закрыто</span>
-          </button>
-        ) : row.proof ? (
-          <button type="button" className="lx-btn lx-btn--sm" disabled={actions.busy} onClick={() => actions.onProof(goal)} aria-label={`Proof: ${row.title}`}>
-            <span className="lx-btn__in"><img src={uiIconUrl("camera")} width={16} height={16} alt="" />Proof</span>
-          </button>
-        ) : (
-          <span className="mission__btns">
-            {startable ? (
-              <button type="button" className="lx-btn lx-btn--secondary lx-btn--sm" disabled={actions.busy} onClick={() => actions.onStart!(goal)} aria-label={`Начать: ${row.title}`}>
-                <span className="lx-btn__in">Начать</span>
+            <span className="mission__btns">
+              {startable ? (
+                <button type="button" className="lx-btn lx-btn--secondary lx-btn--sm" disabled={actions.busy} onClick={() => actions.onStart!(goal)} aria-label={`Начать: ${row.title}`}>
+                  <span className="lx-btn__in">Начать</span>
+                </button>
+              ) : null}
+              <button type="button" className="lx-btn lx-btn--sm" disabled={actions.busy} onClick={() => actions.onDone(row.id)} aria-label={`Выполнить: ${row.title}`}>
+                <span className="lx-btn__in">Выполнить</span>
               </button>
-            ) : null}
-            <button type="button" className="lx-btn lx-btn--sm" disabled={actions.busy} onClick={() => actions.onDone(row.id)} aria-label={`Выполнить: ${row.title}`}>
-              <span className="lx-btn__in">Выполнить</span>
-            </button>
-          </span>
-        )}
-      </div>
+            </span>
+          )}
+        </div>
+      )}
     </li>
   );
 }
 
-function List({ rows, goals, actions, reducedMotion }: { rows: MissionRow[]; goals: readonly Goal[]; actions: MissionActions; reducedMotion: boolean }) {
+function List({ rows, goals, actions, reducedMotion, variant = "list" }: { rows: MissionRow[]; goals: readonly Goal[]; actions: MissionActions; reducedMotion: boolean; variant?: "list" | "own" }) {
   const byId = new Map(goals.map((goal) => [goal.id, goal]));
   return (
-    <ul className="missions">
+    <ul className={variant === "own" ? "missions own-missions__list" : "missions"}>
       {rows.map((row) => (
-        <MissionItem key={row.id} row={row} goal={byId.get(row.id)!} actions={actions} reducedMotion={reducedMotion} />
+        <MissionItem key={row.id} row={row} goal={byId.get(row.id)!} actions={actions} reducedMotion={reducedMotion} variant={variant} />
       ))}
     </ul>
   );
@@ -123,8 +169,8 @@ export function MissionsView({
 }: {
   goals: readonly Goal[];
   states: ReadonlyMap<MapNodeId, MapNodeState>;
-  place: MapNodeId | null;
-  onPlace: (place: MapNodeId | null) => void;
+  place: MissionFilter;
+  onPlace: (place: MissionFilter) => void;
   onCreate: (title: string, sphere: LifeSphereId) => Promise<boolean>;
   /** Add a placeless sphere template (Карьера, Финансы, Отношения) for today. */
   onTemplate?: (templateId: string) => void;
@@ -132,7 +178,8 @@ export function MissionsView({
   reducedMotion: boolean;
 }) {
   const board = missionBoard(goals, place);
-  const placeLabel = MAP_NODES.find((node) => node.id === place)?.name;
+  const placeLabel = place === ANYWHERE ? "Где угодно" : MAP_NODES.find((node) => node.id === place)?.name;
+  const own = ownBoard(goals);
   return (
     <section className="panel missions-view" aria-labelledby="missions-title">
       <h2 id="missions-title">Миссии</h2>
@@ -155,6 +202,15 @@ export function MissionsView({
             <span className="lx-chip__in">{node.name}</span>
           </button>
         ))}
+        {/* scene18 B2: missions without a map place; the globe lives only in this chip. */}
+        <button
+          type="button"
+          className="lx-chip filter-chip is-anywhere-chip"
+          aria-pressed={place === ANYWHERE}
+          onClick={() => onPlace(ANYWHERE)}
+        >
+          <span className="lx-chip__in"><img src={ANYWHERE_GLYPH} width={13} height={13} alt="" />Где угодно</span>
+        </button>
       </div>
 
       <h3>Доступны</h3>
@@ -162,9 +218,13 @@ export function MissionsView({
         <List rows={board.open} goals={goals} actions={actions} reducedMotion={reducedMotion} />
       ) : (
         <p className="empty" data-empty="open">
-          {board.done.length > 0
-            ? `Все миссии${placeLabel ? ` места «${placeLabel}»` : ""} выполнены. Добавь новую ниже.`
-            : `${placeLabel ? `В месте «${placeLabel}» миссий` : "Миссий"} пока нет. Добавь первую ниже.`}
+          {place === ANYWHERE
+            ? board.done.length > 0
+              ? "Все миссии без места выполнены. Новую можно взять ниже."
+              : "Миссий без места пока нет. Их можно взять ниже, в «Без места на карте»."
+            : board.done.length > 0
+              ? `Все миссии${placeLabel ? ` места «${placeLabel}»` : ""} выполнены. Добавь новую ниже.`
+              : `${placeLabel ? `В месте «${placeLabel}» миссий` : "Миссий"} пока нет. Добавь первую ниже.`}
         </p>
       )}
 
@@ -175,7 +235,7 @@ export function MissionsView({
         </>
       ) : null}
 
-      {place === null && onTemplate ? <Placeless goals={goals} busy={actions.busy} onTemplate={onTemplate} /> : null}
+      {(place === null || place === ANYWHERE) && onTemplate ? <Placeless goals={goals} busy={actions.busy} onTemplate={onTemplate} /> : null}
 
       {board.done.length > 0 ? (
         <>
@@ -185,7 +245,41 @@ export function MissionsView({
         </>
       ) : null}
 
-      <NewMission key={place ?? "all"} states={states} place={place} busy={actions.busy} onCreate={onCreate} full={activeOwnCount(goals) >= ACTIVE_OWN_MISSIONS_MAX} />
+      <OwnMissions rows={own.rows} count={own.count} goals={goals} actions={actions} reducedMotion={reducedMotion} />
+
+      <NewMission key={place ?? "all"} states={states} place={place === ANYWHERE ? null : place} busy={actions.busy} onCreate={onCreate} full={activeOwnCount(goals) >= ACTIVE_OWN_MISSIONS_MAX} />
+    </section>
+  );
+}
+
+const ANYWHERE_GLYPH = "/art/scene18/ic_anywhere_a_glyph.svg";
+
+/** Calm empty state (scene17 .lx-empty): art and one line. Static art under reduced motion. */
+export function EmptyState({ kind, art, line, reducedMotion }: { kind?: string; art: "empty_day" | "empty_own" | "empty_resources"; line: string; reducedMotion: boolean }) {
+  return (
+    <div className="lx-empty" data-empty={kind} data-art={art}>
+      <img className="lx-empty__art" src={reducedMotion ? `/art/scene17/static/${art}_static.svg` : `/art/scene17/${art}.svg`} alt="" width={168} height={126} />
+      <p className="lx-empty__line" title={line}>{line}</p>
+    </div>
+  );
+}
+
+/**
+ * «Свои миссии» (scene17), above the form: open own missions and today's finished ones, with the
+ * «N из 20» counter (open ones, the same count as the 20 limit; never red) and «Удалить» on open rows.
+ */
+function OwnMissions({ rows, count, goals, actions, reducedMotion }: { rows: MissionRow[]; count: number; goals: readonly Goal[]; actions: MissionActions; reducedMotion: boolean }) {
+  return (
+    <section className="own-missions" aria-labelledby="own-missions-title">
+      <div className="own-missions__head">
+        <h3 id="own-missions-title">Свои миссии</h3>
+        <span className="own-missions__count" data-own-count={count}>{count} из {ACTIVE_OWN_MISSIONS_MAX}</span>
+      </div>
+      {rows.length > 0 ? (
+        <List rows={rows} goals={goals} actions={actions} reducedMotion={reducedMotion} variant="own" />
+      ) : (
+        <EmptyState kind="own" art="empty_own" line="Своих миссий пока нет." reducedMotion={reducedMotion} />
+      )}
     </section>
   );
 }
@@ -352,7 +446,7 @@ export function TodayPanel({
         <List rows={today.open} goals={goals} actions={actions} reducedMotion={reducedMotion} />
       ) : plan.length > 0 && onPlan ? (
         <div className="today-plan" data-empty="today">
-          <p className="empty">На сегодня дел нет.</p>
+          <EmptyState art="empty_day" line="На сегодня дел нет — день свободен." reducedMotion={reducedMotion} />
           {planBlocks(plan).map(({ kind, chips }, index) => {
             const label = kind === "repeat" ? "Можно снова:" : "Можно взять:";
             return (
