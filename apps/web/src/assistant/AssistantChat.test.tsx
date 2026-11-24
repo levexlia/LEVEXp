@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { ASSISTANT_MESSAGE_MAX_LENGTH, type AssistantReply } from "@levex/domain";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AssistantChat, historyFor, type AskFn, type ChatLine } from "./AssistantChat";
 import { ROBOT_STATES, robotSrc, robotStateFor, typingSrc, type RobotState } from "./art";
@@ -160,7 +160,8 @@ describe("AssistantChat", () => {
     fireEvent.click(send());
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Помощник сейчас не может ответить.");
-    expect(now()).toBe("idle");
+    // The state callback may land a tick after the alert renders (flaked on CI): wait for it.
+    await waitFor(() => expect(now()).toBe("idle"));
     fireEvent.click(screen.getByRole("button", { name: "Повторить" }));
     expect(await screen.findByText("Теперь получилось")).toBeTruthy();
     expect(ask).toHaveBeenLastCalledWith("Привет", [], expect.any(AbortSignal));
