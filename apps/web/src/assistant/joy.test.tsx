@@ -264,6 +264,7 @@ describe("C: new places, levels 2 and 4 only", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await mark("Утренняя прогулка 20 мин");
     expect(screen.getByRole("dialog", { name: "Новый уровень" })).toBeTruthy();
+    await act(async () => {}); // let C mount its timer (passive effect) before moving the clock
     act(() => { vi.advanceTimersByTime(MILESTONE_MS - 50); });
     expect(screen.queryByRole("dialog", { name: "Новый уровень" })).not.toBeNull();
     act(() => { vi.advanceTimersByTime(60); });
@@ -287,6 +288,7 @@ describe("C: new places, levels 2 and 4 only", () => {
     const srcs = [...dialog.querySelectorAll("img")].map((img) => img.getAttribute("src")!).filter((src) => src.includes("scene16"));
     expect(srcs.length).toBeGreaterThan(0);
     for (const src of srcs) expect(src).toMatch(/\/art\/scene16\/static\/.+_static\.svg$/);
+    await act(async () => {}); // let C mount its timer (passive effect) before moving the clock
     act(() => { vi.advanceTimersByTime(MILESTONE_MS + 10); });
     expect(screen.queryByRole("dialog", { name: "Новый уровень" })).toBeNull();
     act(() => { vi.advanceTimersByTime(2000); });
@@ -448,7 +450,10 @@ describe("C accessibility", () => {
       if (how === "x") fireEvent.click(dialog.querySelector(".lxC-x")!);
       if (how === "map") fireEvent.click(within(dialog).getByRole("button", { name: "На карту" }));
       if (how === "tap") fireEvent.click(dialog);
-      if (how === "auto") act(() => { vi.advanceTimersByTime(MILESTONE_MS + 10); });
+      if (how === "auto") {
+        await act(async () => {});
+        act(() => { vi.advanceTimersByTime(MILESTONE_MS + 10); });
+      }
       expect(screen.queryByRole("dialog", { name: "Новый уровень" })).toBeNull();
       expect([keep, screen.queryByRole("button", { name: /ИИ-помощник: открыть чат/ })]).toContain(document.activeElement);
       vi.useRealTimers();
