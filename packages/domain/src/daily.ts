@@ -113,6 +113,32 @@ export function noXpTodayReason(goal: DailyGoal, ledger: DailyLedger): NoXpReaso
 
 export type NoXpReason = "daily_cap" | "own_cap" | "template_already_awarded";
 
+/** The one label used instead of «+N XP» when a completion now would give nothing. */
+export const NO_XP_TODAY_LABEL = "без XP сегодня";
+
+/**
+ * The XP promise of an open mission or a catalog / plan button: «+10 XP», or «без XP сегодня»
+ * when the daily rules would give nothing now. Every place that shows a promise uses this.
+ */
+export function xpPromiseLabel(noXpToday: boolean, xp: number): string {
+  return noXpToday ? NO_XP_TODAY_LABEL : `+${xp} XP`;
+}
+
+/** A done mission: what it really gave («+10 XP получено») or «без XP · записано». */
+export function xpDoneLabel(granted: number): string {
+  return granted > 0 ? `+${granted} XP получено` : "без XP · записано";
+}
+
+/**
+ * Would a NEW goal of this template (or an own mission, `templateKey` null) give XP if finished now?
+ * For catalog and plan buttons that are not goals yet. Same order as {@link awardDecision}.
+ */
+export function templateNoXpReason(templateKey: string | null, ledger: DailyLedger): NoXpReason | null {
+  const probe: DailyGoal = { id: "", title: "", status: "open", xpReward: 0, ...(templateKey ? { templateId: templateKey } : {}) };
+  const decision = awardDecision(probe, ledger);
+  return decision.award ? null : decision.reason;
+}
+
 const dayFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: PLAYER_TIME_ZONE,
   year: "numeric",

@@ -10,6 +10,7 @@ import {
   SEED_TEMPLATES,
   dailyLedger,
   noXpTodayReason,
+  templateNoXpReason,
   type DailyLedger,
   lockedPlaceFor,
   playerDay,
@@ -142,7 +143,7 @@ export interface PlanChip {
   place: MapNodeId | null;
   /** «repeat»: the player has done this template before; «new»: never done yet. */
   kind: "repeat" | "new";
-  /** A repeat whose template already gave XP today: shown after the new ones, marked «без XP сегодня». */
+  /** Finishing it now would give no XP (template given today, or the daily cap 5/5): «без XP сегодня». */
   noXpToday?: boolean;
   /** Copy this goal (a seed or a repeated own mission done before)… */
   repeatOf?: string;
@@ -155,10 +156,10 @@ export interface PlanChip {
 /** At most this many plan buttons in total (Игрок, 24.11): repeats first, then new ones. */
 export const PLAN_MAX = 3;
 
-/** A placeless template in the Миссии tab: already open today, already gave XP today, or free to add. */
+/** A placeless template in the Миссии tab: already open today, no XP if done now (cap / given today), or free to add. */
 export interface SphereTemplateRow {
   template: SphereTemplate;
-  state: "add" | "open" | "awarded";
+  state: "add" | "open" | "noXp";
 }
 
 /** «Без места на карте» in the Миссии tab: the 3 placeless spheres with their 3 templates each. */
@@ -171,7 +172,7 @@ export function placelessBoard(goals: readonly Goal[], now = new Date()): Array<
     name: getLifeSphere(sphere)?.name ?? sphere,
     rows: SPHERE_TEMPLATES.filter((template) => template.sphere === sphere).map((template) => ({
       template,
-      state: open.has(template.id) ? "open" : ledger.templates.has(template.id) ? "awarded" : "add",
+      state: open.has(template.id) ? "open" : templateNoXpReason(template.id, ledger) ? "noXp" : "add",
     })),
   }));
 }
@@ -220,7 +221,9 @@ export function planChips(
       rewarded: ledger.templates.has(key),
     });
   }
-  repeats.sort((a, b) => Number(a.rewarded) - Number(b.rewarded) || b.at.localeCompare(a.at));
+  // At the daily cap nothing gives XP: plain recency, no «with XP / without XP» split (Игрок, 24.11).
+  const capped = ledger.awarded >= ledger.awardCap;
+  repeats.sort((a, b) => (capped ? 0 : Number(a.rewarded) - Number(b.rewarded)) || b.at.localeCompare(a.at));
 
   // Never-done templates, grouped by sphere; spheres with the least XP first, one chip per sphere per round.
   const candidates: Array<{ id: string; title: string; sphere: string }> = [...SEED_TEMPLATES, ...SPHERE_TEMPLATES]
@@ -235,13 +238,17 @@ export function planChips(
       const template = candidates.filter((item) => item.sphere === sphere)[round];
       if (!template) continue;
       added = true;
-      news.push({ key: template.id, title: template.title, place: placeForSphere(template.sphere), kind: "new", templateId: template.id, sphere: template.sphere });
+      news.push({
+        key: template.id, title: template.title, place: placeForSphere(template.sphere), kind: "new", templateId: template.id, sphere: template.sphere,
+        ...(templateNoXpReason(template.id, ledger) ? { noXpToday: true } : {}),
+      });
     }
     if (!added) break;
   }
 
-  const strip = ({ at: _at, rewarded, ...chip }: PlanChip & { at: string; rewarded: boolean }): PlanChip =>
-    rewarded ? { ...chip, noXpToday: true } : chip;
+  const strip = ({ at: _at, rewarded: _rewarded, ...chip }: PlanChip & { at: string; rewarded: boolean }): PlanChip =>
+    templateNoXpReason(chip.key, ledger) ? { ...chip, noXpToday: true } : chip;
+  if (capped) return [...repeats.map(strip), ...news].slice(0, max);
   // Repeats that can still give XP, then new ones, then repeats already rewarded today (Игрок, 24.11).
   const fresh = repeats.filter((chip) => !chip.rewarded).map(strip);
   const stale = repeats.filter((chip) => chip.rewarded).map(strip);
