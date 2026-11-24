@@ -5,7 +5,7 @@ import { activityAid, clock } from "./activity";
 
 /**
  * Spec №2: «Начать» opens a calm screen for the mission. The timer / page counter is optional and can
- * be stopped; «Я закончил — отметить» works at any moment and closes the goal like «Выполнить».
+ * be stopped; «Готово — отметить» works at any moment and closes the goal like «Выполнить».
  * «Не сейчас» goes back and the goal stays open. No "time is not up" texts.
  */
 export function ActivityScreen({
@@ -124,7 +124,7 @@ export function ActivityScreen({
               <span className="lx-btn__in">Не сейчас</span>
             </button>
             <button type="button" className="lx-btn ps-primary" disabled={busy} onClick={() => onDone(goal.id)}>
-              <span className="lx-btn__in">Я закончил — отметить</span>
+              <span className="lx-btn__in">Готово — отметить</span>
             </button>
           </div>
         </div>

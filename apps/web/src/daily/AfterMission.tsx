@@ -126,7 +126,7 @@ export function AfterMission({
             </div>
             <label className="lx-field">
               <span>Заметка (необязательно)</span>
-              <textarea value={note} rows={2} maxLength={REFLECTION_NOTE_MAX} placeholder="Что заметил(а)?" onChange={(event) => setNote(event.target.value)} />
+              <textarea value={note} rows={2} maxLength={REFLECTION_NOTE_MAX} placeholder="Что запомнилось?" onChange={(event) => setNote(event.target.value)} />
             </label>
             <p className="field-hint">{note.length}/{REFLECTION_NOTE_MAX} · на XP не влияет</p>
             <div className="ps-actions">

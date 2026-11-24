@@ -220,7 +220,7 @@ describe("App: usefulness v1", () => {
     expect(screenSheet.getAttribute("data-activity")).toBe("pages");
     fireEvent.click(within(screenSheet).getByRole("button", { name: "Плюс страница" }));
     expect(screenSheet.textContent).toContain("1 / 10");
-    fireEvent.click(within(screenSheet).getByRole("button", { name: "Я закончил — отметить" }));
+    fireEvent.click(within(screenSheet).getByRole("button", { name: "Готово — отметить" }));
     await screen.findByRole("dialog", { name: "«Прочитать 10 страниц» выполнена" });
     expect(api.calls.some((call) => call.method === "POST" && call.url === "/goals/g2/complete")).toBe(true);
   });
