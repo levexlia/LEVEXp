@@ -84,7 +84,8 @@ export function ActivityScreen({
 
           {aid.kind === "pages" ? (
             <div className="activity__aid">
-              <p className="activity__big" aria-live="polite">{pages} / {aid.pages}<small> стр.</small></p>
+              <p className="activity__big" aria-live="polite">{pages} / {aid.pages}<small> страниц</small></p>
+              {pages >= aid.pages ? <p className="activity__goal" role="status">Цель достигнута</p> : null}
               <div className="activity__row">
                 <button type="button" className="lx-btn lx-btn--secondary lx-btn--sm" onClick={() => setPages((v) => Math.max(0, v - 1))} aria-label="Минус страница">
                   <span className="lx-btn__in">−1</span>
@@ -98,9 +99,16 @@ export function ActivityScreen({
             <div className="activity__aid">
               <p className="activity__big" role="timer" aria-live="off">{clock(aid.kind === "timer" ? left : elapsed)}</p>
               <div className="activity__row">
-                <button type="button" className="lx-btn lx-btn--secondary lx-btn--sm" onClick={toggle} disabled={finishedTimer}>
-                  <span className="lx-btn__in">{running ? "Пауза" : elapsed > 0 ? "Продолжить" : aid.kind === "timer" ? `Таймер ${aid.minutes} мин` : "Секундомер"}</span>
-                </button>
+                {elapsed === 0 && !running ? (
+                  // Nothing starts by itself: the timer is a choice, marking never needs it.
+                  <button type="button" className="lx-btn activity__start" onClick={toggle}>
+                    <span className="lx-btn__in">{aid.kind === "timer" ? "Запустить таймер" : "Запустить секундомер"}</span>
+                  </button>
+                ) : (
+                  <button type="button" className="lx-btn lx-btn--secondary lx-btn--sm" onClick={toggle} disabled={finishedTimer}>
+                    <span className="lx-btn__in">{running ? "Пауза" : "Продолжить"}</span>
+                  </button>
+                )}
                 {elapsed > 0 ? (
                   <button type="button" className="quiet" onClick={reset}>Сбросить</button>
                 ) : null}
@@ -109,7 +117,7 @@ export function ActivityScreen({
             </div>
           )}
           <div className={reducedMotion ? "activity__bar still" : "activity__bar"} aria-hidden="true"><i style={{ width: `${Math.round(ratio * 100)}%` }} /></div>
-          <p className="activity__note">Таймер необязателен: отметить можно в любой момент.</p>
+          <p className="activity__note">{aid.kind === "pages" ? "Счётчик" : aid.kind === "timer" ? "Таймер" : "Секундомер"} необязателен: отметить можно в любой момент.</p>
 
           <div className="ps-actions">
             <button type="button" className="lx-btn lx-btn--secondary ps-later" onClick={onClose}>

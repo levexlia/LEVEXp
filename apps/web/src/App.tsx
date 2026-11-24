@@ -20,6 +20,7 @@ import {
   completeGoal,
   createArtifact,
   createGoal,
+  deleteGoal,
   errorMessage,
   generateAvatar,
   goalFromTemplate,
@@ -239,12 +240,29 @@ export function App() {
   }
 
   /** «Да, на завтра»: a copy of the goal for the next player day (R-XP-9). */
-  async function repeatTomorrow(goalId: string): Promise<boolean> {
+  async function repeatTomorrow(goalId: string): Promise<string | null> {
     setBusy(true);
     setError(null);
     try {
-      await repeatGoal(goalId, true);
+      const copy = await repeatGoal(goalId, true);
       await refresh();
+      return copy.id;
+    } catch (err) {
+      setError(errorMessage(err));
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** «Удалить» an open mission, or «Отменить» tomorrow's copy. XP does not change. */
+  async function removeGoal(goalId: string, note?: string): Promise<boolean> {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteGoal(goalId);
+      await refresh();
+      if (note) say(note);
       return true;
     } catch (err) {
       setError(errorMessage(err));
@@ -432,7 +450,7 @@ export function App() {
             place={missionPlace}
             onPlace={setMissionPlace}
             onCreate={addMission}
-            actions={actions}
+            actions={{ ...actions, onDelete: (goal) => void removeGoal(goal.id, `Миссия «${goal.title}» удалена`) }}
             reducedMotion={reducedMotion}
           />
         ) : null}
@@ -510,6 +528,7 @@ export function App() {
           {workshopLocked ? (
             // R-XP-8: no upload while Мастерская is locked; the server would refuse it too.
             <div data-proof-locked="true">
+              <p className="proof-what">{PROOF_WHAT}</p>
               <p className="proof-locked" role="status">
                 {placeLockedMessage(MAP_NODES.find((node) => node.id === "workshop")!)}. Тогда здесь можно будет прикрепить фото к миссии.
               </p>
@@ -528,11 +547,22 @@ export function App() {
       ) : null}
 
       {after ? (
-        <AfterMission key={after.goal.id} info={after} busy={busy} onRepeat={repeatTomorrow} onReflect={reflect} onClose={closeAfter} />
+        <AfterMission
+          key={after.goal.id}
+          info={after}
+          busy={busy}
+          onRepeat={repeatTomorrow}
+          onUndoRepeat={(copyId) => removeGoal(copyId)}
+          onReflect={reflect}
+          onClose={closeAfter}
+        />
       ) : null}
     </div>
   );
 }
+
+/** One gender-neutral line on what Proof is (playtest 24.11). */
+export const PROOF_WHAT = "Proof — фото того, что сделано своими руками. Оно попадёт в галерею.";
 
 function dayWord(count: number): string {
   const abs = Math.abs(count) % 100;
@@ -567,7 +597,14 @@ function Resources({ player }: { player: Player | null }) {
   return (
     <section className="panel">
       <h2>Ресурсы</h2>
-      {rows.length === 0 ? <p className="empty">Опыт по сферам появится после первой миссии.</p> : null}
+      {rows.length === 0 ? (
+        <div className="empty-state" data-empty="resources">
+          <p>Здесь будет видно, в каких сферах жизни копится XP: здоровье, разум, творчество и другие.</p>
+          <p className="empty">Пока пусто. Выполни любую миссию из «Сегодня», и первая полоса появится здесь.</p>
+        </div>
+      ) : (
+        <p className="empty">XP по сферам: за каждую выполненную миссию с начислением.</p>
+      )}
       <ul className="bars">
         {rows.map(([id, value]) => (
           <li key={id}>
@@ -631,7 +668,15 @@ function Profile({
         </div>
       </div>
       <h3>Галерея</h3>
-      {placements.length === 0 ? <p className="empty">Фото появятся после Proof.</p> : null}
+      {placements.length === 0 ? (
+        <div className="empty-state" data-empty="gallery">
+          <p>Галерея пока пуста.</p>
+          <p className="empty">
+            Здесь будут фото из Proof — того, что сделано своими руками.
+            {(player?.progress.level ?? 1) >= 2 ? " Proof — кнопка на карте." : " Proof открывается вместе с Мастерской на уровне 2."}
+          </p>
+        </div>
+      ) : null}
       <ul className="gallery">
         {placements.map((placement) => (
           <li key={placement.artifactId}>
@@ -727,6 +772,7 @@ function ProofForm({
   const place = placeName(placeForSphere(goal?.sphere ?? "creativity"));
   return (
     <form onSubmit={submit}>
+      <p className="proof-what">{PROOF_WHAT}</p>
       <p className="proof-for" data-proof-goal={goal?.id ?? "new"}>
         {goal ? (
           <>Миссия: <b>«{goal.title}»</b> · {place}</>

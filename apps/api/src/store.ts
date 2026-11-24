@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import {
+  activeOwnCount,
+  activeOwnLimitMessage,
+  ACTIVE_OWN_MISSIONS_MAX,
   awardDecision,
   dailyLedger,
   getLifeSphere,
@@ -77,6 +80,39 @@ export class InvalidGoalUpdate extends Error {
     super(message);
     this.name = "InvalidGoalUpdate";
   }
+}
+
+/** Too many open own missions. The message is the Russian text the UI shows. */
+export class GoalLimitReached extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GoalLimitReached";
+  }
+}
+
+/** Only open goals can be removed: a done one is part of the record and of the XP history. */
+export class GoalNotOpen extends Error {
+  constructor() {
+    super("only an open mission can be deleted");
+    this.name = "GoalNotOpen";
+  }
+}
+
+/**
+ * Removes an open goal (it gave no XP, so progress does not change). Used by «Удалить» and by the
+ * «Отменить» after «Повторить завтра». Returns false when the goal is not found.
+ */
+export function deleteGoal(id: string): boolean {
+  const goal = goals.get(id);
+  if (!goal) return false;
+  if (goal.status !== "open") throw new GoalNotOpen();
+  const next = cloneState();
+  next.goals.delete(id);
+  for (const artifact of next.artifacts.values()) {
+    if (artifact.goalId === id) delete artifact.goalId;
+  }
+  commitState(next);
+  return true;
 }
 
 /** R-XP-8: the goal's map place is still locked. The message is the Russian text the UI shows. */
@@ -443,6 +479,10 @@ export function createGoal(input: GoalInput, withFlag?: true): Goal | { goal: Go
     templateId = input.templateId;
   }
   if (!title) throw new InvalidGoalUpdate("title is required");
+  // Own missions: at most ACTIVE_OWN_MISSIONS_MAX open at once (repeats and seeds are templates, not counted).
+  if (templateId === undefined && activeOwnCount([...goals.values()]) >= ACTIVE_OWN_MISSIONS_MAX) {
+    throw new GoalLimitReached(activeOwnLimitMessage());
+  }
   const locked = lockedPlaceFor(sphere, placeLevel(player.progression.totalXp));
   if (locked) throw new PlaceLocked(placeLockedMessage(locked));
   const availableFrom = input.forTomorrow ? shiftDay(playerDay(clock()), 1) : undefined;

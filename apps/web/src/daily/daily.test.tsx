@@ -34,10 +34,18 @@ function server(initial: Goal[], options: { level?: number; awarded?: number; ca
     if (url === "/player") return json(player);
     if (url === "/room") return json({ placements: [] });
     if (url === "/goals" && method === "GET") return json(goals);
+    const del = url.match(/^\/goals\/([^/]+)$/);
+    if (del && method === "DELETE") {
+      const index = goals.findIndex((goal) => goal.id === del[1]);
+      if (index < 0) return json({ error: "goal not found" }, 404);
+      if (goals[index]!.status !== "open") return json({ error: "only an open mission can be deleted" }, 409);
+      goals.splice(index, 1);
+      return new Response(null, { status: 204 });
+    }
     if (url === "/goals" && method === "POST") {
       const source = goals.find((goal) => goal.id === body.repeatOf);
       const goal: Goal = {
-        id: `n${goals.length}`,
+        id: `n${calls.length}`,
         title: source?.title ?? body.title ?? (body.templateId === "seed-walk" ? "Утренняя прогулка 20 мин" : "Прочитать 10 страниц"),
         sphere: source?.sphere ?? body.sphere ?? "health",
         xpReward: 10,
@@ -119,6 +127,8 @@ describe("empty-day plan and «Сегодня» day (spec №1, R-XP-5)", () => 
     expect(board.doneToday).toBe(1);
     expect(board.open).toHaveLength(0);
     expect(board.later.map((row) => row.from)).toEqual(["25.11"]);
+    // seed-walk already paid today, but tomorrow's copy is judged tomorrow: no «без XP сегодня» on it.
+    expect(board.later[0]!.noXpToday).toBe(false);
   });
 });
 
@@ -236,5 +246,122 @@ describe("App: usefulness v1", () => {
     const locked = within(view).getByRole("button", { name: "Место «Мастерская» откроется на уровне 2: Скетч" }) as HTMLButtonElement;
     expect(locked.disabled).toBe(true);
     expect(within(view).queryByRole("button", { name: "Proof: Скетч" })).toBeNull();
+  });
+
+  it("open missions say «без XP сегодня» once the daily cap is reached (no «+10 XP» promise)", async () => {
+    const paid: Goal[] = Array.from({ length: 5 }, (_, i) => ({
+      id: `p${i}`, title: `Дело ${i}`, sphere: "career", xpReward: 10, xpGranted: 10, status: "done", completedAt: new Date().toISOString(),
+    }));
+    server([...paid, { id: "o1", title: "Разобрать стол", sphere: "health", xpReward: 10, status: "open" }], { awarded: 5 });
+    await renderApp();
+    const row = screen.getByRole("complementary", { name: "Сегодня" }).querySelector('[data-mission="o1"]')!;
+    expect(row.textContent).toContain("без XP сегодня");
+    expect(row.textContent).not.toContain("+10 XP");
+  });
+
+  it("an own mission after 3 own awards and a same-template repeat also say «без XP сегодня»", () => {
+    const now = new Date();
+    const at = now.toISOString();
+    const goals: Goal[] = [
+      ...[1, 2, 3].map((i) => ({ id: `s${i}`, title: `Своя ${i}`, sphere: "health", xpReward: 10, xpGranted: 10, status: "done" as const, completedAt: at })),
+      { ...WALK, status: "done", completedAt: at, xpGranted: 10 },
+      { id: "own4", title: "Своя 4", sphere: "health", xpReward: 10, status: "open" },
+      { id: "walk2", title: WALK.title, sphere: "health", xpReward: 10, status: "open", templateId: "seed-walk" },
+      { id: "read", title: READ.title, sphere: "mind", xpReward: 10, status: "open", templateId: "seed-read" },
+    ];
+    const rows = new Map(todayBoard(goals, now, 10).open.map((row) => [row.id, row.noXpToday]));
+    expect(rows.get("own4")).toBe(true);
+    expect(rows.get("walk2")).toBe(true);
+    expect(rows.get("read")).toBe(false);
+  });
+
+  it("Миссии: tomorrow's copy is in its own «Завтра» group, not under «Доступны»", async () => {
+    server([{ ...WALK, id: "t1", availableFrom: "2099-01-01" }, READ]);
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Миссии" }));
+    const view = screen.getByRole("region", { name: "Миссии" });
+    const headings = [...view.querySelectorAll("h3")].map((h) => h.textContent);
+    expect(headings).toContain("Завтра");
+    const lists = [...view.querySelectorAll("ul.missions")];
+    expect(lists[0]!.querySelector('[data-mission="t1"]')).toBeNull();
+    expect(lists[1]!.querySelector('[data-mission="t1"]')).not.toBeNull();
+  });
+
+  it("«Отменить» after «Да, на завтра» deletes the copy and asks again", async () => {
+    const api = server([WALK]);
+    await renderApp();
+    fireEvent.click(within(screen.getByRole("complementary", { name: "Сегодня" })).getByRole("button", { name: "Выполнить: Утренняя прогулка 20 мин" }));
+    const sheet = await screen.findByRole("dialog", { name: /выполнена/ });
+    fireEvent.click(within(sheet).getByRole("button", { name: "Да, на завтра" }));
+    fireEvent.click(await within(sheet).findByRole("button", { name: "Отменить" }));
+    await within(sheet).findByRole("button", { name: "Да, на завтра" });
+    const created = api.calls.find((call) => call.method === "POST" && call.url === "/goals")!;
+    expect(created).toBeTruthy();
+    const deleted = api.calls.filter((call) => call.method === "DELETE");
+    expect(deleted).toHaveLength(1);
+    expect(api.goals.some((goal) => goal.repeatOf === "g1")).toBe(false);
+  });
+
+  it("20 open own missions: the form is off with the calm text; «Удалить» frees a place", async () => {
+    const own: Goal[] = Array.from({ length: 20 }, (_, i) => ({ id: `o${i}`, title: `Своя ${i}`, sphere: "career", xpReward: 10, status: "open" }));
+    const api = server(own);
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Миссии" }));
+    const view = screen.getByRole("region", { name: "Миссии" });
+    expect(within(view).getByText("Активных своих миссий уже 20. Закрой или удали одну, чтобы добавить новую.")).toBeTruthy();
+    fireEvent.change(within(view).getByLabelText("Что сделать"), { target: { value: "Ещё" } });
+    expect((within(view).getByRole("button", { name: "Добавить миссию" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(within(view).getByRole("button", { name: "Удалить: Своя 0" }));
+    await waitFor(() => expect(view.querySelector('[data-own-full="true"]')).toBeNull());
+    expect(api.calls.some((call) => call.method === "DELETE" && call.url === "/goals/o0")).toBe(true);
+    expect((within(view).getByRole("button", { name: "Добавить миссию" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("activity: «Запустить таймер» is the main button and nothing starts by itself; pages say «Цель достигнута»", async () => {
+    server([WALK, READ]);
+    await renderApp();
+    const today = screen.getByRole("complementary", { name: "Сегодня" });
+    fireEvent.click(within(today).getByRole("button", { name: "Начать: Утренняя прогулка 20 мин" }));
+    const walk = screen.getByRole("dialog", { name: "Утренняя прогулка 20 мин" });
+    const start = within(walk).getByRole("button", { name: "Запустить таймер" });
+    expect(start.className).toContain("activity__start");
+    expect(start.className).not.toContain("lx-btn--secondary");
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(within(walk).getByText("20:00")).toBeTruthy();
+    fireEvent.click(within(walk).getByRole("button", { name: "Не сейчас" }));
+    fireEvent.click(within(today).getByRole("button", { name: "Начать: Прочитать 10 страниц" }));
+    const read = screen.getByRole("dialog", { name: "Прочитать 10 страниц" });
+    for (let i = 0; i < 9; i += 1) fireEvent.click(within(read).getByRole("button", { name: "Плюс страница" }));
+    expect(within(read).queryByText("Цель достигнута")).toBeNull();
+    fireEvent.click(within(read).getByRole("button", { name: "Плюс страница" }));
+    expect(within(read).getByText("Цель достигнута")).toBeTruthy();
+    fireEvent.click(within(read).getByRole("button", { name: "Плюс страница" }));
+    expect(read.textContent).toContain("11 / 10");
+    expect(within(read).getByText("Цель достигнута")).toBeTruthy();
+  });
+
+  it("locked Мастерская: 50 XP a day pace, and a caption for the disabled «Войти»; Proof explains itself", async () => {
+    server([WALK], { level: 2 });
+    const view = await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Proof" }));
+    expect(screen.getByText("Proof — фото того, что сделано своими руками. Оно попадёт в галерею.")).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
+    view.unmount();
+    server([WALK]);
+    const fresh = await renderApp();
+    fireEvent.click(fresh.container.querySelector('.map-node[data-node="workshop"]')!);
+    const sheet = await screen.findByRole("dialog", { name: "Мастерская" });
+    // A fresh player needs 100 XP: at most 50 a day, so honestly 2–3 days (1–2 once 50 XP are in).
+    expect(within(sheet).getByText("За день можно получить до 50 XP, поэтому обычно это 2–3 дня.")).toBeTruthy();
+    expect(within(sheet).getByText("Войти можно с уровня 2")).toBeTruthy();
+  });
+
+  it("Ресурсы and Профиль have clear empty states", async () => {
+    server([WALK]);
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Ресурсы" }));
+    expect(document.querySelector('[data-empty="resources"]')?.textContent).toMatch(/в каких сферах жизни копится XP/);
+    fireEvent.click(screen.getByRole("button", { name: "Профиль" }));
+    expect(document.querySelector('[data-empty="gallery"]')?.textContent).toMatch(/Галерея пока пуста.*уровне 2/s);
   });
 });

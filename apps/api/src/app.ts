@@ -35,6 +35,9 @@ import {
   InvalidPlayerUpdate,
   listArtifacts,
   listGoals,
+  deleteGoal,
+  GoalLimitReached,
+  GoalNotOpen,
   PlaceLocked,
   saveReflection,
   setAvatarConfig,
@@ -152,6 +155,18 @@ export function buildApp(opts: {
       return reply.code(created ? 201 : 200).send(goal);
     } catch (err) {
       if (err instanceof InvalidGoalUpdate || err instanceof PlaceLocked) return reply.code(400).send({ error: err.message });
+      if (err instanceof GoalLimitReached) return reply.code(409).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  // Open missions only; a done one stays in the record (409). XP never changes here.
+  app.delete<{ Params: { id: string } }>("/goals/:id", async (req, reply) => {
+    try {
+      if (!deleteGoal(req.params.id)) return reply.code(404).send({ error: "goal not found" });
+      return reply.code(204).send();
+    } catch (err) {
+      if (err instanceof GoalNotOpen) return reply.code(409).send({ error: err.message });
       throw err;
     }
   });

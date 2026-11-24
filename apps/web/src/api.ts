@@ -117,6 +117,7 @@ const KNOWN: Record<string, string> = {
   "candidate not found": "Этот вариант уже недоступен",
   "could not save avatar": "Не удалось сохранить персонажа. Попробуйте ещё раз",
   "nickname must be 1-32 characters": "Ник: от 1 до 32 символов",
+  "only an open mission can be deleted": "Выполненную миссию удалить нельзя: она уже в истории",
 };
 
 export const NO_CONNECTION = "Нет связи с API. В другом терминале: npm run dev:api";
@@ -137,6 +138,11 @@ export function createGoal(title: string, sphere = "creativity"): Promise<Goal> 
 /** «Повторить завтра» (forTomorrow) or a plan chip for today: a copy of a goal. */
 export function repeatGoal(goalId: string, forTomorrow: boolean): Promise<Goal> {
   return sendJson<Goal>("/goals", { repeatOf: goalId, forTomorrow });
+}
+
+/** Remove an open mission (also the «Отменить» after «Повторить завтра»). XP does not change. */
+export async function deleteGoal(goalId: string): Promise<void> {
+  await request<null>(`/goals/${goalId}`, { method: "DELETE" });
 }
 
 /** Plan chip for a template that has no goal yet (a seed). */

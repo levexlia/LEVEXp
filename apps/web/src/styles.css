@@ -3,7 +3,10 @@
 
 :root {
   color-scheme: dark;
-  font-family: var(--lx-font-display);
+  /* Running text in a plain sans with clear Cyrillic: in Tektur lowercase «с» reads as «о» and «д» as «g»
+     (playtest 24.11). Tektur stays for headings, buttons, chips and other uppercase labels. */
+  --lx-font-text: "Noto Sans", "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
+  font-family: var(--lx-font-text);
   background: var(--lx-bg);
   color: var(--lx-text);
 }
@@ -12,7 +15,8 @@
 
 body { margin: 0; min-height: 100vh; background: var(--lx-bg); }
 
-button, input { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3, .brand, .lvl, .xp-line, .quiet, .ps-title, .ps-meta, .ps-label, .field-label, .dock-btn { font-family: var(--lx-font-display); }
 button { cursor: pointer; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
@@ -21,7 +25,8 @@ button { cursor: pointer; }
   max-width: 480px;
   margin: 0 auto;
   min-height: 100vh;
-  padding: 0.5rem 0.8rem 6rem;
+  /* Clear of the fixed tab bar (80px + safe area) so the last button on a page stays tappable. */
+  padding: 0.5rem 0.8rem calc(80px + env(safe-area-inset-bottom) + 2rem);
   background: var(--lx-grad-sky);
 }
 
@@ -503,6 +508,7 @@ button { cursor: pointer; }
 .new-mission h3 { margin: 0; }
 .lx-field { display: grid; gap: 4px; }
 .lx-field > span, .field-label { margin: 0; font: 600 10px var(--lx-font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--lx-text-2); }
+.lx-field input, .lx-field select, .lx-field textarea { font-family: var(--lx-font-text) !important; }
 .lx-field input, .lx-field select {
   width: 100%;
   height: 42px;
@@ -610,3 +616,19 @@ button { cursor: pointer; }
 }
 .lx-field textarea:focus { outline: none; border-color: var(--lx-cyan); box-shadow: inset 0 0 0 1px var(--lx-cyan); }
 .proof-locked { margin: 0 0 0.8rem; color: var(--lx-text-2); }
+
+/* ---------- playtest 24.11 fixes */
+/* «Сегодня» is narrow (300px beside the map): text on top, buttons on their own row under it. */
+.stage-side .mission { grid-template-columns: 24px minmax(0, 1fr); row-gap: 0.4rem; }
+.stage-side .mission__act { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.mission__del { justify-self: start; padding: 0; font-size: 0.7rem; color: var(--lx-text-muted); }
+.mission__del:hover, .mission__del:focus-visible { color: var(--lx-violet); }
+.activity__start { min-width: 220px; height: 48px; }
+.activity__goal { margin: 0; font: 700 12px var(--lx-font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--lx-cyan-soft); }
+.after__ok { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
+.after__ok p { margin: 0; }
+.ps-pace { margin: 8px 0 0; font-size: 12.5px; color: #c7d0f5; }
+.ps-why { margin: 8px 0 0; text-align: right; font: 500 11px var(--lx-font-mono); color: var(--lx-text-muted); }
+.proof-what { margin: 0 0 0.6rem; font-size: 0.85rem; color: var(--lx-text-2); }
+.empty-state { display: grid; gap: 0.3rem; padding: 0.8rem 0.9rem; border: 1px dashed #2c3770; }
+.empty-state p { margin: 0; }

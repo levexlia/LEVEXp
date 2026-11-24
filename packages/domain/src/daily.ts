@@ -24,6 +24,29 @@ export const SEED_TEMPLATES: ReadonlyArray<{ id: SeedTemplateId; title: string; 
 /** Prefix of a template made from the player's own mission by «Повторить завтра» (R-XP-9). */
 export const OWN_TEMPLATE_PREFIX = "own:";
 
+/** At most this many open own missions (no template) at once; keeps the list usable (playtest 24.11). */
+export const ACTIVE_OWN_MISSIONS_MAX = 20;
+
+/** Calm text when the active own-mission limit is reached. */
+export function activeOwnLimitMessage(max = ACTIVE_OWN_MISSIONS_MAX): string {
+  return `Активных своих миссий уже ${max}. Закрой или удали одну, чтобы добавить новую.`;
+}
+
+/** Open own missions (no template), the ones {@link ACTIVE_OWN_MISSIONS_MAX} counts. */
+export function activeOwnCount(goals: ReadonlyArray<Pick<DailyGoal, "status" | "templateId" | "repeatOf" | "title" | "sphere">>): number {
+  return goals.filter((goal) => goal.status === "open" && templateKeyOf(goal) === null).length;
+}
+
+/**
+ * Would completing `goal` now give XP? Same rules as {@link awardDecision}; for the «+10 XP» /
+ * «без XP сегодня» label on open missions. Done goals: null.
+ */
+export function noXpTodayReason(goal: DailyGoal, ledger: DailyLedger): NoXpReason | null {
+  if (goal.status === "done") return null;
+  const decision = awardDecision(goal, ledger);
+  return decision.award ? null : decision.reason;
+}
+
 export type NoXpReason = "daily_cap" | "own_cap" | "template_already_awarded";
 
 const dayFormat = new Intl.DateTimeFormat("en-CA", {

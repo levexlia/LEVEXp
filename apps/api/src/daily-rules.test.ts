@@ -223,6 +223,51 @@ describe("daily XP rules", () => {
   });
 });
 
+describe("active own missions limit and delete (playtest 24.11)", () => {
+  beforeEach(() => {
+    setClockForTests(() => new Date("2026-11-24T08:00:00.000Z"));
+    openStore(null);
+    resetStore(true);
+  });
+  afterEach(() => setClockForTests(null));
+
+  it("allows 20 open own missions, refuses the 21st with a calm 409; repeats and seeds are not counted", async () => {
+    const ids: string[] = [];
+    for (let i = 1; i <= 20; i += 1) ids.push(await make({ title: `Своя ${i}`, sphere: "career" }));
+    const extra = await post("/goals", { title: "Ещё одна", sphere: "career" });
+    expect(extra.statusCode).toBe(409);
+    expect(extra.json().error).toBe("Активных своих миссий уже 20. Закрой или удали одну, чтобы добавить новую.");
+    // A template copy is still fine.
+    await complete(seedId("seed-walk"));
+    expect((await post("/goals", { repeatOf: seedId("seed-walk"), forTomorrow: true })).statusCode).toBe(201);
+    // Closing one frees a place.
+    await complete(ids[0]!);
+    expect((await post("/goals", { title: "Ещё одна", sphere: "career" })).statusCode).toBe(201);
+  });
+
+  it("DELETE removes an open mission only (no XP change); a done one is kept (409); unknown 404", async () => {
+    const id = await make({ title: "Лишняя", sphere: "career" });
+    const del = await app().inject({ method: "DELETE", url: `/goals/${id}` });
+    expect(del.statusCode).toBe(204);
+    expect(listGoals().some((goal) => goal.id === id)).toBe(false);
+    const walk = seedId("seed-walk");
+    await complete(walk);
+    expect((await app().inject({ method: "DELETE", url: `/goals/${walk}` })).statusCode).toBe(409);
+    expect((await app().inject({ method: "DELETE", url: "/goals/nope" })).statusCode).toBe(404);
+    expect(await xp()).toBe(10);
+  });
+
+  it("«Отменить» after «Повторить завтра»: deleting the copy lets the same repeat be made again", async () => {
+    const walk = seedId("seed-walk");
+    await complete(walk);
+    const copy = (await post("/goals", { repeatOf: walk, forTomorrow: true })).json();
+    expect((await app().inject({ method: "DELETE", url: `/goals/${copy.id}` })).statusCode).toBe(204);
+    const again = await post("/goals", { repeatOf: walk, forTomorrow: true });
+    expect(again.statusCode).toBe(201);
+    expect(again.json().id).not.toBe(copy.id);
+  });
+});
+
 describe("micro-reflection (spec №3)", () => {
   beforeEach(() => {
     setClockForTests(() => new Date("2026-11-24T08:00:00.000Z"));

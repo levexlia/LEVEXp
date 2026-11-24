@@ -2,6 +2,9 @@ import {
   MAP_NODES,
   REFLECTION_LABEL,
   SEED_TEMPLATES,
+  dailyLedger,
+  noXpTodayReason,
+  type DailyLedger,
   lockedPlaceFor,
   playerDay,
   playerDayOf,
@@ -34,6 +37,8 @@ export interface MissionRow {
   from: string | null;
   /** «Легко · note» after a saved micro-reflection. */
   reflection: string | null;
+  /** Open, but completing it today would give no XP (daily cap, own cap, same template): «без XP сегодня». */
+  noXpToday: boolean;
 }
 
 export const MISSION_STATUS = { open: "Доступна", done: "Выполнена" } as const;
@@ -54,7 +59,7 @@ export function availableOn(goal: Goal, today: string): boolean {
   return !goal.availableFrom || goal.availableFrom <= today;
 }
 
-export function missionRow(goal: Goal, today = playerDay(new Date())): MissionRow {
+export function missionRow(goal: Goal, today = playerDay(new Date()), ledger?: DailyLedger): MissionRow {
   const place = placeForSphere(goal.sphere);
   return {
     id: goal.id,
@@ -72,11 +77,16 @@ export function missionRow(goal: Goal, today = playerDay(new Date())): MissionRo
     reflection: goal.reflection
       ? `${REFLECTION_LABEL[goal.reflection.felt]}${goal.reflection.note ? ` · ${goal.reflection.note}` : ""}`
       : null,
+    // A copy for a later day is judged on its own day, not today.
+    noXpToday: ledger && !(goal.availableFrom && !availableOn(goal, today)) ? noXpTodayReason(goal, ledger) !== null : false,
   };
 }
 
 export interface MissionBoard {
+  /** Open missions for today. */
   open: MissionRow[];
+  /** Open copies waiting for a later day («Повторить завтра»): the «Завтра» group. */
+  later: MissionRow[];
   done: MissionRow[];
   /** Counts over all goals, ignoring the place filter. */
   total: { open: number; done: number };
@@ -85,11 +95,14 @@ export interface MissionBoard {
 /** Open missions first (in API order), then done ones, newest first. `place` filters by map place. */
 export function missionBoard(goals: readonly Goal[], place: MapNodeId | null = null, now = new Date()): MissionBoard {
   const today = playerDay(now);
-  const rows = goals.map((goal) => missionRow(goal, today));
+  // Same rules as the server (domain daily.ts), so «+10 XP» is not promised when it would be 0.
+  const ledger = dailyLedger(goals, now);
+  const rows = goals.map((goal) => missionRow(goal, today, ledger));
   const shown = place ? rows.filter((row) => row.place === place) : rows;
   const completedAt = new Map(goals.map((goal) => [goal.id, goal.completedAt ?? ""]));
   return {
-    open: shown.filter((row) => !row.done),
+    open: shown.filter((row) => !row.done && row.from === null),
+    later: shown.filter((row) => !row.done && row.from !== null),
     done: shown
       .filter((row) => row.done)
       .sort((a, b) => (completedAt.get(b.id) ?? "").localeCompare(completedAt.get(a.id) ?? "")),
@@ -108,9 +121,8 @@ export function todayBoard(
 ): { open: MissionRow[]; openTotal: number; doneToday: number; later: MissionRow[] } {
   const today = playerDay(now);
   const board = missionBoard(goals, null, now);
-  const open = board.open.filter((row) => row.from === null);
   const doneToday = goals.filter((goal) => goal.status === "done" && playerDayOf(goal.completedAt) === today).length;
-  return { open: open.slice(0, limit), openTotal: open.length, doneToday, later: board.open.filter((row) => row.from !== null) };
+  return { open: board.open.slice(0, limit), openTotal: board.open.length, doneToday, later: board.later };
 }
 
 /** A chip of the empty-day plan: «Можно снова: …». */

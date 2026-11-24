@@ -1,4 +1,4 @@
-import { MAP_NODES, dailyCapHint, type LifeSphereId, type MapNodeId, type MapNodeState } from "@levex/domain";
+import { ACTIVE_OWN_MISSIONS_MAX, MAP_NODES, activeOwnCount, activeOwnLimitMessage, dailyCapHint, type LifeSphereId, type MapNodeId, type MapNodeState } from "@levex/domain";
 import { useState, type FormEvent } from "react";
 import type { Goal, TodayAwards } from "./api";
 import { activityAid } from "./daily/activity";
@@ -20,6 +20,8 @@ export interface MissionActions {
   onStart?: (goal: Goal) => void;
   /** R-XP-8: the place of this row is locked, so Proof / «Выполнить» would be refused. */
   lockedText?: (row: MissionRow) => string | null;
+  /** «Удалить» an open mission (Missions tab only). */
+  onDelete?: (goal: Goal) => void;
 }
 
 /** One mission: place, title, status (доступна / выполнена) and its action. */
@@ -50,9 +52,14 @@ export function MissionItem({ row, goal, actions, reducedMotion }: { row: Missio
         </span>
         {row.reflection ? <span className="mission__refl">{row.reflection}</span> : null}
         {locked ? <span className="mission__refl">{locked}</span> : null}
+        {!row.done && actions.onDelete ? (
+          <button type="button" className="quiet mission__del" disabled={actions.busy} onClick={() => actions.onDelete!(goal)} aria-label={`Удалить: ${row.title}`}>
+            Удалить
+          </button>
+        ) : null}
       </div>
       <div className="mission__act">
-        <span className="mission__xp">{row.done ? (row.noXp ? "без XP · записано" : `+${row.xp} XP получено`) : `+${row.xp} XP`}</span>
+        <span className="mission__xp">{row.done ? (row.noXp ? "без XP · записано" : `+${row.xp} XP получено`) : row.noXpToday ? "без XP сегодня" : `+${row.xp} XP`}</span>
         {row.done ? null : locked ? (
           <button type="button" className="lx-btn lx-btn--sm" disabled aria-label={`${locked}: ${row.title}`}>
             <span className="lx-btn__in"><img src="/art/scene14/ui/ic_lock.svg" width={14} height={14} alt="" />Закрыто</span>
@@ -144,6 +151,13 @@ export function MissionsView({
         </p>
       )}
 
+      {board.later.length > 0 ? (
+        <>
+          <h3>Завтра</h3>
+          <List rows={board.later} goals={goals} actions={actions} reducedMotion={reducedMotion} />
+        </>
+      ) : null}
+
       {board.done.length > 0 ? (
         <>
           <h3>Выполнены</h3>
@@ -152,7 +166,7 @@ export function MissionsView({
         </>
       ) : null}
 
-      <NewMission key={place ?? "all"} states={states} place={place} busy={actions.busy} onCreate={onCreate} />
+      <NewMission key={place ?? "all"} states={states} place={place} busy={actions.busy} onCreate={onCreate} full={activeOwnCount(goals) >= ACTIVE_OWN_MISSIONS_MAX} />
     </section>
   );
 }
@@ -162,11 +176,14 @@ function NewMission({
   place,
   busy,
   onCreate,
+  full = false,
 }: {
   states: ReadonlyMap<MapNodeId, MapNodeState>;
   place: MapNodeId | null;
   busy: boolean;
   onCreate: (title: string, sphere: LifeSphereId) => Promise<boolean>;
+  /** {@link ACTIVE_OWN_MISSIONS_MAX} open own missions already: the server would refuse (409). */
+  full?: boolean;
 }) {
   const open = MAP_NODES.filter((node) => (states.get(node.id) ?? "locked") !== "locked");
   const preferred = open.find((node) => node.id === place) ?? open[0] ?? MAP_NODES[0]!;
@@ -176,7 +193,7 @@ function NewMission({
   async function submit(event: FormEvent) {
     event.preventDefault();
     const clean = title.trim();
-    if (!clean) return;
+    if (!clean || full) return;
     if (await onCreate(clean, chosen.sphere)) setTitle("");
   }
   return (
@@ -199,7 +216,8 @@ function NewMission({
           ))}
         </select>
       </label>
-      <button type="submit" className="lx-btn lx-btn--secondary lx-btn--wide" disabled={busy || title.trim().length === 0}>
+      {full ? <p className="field-hint" role="status" data-own-full="true">{activeOwnLimitMessage()}</p> : null}
+      <button type="submit" className="lx-btn lx-btn--secondary lx-btn--wide" disabled={busy || full || title.trim().length === 0}>
         <span className="lx-btn__in">Добавить миссию</span>
       </button>
     </form>

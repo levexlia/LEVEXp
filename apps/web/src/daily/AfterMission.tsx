@@ -21,16 +21,21 @@ export function AfterMission({
   info,
   busy,
   onRepeat,
+  onUndoRepeat,
   onReflect,
   onClose,
 }: {
   info: AfterMissionInfo;
   busy: boolean;
-  onRepeat: (goalId: string) => Promise<boolean>;
+  /** Returns the id of tomorrow's copy, or null when it failed. */
+  onRepeat: (goalId: string) => Promise<string | null>;
+  /** «Отменить»: removes tomorrow's copy again. */
+  onUndoRepeat: (copyId: string) => Promise<boolean>;
   onReflect: (goalId: string, felt: ReflectionFeeling, note: string) => Promise<boolean>;
   onClose: () => void;
 }) {
   const [repeat, setRepeat] = useState<"ask" | "yes" | "no">(info.canRepeat ? "ask" : "no");
+  const [copyId, setCopyId] = useState<string | null>(null);
   const [felt, setFelt] = useState<ReflectionFeeling | null>(null);
   const [note, setNote] = useState("");
 
@@ -63,7 +68,11 @@ export function AfterMission({
                   className="lx-btn lx-btn--sm"
                   disabled={busy}
                   onClick={async () => {
-                    if (await onRepeat(info.goal.id)) setRepeat("yes");
+                    const id = await onRepeat(info.goal.id);
+                    if (id) {
+                      setCopyId(id);
+                      setRepeat("yes");
+                    }
                   }}
                 >
                   <span className="lx-btn__in">Да, на завтра</span>
@@ -74,7 +83,22 @@ export function AfterMission({
               </div>
             </div>
           ) : repeat === "yes" ? (
-            <p className="after__block after__ok" role="status">Поставлено на завтра. Утром будет в «Сегодня».</p>
+            <div className="after__block after__ok">
+              <p role="status">Поставлено на завтра. Утром будет в «Сегодня».</p>
+              <button
+                type="button"
+                className="quiet"
+                disabled={busy || !copyId}
+                onClick={async () => {
+                  if (copyId && (await onUndoRepeat(copyId))) {
+                    setCopyId(null);
+                    setRepeat("ask");
+                  }
+                }}
+              >
+                Отменить
+              </button>
+            </div>
           ) : null}
 
           <form
