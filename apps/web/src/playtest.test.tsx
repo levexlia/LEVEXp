@@ -182,9 +182,11 @@ describe("playtest fixes", () => {
     expect(today.textContent).toContain("Выполнено сегодня: 1");
     expect(today.textContent).not.toContain("Миссий пока нет");
     fireEvent.click(within(today).getByRole("button", { name: "Выполнить: Прочитать 10 страниц" }));
-    // Spec №1: an empty day shows «Можно снова:» with the seed chips instead of only the form.
-    await waitFor(() => expect(today.querySelector('[data-empty="today"]')?.textContent).toMatch(/^На сегодня дел нет\. Можно снова:/));
-    expect(today.querySelectorAll("[data-plan]")).toHaveLength(2);
+    // Spec №1: an empty day shows a plan instead of only the form: «Можно снова:» first, max 3 buttons.
+    // Both seeds already gave XP today: new missions come first and fill the 3 buttons, so no «Можно снова» block.
+    await waitFor(() => expect(today.querySelector('[data-empty="today"]')?.textContent).toMatch(/^На сегодня дел нет\.Можно взять:/));
+    expect(today.querySelectorAll("[data-plan]")).toHaveLength(3);
+    expect(today.querySelector('[data-plan-block="repeat"]')).toBeNull();
   });
 
   it("Proof sheet: empty caption with a placeholder, Russian photo picker, closes on Esc and on the backdrop", async () => {

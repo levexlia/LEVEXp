@@ -188,11 +188,23 @@ button { cursor: pointer; }
   align-items: center;
   min-height: 46px;
   padding: 0.35rem 0.6rem 0.35rem 0.9rem;
-  border: 1px solid #1f2a5c;
-  background: rgba(10, 16, 48, 0.75);
+  /* Cut corners with a whole border: the outer layer is the border colour, ::before is the fill
+     1px inside with the same cut, so the diagonal edges get a line too (no clipped border). */
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  background: #1f2a5c;
   clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
   font-size: 13px;
   font-weight: 500;
+}
+.bars li::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  background: #0a1030;
+  clip-path: polygon(9.6px 0, 100% 0, 100% calc(100% - 9.6px), calc(100% - 9.6px) 100%, 0 100%, 0 9.6px);
 }
 .bars i { flex: 1; height: 8px; background: #131b44; transform: skewX(-20deg); overflow: hidden; }
 .bars b { display: block; height: 100%; background: var(--lx-grad-neon); }
@@ -656,3 +668,45 @@ button { cursor: pointer; }
 .activity .ps-actions .ps-later { width: auto; flex: none; letter-spacing: 0.12em; }
 .activity .ps-actions .ps-later > .lx-btn__in, .activity .ps-actions .ps-primary > .lx-btn__in { padding: 0 12px; }
 .activity .ps-actions .ps-primary { font-size: 14px; letter-spacing: 0.14em; }
+
+/* Placeless missions (Карьера, Финансы, Отношения) in the Миссии tab. */
+.placeless { display: grid; gap: 0.6rem; margin: 0.8rem 0; }
+.placeless h3 { margin: 0; }
+.placeless .missions-note { margin: 0; }
+.placeless__group { display: grid; gap: 0.4rem; }
+.placeless__name { display: flex; align-items: center; gap: 0.4rem; margin: 0.3rem 0 0; font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lx-text-2); }
+.placeless__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.placeless__add {
+  width: 100%; min-height: 48px; display: grid; gap: 2px; justify-items: start; text-align: left;
+  padding: 0.45rem 0.8rem; border: 1px solid #2c3770; background: rgba(10, 16, 48, 0.75); color: var(--lx-text);
+  font: 500 14px var(--lx-font-text); cursor: pointer;
+}
+.placeless__add:hover:not(:disabled), .placeless__add:focus-visible { border-color: var(--lx-cyan); }
+.placeless__add:disabled { opacity: 0.55; cursor: default; }
+.placeless__meta { font-size: 12px; color: var(--lx-text-muted); }
+/* Steps on the activity screen (placeless templates). */
+.activity__aid--steps { justify-items: stretch; }
+.activity__steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.4rem; }
+.activity__steps label { display: flex; align-items: center; gap: 0.6rem; min-height: 44px; padding: 0.3rem 0.6rem; border: 1px solid #2c3770; background: rgba(10, 16, 48, 0.6); cursor: pointer; font-size: 15px; }
+.activity__steps input { width: 20px; height: 20px; flex: none; accent-color: var(--lx-cyan); }
+.activity__steps input:checked + span { color: var(--lx-text-2); text-decoration: line-through; }
+.activity__aid--steps .activity__goal { justify-self: center; }
+
+/* Empty-day plan: «Можно снова:» / «Можно взять:» blocks. */
+.today-plan__block { display: grid; gap: 0.35rem; }
+.today-plan__label { margin: 0; font-size: 13px; color: var(--lx-text-2); }
+.plan-chip { max-width: 100%; }
+.plan-chip .lx-chip__in { white-space: normal; text-align: left; }
+
+/* Desktop (playtest 1280×800): the three placeless spheres side by side instead of 800px-wide rows. */
+.placeless__groups { display: grid; gap: 0.6rem; }
+@media (min-width: 900px) {
+  .placeless__groups { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+  .placeless__add { min-height: 56px; }
+}
+/* After-mission sheet: «Пропустить» / «Сохранить» stay on one line with some air (as on the activity sheet). */
+.after .ps-actions { gap: 8px; }
+.after .ps-actions .lx-btn { white-space: nowrap; min-width: 0; }
+.after .ps-actions .ps-later { width: auto; flex: none; letter-spacing: 0.12em; }
+.after .ps-actions .ps-later > .lx-btn__in { padding: 0 14px; }
+.plan-chip__noxp { font-size: 0.85em; opacity: 0.75; text-transform: none; letter-spacing: 0.02em; }

@@ -3,12 +3,18 @@
  * «… 20 мин» → an optional countdown, «… 10 страниц» → a page counter, anything else → a stopwatch.
  * None of them is required to mark the mission: self-report stays as decided (C / R-XP-2).
  */
+import { sphereTemplate } from "@levex/domain";
+
 export type ActivityAid =
   | { kind: "timer"; minutes: number }
   | { kind: "pages"; pages: number }
+  | { kind: "steps"; steps: readonly string[] }
   | { kind: "stopwatch" };
 
-export function activityAid(title: string): ActivityAid {
+/** A placeless sphere template brings its own aid (a timer or steps); otherwise it is read from the title. */
+export function activityAid(title: string, templateId?: string): ActivityAid {
+  const template = sphereTemplate(templateId);
+  if (template) return template.aid;
   const minutes = /(\d{1,3})\s*(?:мин|min)/iu.exec(title);
   if (minutes) {
     const value = Number(minutes[1]);

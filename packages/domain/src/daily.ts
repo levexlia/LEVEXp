@@ -21,6 +21,70 @@ export const SEED_TEMPLATES: ReadonlyArray<{ id: SeedTemplateId; title: string; 
   { id: "seed-read", title: "Прочитать 10 страниц", sphere: "mind" },
 ];
 
+/**
+ * Activity screen help of a built-in template («Начать»): an optional countdown or a short list
+ * of steps. Steps live only on the screen; nothing the player ticks or types there is stored.
+ */
+export type TemplateAid = { kind: "timer"; minutes: number } | { kind: "steps"; steps: readonly string[] };
+
+/** Spheres with no place on the map yet: their missions live in the Миссии tab («Без места»). */
+export const PLACELESS_SPHERES = ["career", "finance", "relationships"] as const satisfies readonly LifeSphereId[];
+export type PlacelessSphere = (typeof PLACELESS_SPHERES)[number];
+
+export interface SphereTemplate {
+  id: string;
+  title: string;
+  sphere: PlacelessSphere;
+  /** About how long it takes, minutes (5–25). */
+  minutes: number;
+  aid: TemplateAid;
+}
+
+/**
+ * Placeless missions (package «sphere missions», 24.11.2026): 3 small realistic templates per
+ * sphere, open from level 1, +10 XP under the same R-XP-5…10 rules as the seeds (a template
+ * gives XP once a day, the day cap counts them, the own-mission cap does not).
+ * Finance missions never ask for or store amounts: only the done mark and an optional note.
+ */
+export const SPHERE_TEMPLATES: readonly SphereTemplate[] = [
+  { id: "career-focus", title: "25 минут над важной задачей", sphere: "career", minutes: 25, aid: { kind: "timer", minutes: 25 } },
+  {
+    id: "career-plan", title: "Записать 3 дела на завтра", sphere: "career", minutes: 5,
+    aid: { kind: "steps", steps: ["Открыть блокнот или заметки", "Записать три дела на завтра", "Отметить самое важное"] },
+  },
+  { id: "career-learn", title: "Узнать одну новую вещь по работе или учёбе", sphere: "career", minutes: 15, aid: { kind: "timer", minutes: 15 } },
+  {
+    id: "finance-spend", title: "Записать траты за день", sphere: "finance", minutes: 5,
+    aid: { kind: "steps", steps: ["Открыть свой блокнот или приложение банка", "Записать сегодняшние траты там, где удобно", "Посмотреть, что из этого было нужно"] },
+  },
+  {
+    id: "finance-sub", title: "Проверить одну подписку", sphere: "finance", minutes: 10,
+    aid: { kind: "steps", steps: ["Выбрать одну подписку", "Вспомнить, когда ею пользовались в последний раз", "Решить: оставить, поставить на паузу или отменить"] },
+  },
+  {
+    id: "finance-save", title: "Отложить небольшую сумму", sphere: "finance", minutes: 5,
+    aid: { kind: "steps", steps: ["Выбрать посильную сумму, можно совсем маленькую", "Отложить её в копилку или на накопительный счёт"] },
+  },
+  {
+    id: "rel-write", title: "Написать близкому человеку", sphere: "relationships", minutes: 5,
+    aid: { kind: "steps", steps: ["Выбрать человека", "Написать пару тёплых строк", "Отправить"] },
+  },
+  { id: "rel-call", title: "Позвонить родным или другу", sphere: "relationships", minutes: 10, aid: { kind: "timer", minutes: 10 } },
+  {
+    id: "rel-thanks", title: "Поблагодарить кого-то", sphere: "relationships", minutes: 5,
+    aid: { kind: "steps", steps: ["Вспомнить, кто недавно помог", "Сказать или написать «спасибо» и за что именно"] },
+  },
+];
+
+export function sphereTemplate(id: string | undefined): SphereTemplate | undefined {
+  return id ? SPHERE_TEMPLATES.find((template) => template.id === id) : undefined;
+}
+
+/** Seeds and placeless templates: the ids POST /goals accepts as `templateId` besides `own:<id>`. */
+export function builtInTemplate(id: string): { id: string; title: string; sphere: LifeSphereId } | undefined {
+  return SEED_TEMPLATES.find((template) => template.id === id) ?? sphereTemplate(id);
+}
+
 /** Prefix of a template made from the player's own mission by «Повторить завтра» (R-XP-9). */
 export const OWN_TEMPLATE_PREFIX = "own:";
 

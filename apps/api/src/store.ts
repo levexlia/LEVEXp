@@ -8,7 +8,7 @@ import {
   awardDecision,
   dailyLedger,
   getLifeSphere,
-  isSeedTemplateId,
+  builtInTemplate,
   lockedPlaceFor,
   noXpMessage,
   placeLockedMessage,
@@ -437,7 +437,7 @@ export function selectAvatar(candidateId: string): PlayerView {
 export interface GoalInput {
   title?: string;
   sphere?: LifeSphereId;
-  /** `seed-walk`, `seed-read` or an `own:<goal id>` template that already exists. */
+  /** A seed, a placeless sphere template (SPHERE_TEMPLATES) or an `own:<goal id>` template that already exists. */
   templateId?: string;
   /** «Повторить завтра» / plan chip: copy this goal (title, sphere, template). */
   repeatOf?: string;
@@ -501,7 +501,8 @@ export function createGoal(input: GoalInput, withFlag?: true): Goal | { goal: Go
 
 /** Title and sphere behind a template id the client may send. */
 function templateSource(id: string): { title: string; sphere?: LifeSphereId } | undefined {
-  if (isSeedTemplateId(id)) return SEED_TEMPLATES.find((template) => template.id === id);
+  const builtIn = builtInTemplate(id);
+  if (builtIn) return builtIn;
   if (!id.startsWith(OWN_TEMPLATE_PREFIX)) return undefined;
   const origin = goals.get(id.slice(OWN_TEMPLATE_PREFIX.length));
   if (!origin || templateKeyOf(origin) !== null) return undefined;

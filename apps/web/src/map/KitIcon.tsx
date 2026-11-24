@@ -20,9 +20,13 @@ const ICONS = {
 
 export type KitIconName = keyof typeof ICONS;
 
+export function kitIconUrl(name: KitIconName): string {
+  return `/map/${ICONS[name]}.svg`;
+}
+
 export function KitIcon({ name, size = 22 }: { name: KitIconName; size?: number }) {
   return (
-    <img className="kit-icon" src={`/map/${ICONS[name]}.svg`} width={size} height={size} alt="" />
+    <img className="kit-icon" src={kitIconUrl(name)} width={size} height={size} alt="" />
   );
 }
 

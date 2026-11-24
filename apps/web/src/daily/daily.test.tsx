@@ -2,12 +2,14 @@
 /** Usefulness v1 (spec 24.11.2026): «Повторить завтра» + empty-day plan, «Начать», micro-reflection, limit texts. */
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_AVATAR_CONFIG, noXpMessage } from "@levex/domain";
+import { DEFAULT_AVATAR_CONFIG, SEED_TEMPLATES as SEED_TEMPLATES_FOR_TEST, SPHERE_TEMPLATES, builtInTemplate, noXpMessage } from "@levex/domain";
 import { App } from "../App";
 import type { Goal } from "../api";
-import { planChips, todayBoard } from "../map/missions";
+import { placelessBoard, planChips, todayBoard } from "../map/missions";
 import { sphereHint, sphereRows } from "../map/resources";
 import { activityAid, clock } from "./activity";
+import { notePlaceholder } from "./AfterMission";
+import { planBlocks } from "../Missions";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -47,8 +49,8 @@ function server(initial: Goal[], options: { level?: number; awarded?: number; ca
       const source = goals.find((goal) => goal.id === body.repeatOf);
       const goal: Goal = {
         id: `n${calls.length}`,
-        title: source?.title ?? body.title ?? (body.templateId === "seed-walk" ? "Утренняя прогулка 20 мин" : "Прочитать 10 страниц"),
-        sphere: source?.sphere ?? body.sphere ?? "health",
+        title: source?.title ?? body.title ?? builtInTemplate(body.templateId)?.title ?? "Прочитать 10 страниц",
+        sphere: source?.sphere ?? body.sphere ?? builtInTemplate(body.templateId)?.sphere ?? "health",
         xpReward: 10,
         status: "open",
         templateId: body.templateId ?? source?.templateId,
@@ -109,12 +111,14 @@ describe("empty-day plan and «Сегодня» day (spec №1, R-XP-5)", () => 
     const own: Goal = { id: "c1", title: "Зарядка", sphere: "health", xpReward: 10, status: "done", templateId: "own:o1", completedAt: "2026-11-23T09:00:00.000Z" };
     const art: Goal = { id: "a1", title: "Скетч", sphere: "creativity", xpReward: 10, status: "done", templateId: "own:a0" };
     const chips = planChips([done(WALK), done(READ), own, art], 1);
-    expect(chips.map((chip) => chip.title)).toEqual(["Утренняя прогулка 20 мин", "Прочитать 10 страниц", "Зарядка"]);
-    expect(chips[0]).toMatchObject({ repeatOf: "g1" });
+    // Only done-before templates, newest first; max 3; the locked Мастерская copy is skipped.
+    expect(chips.map((chip) => chip.title)).toEqual(["Зарядка", "Утренняя прогулка 20 мин", "Прочитать 10 страниц"]);
+    expect(chips.every((chip) => chip.kind === "repeat")).toBe(true);
+    expect(chips[1]).toMatchObject({ repeatOf: "g1" });
     // A fresh player without seed goals gets the seed template ids.
-    expect(planChips([], 1).map((chip) => chip.templateId)).toEqual(["seed-walk", "seed-read"]);
+    expect(planChips([], 1).map((chip) => [chip.kind, chip.templateId])).toEqual([["new", "seed-walk"], ["new", "seed-read"], ["new", "career-focus"]]);
     // An open seed is not offered again.
-    expect(planChips([WALK, done(READ)], 1).map((chip) => chip.key)).toEqual(["seed-read"]);
+    expect(planChips([WALK, done(READ)], 1).map((chip) => chip.key)).toEqual(["seed-read", "career-focus", "finance-spend"]);
   });
 
   it("counts «Выполнено сегодня» by the Israeli day and keeps tomorrow's copies out of today", () => {
@@ -193,7 +197,11 @@ describe("App: usefulness v1", () => {
     const api = server([{ ...WALK, status: "done", completedAt: "2026-11-20T08:00:00.000Z" }]);
     await renderApp();
     const today = screen.getByRole("complementary", { name: "Сегодня" });
-    expect(today.textContent).toContain("На сегодня дел нет. Можно снова:");
+    expect(today.textContent).toContain("На сегодня дел нет.");
+    expect(today.querySelector('[data-plan-block="repeat"]')?.textContent).toBe("Можно снова:+ Утренняя прогулка 20 мин");
+    expect(today.querySelector('[data-plan-block="new"]')?.textContent).toContain("Можно взять:");
+    expect(today.textContent).toContain("Отдых тоже нормален.");
+    expect(within(today).getByRole("button", { name: "Все миссии" })).toBeTruthy();
     expect(within(today).getByRole("button", { name: "+ Прочитать 10 страниц" })).toBeTruthy();
     fireEvent.click(within(today).getByRole("button", { name: "+ Утренняя прогулка 20 мин" }));
     await waitFor(() => expect(within(today).getByRole("button", { name: "Выполнить: Утренняя прогулка 20 мин" })).toBeTruthy());
@@ -376,7 +384,7 @@ describe("App: usefulness v1", () => {
     expect(health.querySelector(".bars__hint")).toBeNull();
     const park = document.querySelector('[data-sphere="spirit"]')!;
     expect(park.querySelector(".bars__hint")?.textContent).toBe("Растёт от миссий в месте «Парк»: тишина, прогулка без телефона. Место откроется на уровне 2.");
-    expect(document.querySelector('[data-sphere="finance"] .bars__hint')?.textContent).toBe("Миссий для этой сферы пока нет: они появятся в новых местах.");
+    expect(document.querySelector('[data-sphere="finance"] .bars__hint')?.textContent).toBe("Растёт от миссий без места на карте, например «Записать траты за день». Добавить можно во вкладке «Миссии».");
   });
 
   it("sphereRows: domain order, 0 for missing, the lock note disappears once the place is open", () => {
@@ -395,5 +403,144 @@ describe("App: usefulness v1", () => {
     expect(document.querySelector('[data-empty="resources"]')?.textContent).toMatch(/в каких сферах жизни копится XP/);
     fireEvent.click(screen.getByRole("button", { name: "Профиль" }));
     expect(document.querySelector('[data-empty="gallery"]')?.textContent).toMatch(/Галерея пока пуста.*уровне 2/s);
+  });
+});
+
+describe("placeless sphere missions (Карьера, Финансы, Отношения)", () => {
+  beforeEach(() => vi.useRealTimers());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("each template brings its own aid: a timer or steps", () => {
+    expect(activityAid("25 минут над важной задачей", "career-focus")).toEqual({ kind: "timer", minutes: 25 });
+    const steps = activityAid("Записать траты за день", "finance-spend");
+    expect(steps.kind).toBe("steps");
+    for (const t of SPHERE_TEMPLATES) expect(activityAid(t.title, t.id).kind).not.toBe("stopwatch");
+  });
+
+  it("placelessBoard: open today → «open», gave XP today → «awarded», otherwise «add»", () => {
+    const now = new Date("2026-11-24T08:00:00.000Z");
+    const goals: Goal[] = [
+      { id: "a", title: "Проверить одну подписку", sphere: "finance", xpReward: 10, status: "open", templateId: "finance-sub" },
+      { id: "b", title: "Поблагодарить кого-то", sphere: "relationships", xpReward: 10, status: "done", templateId: "rel-thanks", completedAt: "2026-11-24T07:00:00.000Z", xpGranted: 10 },
+    ];
+    const board = placelessBoard(goals, now);
+    expect(board.map((group) => group.name)).toEqual(["Карьера", "Финансы", "Отношения"]);
+    const state = (id: string) => board.flatMap((group) => group.rows).find((row) => row.template.id === id)!.state;
+    expect(state("finance-sub")).toBe("open");
+    expect(state("rel-thanks")).toBe("awarded");
+    expect(state("career-focus")).toBe("add");
+  });
+
+  it("Миссии tab at level 1: 9 placeless missions; adding one sends only the template id and shows its sphere", async () => {
+    const api = server([WALK, READ], { level: 1 });
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Миссии" }));
+    const view = screen.getByRole("region", { name: "Миссии" });
+    const block = within(view).getByRole("region", { name: "Без места на карте" });
+    expect(block.querySelectorAll("[data-template]")).toHaveLength(9);
+    fireEvent.click(within(block).getByRole("button", { name: "Добавить: Записать траты за день" }));
+    await waitFor(() => expect(within(block).getByRole("button", { name: "Записать траты за день: уже в списке" })).toBeTruthy());
+    const post = api.calls.find((call) => call.method === "POST" && call.url === "/goals")!;
+    expect(post.body).toEqual({ templateId: "finance-spend" });
+    const row = view.querySelector(`[data-mission="${api.goals.at(-1)!.id}"]`)!;
+    expect(row.textContent).toContain("Финансы");
+    expect(row.querySelector("img.mission__icon")?.getAttribute("src")).toBe("/map/sp_finance.svg");
+  });
+
+  it("«Начать» on a finance mission: steps, no amounts, and «Готово — отметить» closes it with +10 XP", async () => {
+    const spend: Goal = { id: "f1", title: "Записать траты за день", sphere: "finance", xpReward: 10, status: "open", templateId: "finance-spend" };
+    const api = server([spend]);
+    await renderApp();
+    const today = screen.getByRole("complementary", { name: "Сегодня" });
+    fireEvent.click(within(today).getByRole("button", { name: "Начать: Записать траты за день" }));
+    const sheet = screen.getByRole("dialog", { name: "Записать траты за день" });
+    expect(sheet.textContent).toContain("Занятие · Финансы");
+    expect(sheet.querySelector('[data-no-amounts="true"]')?.textContent).toBe("Суммы в игре не нужны и нигде не сохраняются.");
+    expect(sheet.querySelector("input[type=number]")).toBeNull();
+    const boxes = within(sheet).getAllByRole("checkbox");
+    expect(boxes).toHaveLength(3);
+    for (const box of boxes) fireEvent.click(box);
+    expect(within(sheet).getByText("Все шаги пройдены")).toBeTruthy();
+    fireEvent.click(within(sheet).getByRole("button", { name: "Готово — отметить" }));
+    await waitFor(() => expect(document.querySelector(".after")).toBeTruthy());
+    const complete = api.calls.find((call) => call.url === "/goals/f1/complete")!;
+    expect(complete.body ?? {}).toEqual({});
+    expect(api.goals[0]).toMatchObject({ status: "done", xpGranted: 10 });
+  });
+
+  it("plan: new missions come from the spheres with the least XP, one per sphere, max 3", () => {
+    const now = new Date("2026-11-24T08:00:00.000Z");
+    const chips = planChips([], 1, now, { health: 20, mind: 10, career: 30 });
+    expect(chips.map((chip) => chip.templateId)).toEqual(["finance-spend", "rel-write", "seed-read"]);
+    expect(chips.every((chip) => chip.kind === "new")).toBe(true);
+    // A bigger limit cycles the spheres again in the same order.
+    expect(planChips([], 1, now, { health: 20, mind: 10, career: 30 }, 6).map((chip) => chip.templateId))
+      .toEqual(["finance-spend", "rel-write", "seed-read", "seed-walk", "career-focus", "finance-sub"]);
+  });
+
+  it("plan: repeats that can still give XP first, then new ones, then repeats «без XP сегодня»; never more than 3", () => {
+    const now = new Date("2026-11-24T08:00:00.000Z");
+    const g = (id: string, templateId: string, title: string, sphere: string, completedAt: string): Goal =>
+      ({ id, title, sphere, xpReward: 10, status: "done", templateId, completedAt, xpGranted: 10 });
+    const todaySpend = g("t", "finance-spend", "Записать траты за день", "finance", "2026-11-24T07:00:00.000Z");
+    const oldCall = g("c", "rel-call", "Позвонить родным или другу", "relationships", "2026-11-20T07:00:00.000Z");
+    const chips = planChips([todaySpend, oldCall], 1, now, {});
+    // The rewarded repeat (finance-spend) goes after the new ones and is cut by the cap of 3.
+    expect(chips.map((chip) => [chip.kind, chip.key])).toEqual([["repeat", "rel-call"], ["new", "seed-walk"], ["new", "seed-read"]]);
+    // With room for it, it comes last and is marked.
+    const wide = planChips([todaySpend, oldCall], 1, now, {}, 20);
+    expect(wide.at(-1)).toMatchObject({ kind: "repeat", key: "finance-spend", noXpToday: true });
+    expect(wide.slice(1, -1).every((chip) => chip.kind === "new")).toBe(true);
+    expect(wide[0]!.noXpToday).toBeUndefined();
+    // Placeless repeats go by templateId (no copy of an old goal needed).
+    expect(chips[0]).toMatchObject({ templateId: "rel-call" });
+    expect(chips[0]!.repeatOf).toBeUndefined();
+    // Four repeats: only the first three are shown, and no «Можно взять» at all.
+    const four = ["career-focus", "career-plan", "rel-thanks", "finance-sub"].map((id, i) =>
+      g(`r${i}`, id, id, "career", `2026-11-2${i}T07:00:00.000Z`));
+    const top = planChips(four, 1, now, {});
+    expect(top).toHaveLength(3);
+    expect(top.every((chip) => chip.kind === "repeat")).toBe(true);
+    expect(top.map((chip) => chip.key)).toEqual(["finance-sub", "rel-thanks", "career-plan"]);
+  });
+
+  it("planBlocks keeps the order: «Можно снова» · «Можно взять» · «Можно снова» (без XP сегодня)", () => {
+    const chip = (key: string, kind: "repeat" | "new", noXpToday?: boolean) => ({ key, title: key, place: null, kind, ...(noXpToday ? { noXpToday } : {}) });
+    const blocks = planBlocks([chip("a", "repeat"), chip("b", "new"), chip("c", "repeat", true)]);
+    expect(blocks.map((block) => [block.kind, block.chips.map((c) => c.key)])).toEqual([["repeat", ["a"]], ["new", ["b"]], ["repeat", ["c"]]]);
+  });
+
+  it("plan: a repeat already rewarded today is shown after the new ones with «без XP сегодня»", async () => {
+    // Every new template is done on an earlier day except one, so the plan has room for the rewarded repeat.
+    const old = "2026-11-01T07:00:00.000Z";
+    const nowIso = new Date().toISOString();
+    const all = [...SEED_TEMPLATES_FOR_TEST, ...SPHERE_TEMPLATES];
+    const goals: Goal[] = all
+      .filter((t) => t.id !== "rel-thanks")
+      .map((t, i) => ({ id: `d${i}`, title: t.title, sphere: t.sphere, xpReward: 10, status: "open" as const, templateId: t.id }));
+    // Keep these open so they are not offered; the two below are done.
+    const rewardedToday: Goal = { id: "rt", title: "Записать траты за день", sphere: "finance", xpReward: 10, status: "done", templateId: "finance-spend", completedAt: nowIso, xpGranted: 10 };
+    const doneLongAgo: Goal = { id: "la", title: "Позвонить родным или другу", sphere: "relationships", xpReward: 10, status: "done", templateId: "rel-call", completedAt: old, xpGranted: 10 };
+    const plan = planChips([...goals.filter((g) => g.templateId !== "finance-spend" && g.templateId !== "rel-call"), rewardedToday, doneLongAgo], 1, new Date());
+    expect(plan.map((c) => [c.kind, c.key, c.noXpToday ?? false])).toEqual([
+      ["repeat", "rel-call", false], ["new", "rel-thanks", false], ["repeat", "finance-spend", true],
+    ]);
+  });
+
+  it("App: an empty day hides an empty block («Можно взять» only for a fresh plan)", async () => {
+    server([]);
+    await renderApp();
+    const today = screen.getByRole("complementary", { name: "Сегодня" });
+    expect(today.querySelector('[data-plan-block="repeat"]')).toBeNull();
+    expect(today.querySelectorAll('[data-plan-block="new"] [data-plan]')).toHaveLength(3);
+  });
+
+  it("finance note placeholder does not invite amounts; others stay neutral", () => {
+    expect(notePlaceholder("finance")).toBe("Что запомнилось? (без сумм)");
+    expect(notePlaceholder("career")).toBe("Что запомнилось?");
+    expect(notePlaceholder(undefined)).toBe("Что запомнилось?");
   });
 });
