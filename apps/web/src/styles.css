@@ -813,3 +813,25 @@ button { cursor: pointer; }
 .lx-day__mark { display: inline-flex; align-items: flex-end; }
 .lx-day__marks { flex-wrap: nowrap; overflow: hidden; }
 .lx-week__sum { margin-top: 2px; }
+
+/* cycle2 «Чистый Сегодня и честное Завтра» */
+/* P-C3: a copy for a later day shows its date instead of «Выполнить»; calm, not a button, not red. */
+.mission__from {
+  display: inline-flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 8px;
+  border: 1px dashed var(--lx-line-2, rgba(160, 175, 230, 0.35)); color: var(--lx-text-2);
+  font: 600 11px var(--lx-font-mono); white-space: nowrap; letter-spacing: 0.04em;
+}
+.ps-missions .ps-from { min-height: 28px; margin-left: auto; }
+/* P-C1: «Ещё N — во вкладке «Миссии»»: neutral, no warning colour. */
+.today-more, .ps-more { margin: 0.4rem 0 0; font: 500 11px var(--lx-font-mono); color: var(--lx-text-2); }
+.ps-more .quiet { padding: 0 0 0 4px; }
+/* P-C5: everything for today is recorded. */
+.today-done { margin: 0.2rem 0 0.4rem; }
+.today-done__line { margin: 0 0 0.4rem; color: var(--lx-text); font-weight: 600; line-height: 1.4; }
+.today-ideas { min-height: 44px; padding: 0.2rem 0; }
+.today-ideas::after { content: " ▾"; }
+.today-ideas[aria-expanded="true"]::after { content: " ▴"; }
+/* P-C2: folded «Выполнены» under the form. */
+.done-history { margin-top: 1.2rem; }
+.done-more { display: block; min-height: 44px; margin: 0.3rem 0 0; padding: 0.2rem 0; }
+.done-more__n { color: var(--lx-text-muted); font-size: 0.85em; }

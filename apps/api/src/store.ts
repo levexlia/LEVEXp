@@ -124,6 +124,16 @@ export class GoalNotDone extends Error {
   }
 }
 
+/** cycle2 P-C3: a «Повторить завтра» copy is not done before its day (Asia/Jerusalem). Nothing changes. */
+export class NotYetAvailable extends Error {
+  readonly availableFrom: string;
+  constructor(availableFrom: string) {
+    super(`Эта миссия на ${availableFrom.slice(8, 10)}.${availableFrom.slice(5, 7)}`);
+    this.name = "NotYetAvailable";
+    this.availableFrom = availableFrom;
+  }
+}
+
 export class UndoPastDay extends Error {
   constructor() {
     super("only today's record can be undone");
@@ -612,6 +622,8 @@ export function completeGoal(id: string, artifactId?: string): CompleteResult | 
   if (!goal) return undefined;
   const first = goal.status !== "done";
   if (first) {
+    // cycle2 P-C3: tomorrow's copy waits for its own day; XP, completedAt and the daily caps stay untouched.
+    if (goal.availableFrom && goal.availableFrom > playerDay(clock())) throw new NotYetAvailable(goal.availableFrom);
     // R-XP-8: an open goal in a locked place is neither closed nor paid. Old done goals stay as they are.
     const locked = lockedPlaceFor(goal.sphere, placeLevel(player.progression.totalXp));
     if (locked) throw new PlaceLocked(placeLockedMessage(locked));

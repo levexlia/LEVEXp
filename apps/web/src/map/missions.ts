@@ -17,6 +17,7 @@ import {
   playerDay,
   playerDayOf,
   playerDdMm,
+  shiftDay,
   templateKeyOf,
   type MapNodeId,
   type MapNodeState,
@@ -54,7 +55,7 @@ export interface MissionRow {
   noXpToday: boolean;
 }
 
-export const MISSION_STATUS = { open: "Доступна", done: "Выполнена" } as const;
+export const MISSION_STATUS = { open: "Доступна", done: "Выполнена", later: "Запланирована" } as const;
 
 export function placeForSphere(sphere: string | undefined): MapNodeId | null {
   return MAP_NODES.find((node) => node.sphere === sphere)?.id ?? null;
@@ -103,6 +104,8 @@ export interface MissionBoard {
   /** Open copies waiting for a later day («Повторить завтра»): the «Завтра» group. */
   later: MissionRow[];
   done: MissionRow[];
+  /** How many of `done` (newest first) were finished today or yesterday: the folded «Выполнены» (cycle2 P-C2). */
+  doneRecent: number;
   /** Counts over all goals, ignoring the place filter. */
   total: { open: number; done: number };
 }
@@ -125,19 +128,48 @@ export function missionBoard(goals: readonly Goal[], place: MissionFilter = null
   const rows = goals.map((goal) => missionRow(goal, today, ledger));
   const shown = place === ANYWHERE ? rows.filter((row) => row.place === null) : place ? rows.filter((row) => row.place === place) : rows;
   const completedAt = new Map(goals.map((goal) => [goal.id, goal.completedAt ?? ""]));
+  const done = shown
+    .filter((row) => row.done)
+    .sort((a, b) => (completedAt.get(b.id) ?? "").localeCompare(completedAt.get(a.id) ?? ""));
+  const yesterday = shiftDay(today, -1);
   return {
     open: shown.filter((row) => !row.done && row.from === null),
     later: shown.filter((row) => !row.done && row.from !== null),
-    done: shown
-      .filter((row) => row.done)
-      .sort((a, b) => (completedAt.get(b.id) ?? "").localeCompare(completedAt.get(a.id) ?? "")),
+    done,
+    doneRecent: done.filter((row) => (playerDayOf(completedAt.get(row.id)) ?? "") >= yesterday).length,
     total: { open: rows.filter((row) => !row.done).length, done: rows.filter((row) => row.done).length },
   };
 }
 
 /**
- * «Сегодня»: the first open missions for today, how many were finished today and the copies waiting
- * for tomorrow. The day is the player's day in Asia/Jerusalem (R-XP-5), the same as the server's.
+ * Order of «Сегодня» (cycle2 P-C1): 0 — copies the player planned with «Повторить завтра» whose day has come
+ * (the latest planned day first, then the newest copy), 1 — other built-in templates and copies, 2 — own missions, newest first.
+ * Goals carry no creation date, so «newest» is the reverse of the API order (the store keeps insertion order).
+ * Only the order changes: nothing is hidden, the Missions tab keeps the API order.
+ */
+function todayRank(goal: Goal): number {
+  if (goal.availableFrom) return 0;
+  return templateKeyOf(goal) !== null ? 1 : 2;
+}
+
+function todayOrder(rows: readonly MissionRow[], goals: readonly Goal[]): MissionRow[] {
+  const byId = new Map(goals.map((goal, index) => [goal.id, { goal, index }]));
+  return [...rows].sort((a, b) => {
+    const ga = byId.get(a.id)!;
+    const gb = byId.get(b.id)!;
+    const ra = todayRank(ga.goal);
+    const rb = todayRank(gb.goal);
+    if (ra !== rb) return ra - rb;
+    // Planned copies: the latest planned day first, then the newest; own missions: newest first.
+    if (ra === 0) return (gb.goal.availableFrom ?? "").localeCompare(ga.goal.availableFrom ?? "") || gb.index - ga.index;
+    if (ra === 2) return gb.index - ga.index;
+    return ga.index - gb.index;
+  });
+}
+
+/**
+ * «Сегодня»: the first open missions for today (see {@link todayOrder}), how many were finished today and
+ * the copies waiting for tomorrow. The day is the player's day in Asia/Jerusalem (R-XP-5), the same as the server's.
  */
 export function todayBoard(
   goals: readonly Goal[],
@@ -147,7 +179,7 @@ export function todayBoard(
   const today = playerDay(now);
   const board = missionBoard(goals, null, now);
   const doneToday = goals.filter((goal) => goal.status === "done" && playerDayOf(goal.completedAt) === today).length;
-  return { open: board.open.slice(0, limit), openTotal: board.open.length, doneToday, later: board.later };
+  return { open: todayOrder(board.open, goals).slice(0, limit), openTotal: board.open.length, doneToday, later: board.later };
 }
 
 /**

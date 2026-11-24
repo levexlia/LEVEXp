@@ -142,8 +142,13 @@ export function PlaceSheet({
                     alt={mission.done ? "Выполнена" : ""}
                   />
                   <span className="ttl">{mission.title}</span>
-                  <span className="xpv">{mission.done ? xpDoneLabel(mission.xp) : xpPromiseLabel(mission.noXpToday, mission.xp)}</span>
-                  {!mission.done && id === "workshop" && onProof ? (
+                  {mission.from && !mission.done ? null : (
+                    <span className="xpv">{mission.done ? xpDoneLabel(mission.xp) : xpPromiseLabel(mission.noXpToday, mission.xp)}</span>
+                  )}
+                  {!mission.done && mission.from ? (
+                    // cycle2 P-C3: tomorrow's copy — its day instead of «Выполнить» and «+10 XP».
+                    <span className="mission__from ps-from" data-from={mission.from} aria-label={`Можно выполнить с ${mission.from}: ${mission.title}`}>с {mission.from}</span>
+                  ) : !mission.done && id === "workshop" && onProof ? (
                     <button type="button" className="lx-btn lx-btn--secondary lx-btn--sm" disabled={busy} onClick={() => onProof(mission.id)} aria-label={`Proof: ${mission.title}`}>
                       <span className="lx-btn__in">Proof</span>
                     </button>
@@ -156,6 +161,12 @@ export function PlaceSheet({
               ),
             )}
           </ul>
+          {!sheet.missionsHidden && sheet.moreDone > 0 ? (
+            <p className="ps-more" data-more-done={sheet.moreDone}>
+              Ещё {sheet.moreDone} {doneWord(sheet.moreDone)} — во вкладке «Миссии»
+              {onMissions ? <> <button type="button" className="quiet" onClick={() => onMissions(id)}>Открыть</button></> : null}
+            </p>
+          ) : null}
 
           <div className="ps-actions">
             {sheet.actions.map((action, index) => {
@@ -202,4 +213,14 @@ function missionWord(count: number): string {
   if (last === 1) return "миссия";
   if (last >= 2 && last <= 4) return "миссии";
   return "миссий";
+}
+
+/** «выполненная / выполненные / выполненных» after a number. */
+function doneWord(count: number): string {
+  const abs = Math.abs(count) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return "выполненных";
+  if (last === 1) return "выполненная";
+  if (last >= 2 && last <= 4) return "выполненные";
+  return "выполненных";
 }

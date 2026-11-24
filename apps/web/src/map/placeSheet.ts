@@ -1,4 +1,4 @@
-import { DAILY_AWARD_CAP, MAP_NODES, XP_PER_LEVEL, XP_REWARD_STANDARD, dailyLedger, grantedXp, noXpTodayReason, playerDdMm, type MapNodeId, type MapNodeState } from "@levex/domain";
+import { DAILY_AWARD_CAP, MAP_NODES, XP_PER_LEVEL, XP_REWARD_STANDARD, dailyLedger, grantedXp, noXpTodayReason, playerDay, playerDdMm, type MapNodeId, type MapNodeState } from "@levex/domain";
 import type { Goal } from "../api";
 import { lockedHint } from "./spots";
 
@@ -12,7 +12,12 @@ export interface SheetMission {
   done: boolean;
   /** Open, but today it would be recorded without XP (daily rules). */
   noXpToday: boolean;
+  /** Open copy for a later day («Повторить завтра»): its `DD.MM`; it cannot be done before (cycle2 P-C3). */
+  from: string | null;
 }
+
+/** The place sheet shows open missions and at most this many of the newest finished ones (cycle2 P-C2). */
+export const SHEET_DONE_MAX = 3;
 
 export interface PlaceSheetModel {
   id: MapNodeId;
@@ -24,6 +29,8 @@ export interface PlaceSheetModel {
   /** Goals of this place's sphere: how many are done out of all. */
   progress: { done: number; total: number };
   missions: SheetMission[];
+  /** Finished missions of this place not listed (older than the {@link SHEET_DONE_MAX} newest): «ещё N». */
+  moreDone: number;
   /** Missions are listed but their names and XP are masked. */
   missionsHidden: boolean;
   /** Done only: XP already earned here (sum of finished goals), never a new reward. */
@@ -72,19 +79,28 @@ export function placeSheet(input: {
   xp: number;
   now?: Date;
 }): PlaceSheetModel {
-  const ledger = dailyLedger(input.goals, input.now ?? new Date());
+  const now = input.now ?? new Date();
+  const ledger = dailyLedger(input.goals, now);
+  const today = playerDay(now);
   const index = MAP_NODES.findIndex((node) => node.id === input.id);
   const node = MAP_NODES[index];
   if (!node) throw new Error(`unknown place ${input.id}`);
   const own = input.goals.filter((goal) => goal.sphere === node.sphere);
   const finished = own.filter((goal) => goal.status === "done");
-  const missions = own.map((goal) => ({
-    id: goal.id,
-    title: goal.title,
-    xp: goal.status === "done" ? grantedXp(goal) : goal.xpReward,
-    done: goal.status === "done",
-    noXpToday: noXpTodayReason(goal, ledger) !== null,
-  }));
+  const toMission = (goal: Goal): SheetMission => {
+    const waiting = goal.status === "open" && !!goal.availableFrom && goal.availableFrom > today;
+    return {
+      id: goal.id,
+      title: goal.title,
+      xp: goal.status === "done" ? grantedXp(goal) : goal.xpReward,
+      done: goal.status === "done",
+      noXpToday: !waiting && noXpTodayReason(goal, ledger) !== null,
+      from: waiting ? `${goal.availableFrom!.slice(8, 10)}.${goal.availableFrom!.slice(5, 7)}` : null,
+    };
+  };
+  // Open ones in API order, then the newest finished ones; older records stay in the data and the Missions tab.
+  const newestDone = [...finished].sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""));
+  const missions = [...own.filter((goal) => goal.status !== "done"), ...newestDone.slice(0, SHEET_DONE_MAX)].map(toMission);
   const locked = input.state === "locked";
   const done = input.state === "done";
   const last = finished
@@ -100,6 +116,7 @@ export function placeSheet(input: {
     status: STATUS_WORD[input.state],
     progress: { done: finished.length, total: own.length },
     missions,
+    moreDone: Math.max(0, finished.length - SHEET_DONE_MAX),
     missionsHidden: locked,
     // XP really granted: a mission recorded without XP (daily rules) adds 0.
     earnedXp: done ? finished.reduce((sum, goal) => sum + grantedXp(goal), 0) : null,

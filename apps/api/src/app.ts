@@ -41,6 +41,7 @@ import {
   GoalNotDone,
   UndoPastDay,
   undoGoal,
+  NotYetAvailable,
   PlaceLocked,
   saveReflection,
   setAvatarConfig,
@@ -213,6 +214,9 @@ export function buildApp(opts: {
         ownAwardCap: result.today.ownAwardCap,
       };
     } catch (err) {
+      if (err instanceof NotYetAvailable) {
+        return reply.code(409).send({ error: "not_yet", message: err.message, availableFrom: err.availableFrom });
+      }
       if (err instanceof PlaceLocked) return reply.code(400).send({ error: err.message });
       if (err instanceof ArtifactNotFound) return reply.code(400).send({ error: err.message });
       if (err instanceof ArtifactAlreadyLinked) return reply.code(409).send({ error: err.message });

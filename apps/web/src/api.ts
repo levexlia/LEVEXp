@@ -277,6 +277,8 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
 function readError(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
   const record = payload as Record<string, unknown>;
+  // cycle2: the server sends a code plus a ready Russian message for a copy that is not due yet.
+  if (record.error === "not_yet" && typeof record.message === "string") return record.message;
   if (typeof record.error === "string" && record.error !== "Bad Request") return record.error;
   if (typeof record.message === "string") return record.message;
   return null;
