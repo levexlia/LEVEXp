@@ -769,6 +769,14 @@ button { cursor: pointer; }
 .map-hint { --tail: 150px; position: absolute; z-index: 5; width: var(--lx-hint-w); left: calc(75% + 8px - var(--tail)); bottom: 74px; }
 .map-hint[data-hint="own_cap"] { --tail: 226px; }
 .map-hint .lx-hint { position: relative; }
+/* The bubble never blocks the map: taps pass through to chips and domes under it; only × is a real button. */
+.map-hint, .map-hint * { pointer-events: none; }
+.map-hint .lx-hint__x { pointer-events: auto; }
+/* × sits top-left on the map: its 44×44 zone then lands on empty map at 390/360/1280, never on the
+   «Учебный центр» badge/chip that the top-right corner would cover (checked with elementFromPoint). */
+.map-hint .lx-hint__x { left: 0; right: auto; }
+.map-hint .lx-hint__x::before, .map-hint .lx-hint__x::after { left: 11px; right: auto; }
+.map-hint .lx-hint__meta { padding-right: 0; padding-left: 24px; }
 .map-hint .lx-hint__tail { left: var(--tail); bottom: -9px; }
 /* × is 20×20 to the eye, 44×44 to the finger. */
 .lx-hint__x { right: 0; top: 0; width: 44px; height: 44px; padding: 0; border: 0; background: none; cursor: pointer; }

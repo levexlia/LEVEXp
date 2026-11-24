@@ -31,4 +31,12 @@ describe("scene17/18 assets (PR-A)", () => {
     for (const name of ["levex-hint.css", "levex-empty.css"]) expect(css(name).replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/#ff5c8a|#f00\b|red\b/i);
     expect(css("levex-hint.css")).toMatch(/prefers-reduced-motion:reduce\)\{\.lx-hint-in\{animation:none\}/);
   });
+
+  it("the map hint passes taps through to chips and badges; only × (44×44, top-left) catches them", () => {
+    const styles = readFileSync(fileURLToPath(new URL("../styles.css", import.meta.url)), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(styles).toMatch(/\.map-hint, \.map-hint \* \{ pointer-events: none; \}/);
+    expect(styles).toMatch(/\.map-hint \.lx-hint__x \{ pointer-events: auto; \}/);
+    expect(styles).toMatch(/\.map-hint \.lx-hint__x \{ left: 0; right: auto; \}/);
+    expect(styles).toMatch(/\.lx-hint__x \{[^}]*width: 44px; height: 44px;/);
+  });
 });
