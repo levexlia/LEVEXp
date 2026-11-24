@@ -100,13 +100,23 @@ export function App() {
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const hideToast = useCallback(() => setToast(null), []);
 
+  // Only the newest reload is applied: an older one that finishes later must not bring back old XP/level.
+  const refreshSeq = useRef(0);
   async function refresh(): Promise<{ player: Player; goals: Goal[] }> {
+    const seq = ++refreshSeq.current;
     const data = await loadRoom();
+    if (seq !== refreshSeq.current) return data;
     setPlayer(data.player);
     setGoals(data.goals);
     setPlacements(data.placements);
     if (data.player.avatarConfig) setDraft(data.player.avatarConfig);
     return data;
+  }
+
+  /** Level, XP bar and profile follow a mark / «Отменить» answer at once, before the reload finishes. */
+  function applyAnswer(goal: Goal, progress: Player["progress"]) {
+    setPlayer((current) => (current ? { ...current, progress } : current));
+    setGoals((list) => list.map((item) => (item.id === goal.id ? goal : item)));
   }
 
   useEffect(() => {
@@ -222,6 +232,7 @@ export function App() {
       const wasOpen = goals.find((goal) => goal.id === goalId)?.status !== "done";
       const done = await completeGoal(goalId);
       setActivity(null);
+      applyAnswer(done.goal, done.progress);
       await completed(before, done, wasOpen);
     } catch (err) {
       setError(errorMessage(err));
@@ -241,6 +252,7 @@ export function App() {
     setError(null);
     try {
       const answer = await undoGoal(goal.id);
+      applyAnswer(answer.goal, answer.progress);
       await refresh();
       say(answer.removedXp > 0 ? `Запись «${goal.title}» отменена. XP за неё снят: ${answer.removedXp}.` : `Запись «${goal.title}» отменена.`);
     } catch (err) {
@@ -259,6 +271,7 @@ export function App() {
     try {
       const before = player?.progress.xp ?? 0;
       const done = await completeGoal(goal.id);
+      applyAnswer(done.goal, done.progress);
       await refresh();
       gained(before, done.progress.xp, done.goal.title, done.message);
     } catch (err) {
@@ -297,6 +310,7 @@ export function App() {
       await createArtifact({ title, imageUrl: url, goalId: goal.id });
       const done = await completeGoal(goal.id);
       setProof(null);
+      applyAnswer(done.goal, done.progress);
       await completed(before, done, goal.status !== "done");
     } catch (err) {
       setError(errorMessage(err));
