@@ -92,6 +92,7 @@ export function PlaceSheet({
               <p className="ps-cond__text" role="status">{sheet.condition.text}</p>
               <p className="ps-row"><span>Уровень</span><span>{sheet.condition.level} / {sheet.condition.needLevel}</span></p>
               <Segments lit={segments(sheet.condition.level, sheet.condition.needLevel)} tone="locked" />
+              <p className="ps-pace">{sheet.condition.pace}</p>
               {hint ? (
                 <p className="ps-hint">
                   <span>{hint.text}</span>
@@ -141,7 +142,7 @@ export function PlaceSheet({
                     alt={mission.done ? "Выполнена" : ""}
                   />
                   <span className="ttl">{mission.title}</span>
-                  <span className="xpv">+{mission.xp} XP</span>
+                  <span className="xpv">{!mission.done && mission.noXpToday ? "без XP сегодня" : `+${mission.xp} XP`}</span>
                   {!mission.done && id === "workshop" && onProof ? (
                     <button type="button" className="lx-btn lx-btn--secondary lx-btn--sm" disabled={busy} onClick={() => onProof(mission.id)} aria-label={`Proof: ${mission.title}`}>
                       <span className="lx-btn__in">Proof</span>
@@ -177,6 +178,7 @@ export function PlaceSheet({
               );
             })}
           </div>
+          {sheet.disabledWhy ? <p className="ps-why" data-why="locked">{sheet.disabledWhy}</p> : null}
         </div>
       </section>
     </div>

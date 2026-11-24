@@ -1,15 +1,33 @@
-import { DEFAULT_AVATAR_CONFIG, LIFE_SPHERES, NICKNAME_MAX_LENGTH, XP_PER_LEVEL, type AvatarConfig, type LifeSphereId, type MapNodeId } from "@levex/domain";
+import {
+  DEFAULT_AVATAR_CONFIG,
+  MAP_NODES,
+  NICKNAME_MAX_LENGTH,
+  XP_PER_LEVEL,
+  lockedPlaceFor,
+  placeLockedMessage,
+  playerDay,
+  shiftDay,
+  templateKeyOf,
+  type AvatarConfig,
+  type LifeSphereId,
+  type MapNodeId,
+  type ReflectionFeeling,
+} from "@levex/domain";
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   askAssistant,
   completeGoal,
   createArtifact,
   createGoal,
+  deleteGoal,
   errorMessage,
   generateAvatar,
+  goalFromTemplate,
   loadRoom,
   mergePlayer,
+  repeatGoal,
   saveAvatar,
+  saveReflection,
   updateNickname,
   uploadImage,
   type Goal,
@@ -25,8 +43,11 @@ import { Check, PhotoPick, Toast } from "./Controls";
 import { HomeMap, mapStates } from "./HomeMap";
 import { MissionsView, TodayPanel, type MissionActions } from "./Missions";
 import { PlaceSheet } from "./PlaceSheet";
-import { placeName, placeForSphere, xpHint } from "./map/missions";
+import { ActivityScreen } from "./daily/ActivityScreen";
+import { AfterMission, type AfterMissionInfo } from "./daily/AfterMission";
+import { availableOn, planChips, placeName, placeForSphere, xpHint, type PlanChip } from "./map/missions";
 import { segments } from "./map/placeSheet";
+import { sphereRows } from "./map/resources";
 import { HEX_LEVEL_URL, tabIconUrl, uiIconUrl, type HeaderIcon, type TabIcon } from "./theme/uiArt";
 import { useReducedMotion } from "./theme/useReducedMotion";
 import { KitIcon, SPHERE_ICON } from "./map/KitIcon";
@@ -49,6 +70,12 @@ export function App() {
   const [draft, setDraft] = useState<AvatarConfig>(DEFAULT_AVATAR_CONFIG);
   const [nodeId, setNodeId] = useState<MapNodeId | null>(null);
   const [proof, setProof] = useState<ProofTarget | null>(null);
+  /** «Начать»: the mission on the activity screen (spec №2). */
+  const [activity, setActivity] = useState<Goal | null>(null);
+  /** After a completion: «Повторить завтра?» + «Как прошло?» (spec №1, №3). */
+  const [after, setAfter] = useState<AfterMissionInfo | null>(null);
+  const closeActivity = useCallback(() => setActivity(null), []);
+  const closeAfter = useCallback(() => setAfter(null), []);
   const [cheer, setCheer] = useState(false);
   const [chat, setChat] = useState(false);
   const [robotState, setRobotState] = useState<RobotState>("idle");
@@ -68,13 +95,13 @@ export function App() {
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const hideToast = useCallback(() => setToast(null), []);
 
-  async function refresh(): Promise<Player> {
+  async function refresh(): Promise<{ player: Player; goals: Goal[] }> {
     const data = await loadRoom();
     setPlayer(data.player);
     setGoals(data.goals);
     setPlacements(data.placements);
     if (data.player.avatarConfig) setDraft(data.player.avatarConfig);
-    return data.player;
+    return data;
   }
 
   useEffect(() => {
@@ -116,12 +143,31 @@ export function App() {
     window.scrollTo?.(0, 0);
   }
 
-  /** «Начать» / «Войти»: Мастерская opens the photo proof, other places their missions. */
+  /**
+   * «Начать» / «Войти»: Мастерская opens the photo proof. Other places open the activity screen for
+   * their first open mission of today (spec №2), or their missions when there is none.
+   */
   function enterPlace(id: MapNodeId) {
     if (id === "workshop" && states.get(id) !== "done") {
       setNodeId(null);
       setProof({ goal: null });
+      return;
+    }
+    const sphere = MAP_NODES.find((node) => node.id === id)?.sphere;
+    const today = playerDay(new Date());
+    const next = goals.find((goal) => goal.status === "open" && goal.sphere === sphere && availableOn(goal, today));
+    if (next) {
+      setNodeId(null);
+      setActivity(next);
     } else openMissions(id);
+  }
+
+  /** Can «Повторить завтра» make a copy? Not in a locked place, not when tomorrow already has one. */
+  function canRepeat(goal: Goal, list: readonly Goal[], lvl: number): boolean {
+    if (lockedPlaceFor(goal.sphere, lvl)) return false;
+    const key = templateKeyOf(goal) ?? `own:${goal.id}`;
+    const tomorrow = shiftDay(playerDay(new Date()), 1);
+    return !list.some((item) => item.status === "open" && item.availableFrom === tomorrow && (templateKeyOf(item) ?? "") === key);
   }
 
   function burst() {
@@ -129,9 +175,23 @@ export function App() {
     window.setTimeout(() => setCheer(false), 1600);
   }
 
-  function gained(before: number, after: number, title: string) {
-    say(after > before ? `+${after - before} XP · «${title}» выполнена` : `«${title}» выполнена`);
+  function gained(before: number, after: number, title: string, message?: string) {
+    say(after > before ? `+${after - before} XP · «${title}» выполнена` : message ?? `«${title}» выполнена`);
     if (after > before) burst();
+  }
+
+  /** After a first completion: toast, then the short «Повторить завтра? / Как прошло?» sheet. */
+  async function completed(before: number, done: Awaited<ReturnType<typeof completeGoal>>, wasOpen: boolean) {
+    const data = await refresh();
+    gained(before, done.progress.xp, done.goal.title, done.message);
+    if (!wasOpen) return;
+    setAfter({
+      goal: done.goal,
+      awarded: done.awarded,
+      gained: Math.max(0, done.progress.xp - before),
+      message: done.message,
+      canRepeat: canRepeat(done.goal, data.goals, data.player.progress.level),
+    });
   }
 
   async function finish(goalId: string) {
@@ -139,9 +199,10 @@ export function App() {
     setError(null);
     try {
       const before = player?.progress.xp ?? 0;
+      const wasOpen = goals.find((goal) => goal.id === goalId)?.status !== "done";
       const done = await completeGoal(goalId);
-      await refresh();
-      gained(before, done.progress.xp, done.goal.title);
+      setActivity(null);
+      await completed(before, done, wasOpen);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -176,9 +237,8 @@ export function App() {
       const url = await uploadImage(file);
       await createArtifact({ title, imageUrl: url, goalId: goal.id });
       const done = await completeGoal(goal.id);
-      await refresh();
       setProof(null);
-      gained(before, done.progress.xp, done.goal.title);
+      await completed(before, done, goal.status !== "done");
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -186,7 +246,81 @@ export function App() {
     }
   }
 
-  const actions: MissionActions = { busy, onDone: finish, onProof: (goal) => setProof({ goal }) };
+  /** «Да, на завтра»: a copy of the goal for the next player day (R-XP-9). */
+  async function repeatTomorrow(goalId: string): Promise<string | null> {
+    setBusy(true);
+    setError(null);
+    try {
+      const copy = await repeatGoal(goalId, true);
+      await refresh();
+      return copy.id;
+    } catch (err) {
+      setError(errorMessage(err));
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** «Удалить» an open mission, or «Отменить» tomorrow's copy. XP does not change. */
+  async function removeGoal(goalId: string, note?: string): Promise<boolean> {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteGoal(goalId);
+      await refresh();
+      if (note) say(note);
+      return true;
+    } catch (err) {
+      setError(errorMessage(err));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reflect(goalId: string, felt: ReflectionFeeling, note: string): Promise<boolean> {
+    setBusy(true);
+    setError(null);
+    try {
+      await saveReflection(goalId, felt, note);
+      await refresh();
+      say("Сохранено. На XP это не влияет.");
+      return true;
+    } catch (err) {
+      setError(errorMessage(err));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Empty-day plan chip: a copy of a template for today. */
+  async function addFromPlan(chip: PlanChip) {
+    setBusy(true);
+    setError(null);
+    try {
+      const goal = chip.repeatOf ? await repeatGoal(chip.repeatOf, false) : await goalFromTemplate(chip.templateId!);
+      await refresh();
+      say(`Миссия «${goal.title}» на сегодня`);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const workshopLocked = states.get("workshop") === "locked";
+  const actions: MissionActions = {
+    busy,
+    onDone: finish,
+    onProof: (goal) => setProof({ goal }),
+    onStart: (goal) => setActivity(goal),
+    lockedText: (row) => {
+      const node = row.place ? MAP_NODES.find((item) => item.id === row.place) : undefined;
+      return node && states.get(node.id) === "locked" ? placeLockedMessage(node) : null;
+    },
+  };
 
   return (
     <div className="app">
@@ -319,6 +453,9 @@ export function App() {
               actions={actions}
               reducedMotion={reducedMotion}
               onAll={() => openMissions(null)}
+              plan={planChips(goals, level)}
+              today={player?.today}
+              onPlan={addFromPlan}
             />
           </div>
         ) : null}
@@ -329,7 +466,7 @@ export function App() {
             place={missionPlace}
             onPlace={setMissionPlace}
             onCreate={addMission}
-            actions={actions}
+            actions={{ ...actions, onDelete: (goal) => void removeGoal(goal.id, `Миссия «${goal.title}» удалена`) }}
             reducedMotion={reducedMotion}
           />
         ) : null}
@@ -404,12 +541,44 @@ export function App() {
 
       {proof ? (
         <Sheet title="Proof: фото к миссии" onClose={() => setProof(null)}>
-          <ProofForm busy={busy} goal={proof.goal} error={error} onSubmit={(caption, file) => sendProof(proof, caption, file)} />
+          {workshopLocked ? (
+            // R-XP-8: no upload while Мастерская is locked; the server would refuse it too.
+            <div data-proof-locked="true">
+              <p className="proof-what">{PROOF_WHAT}</p>
+              <p className="proof-locked" role="status">
+                {placeLockedMessage(MAP_NODES.find((node) => node.id === "workshop")!)}. Тогда здесь можно будет прикрепить фото к миссии.
+              </p>
+              <button type="button" className="lx-btn lx-btn--secondary lx-btn--wide" onClick={() => { setProof(null); openMissions(null); }}>
+                <span className="lx-btn__in">К миссиям</span>
+              </button>
+            </div>
+          ) : (
+            <ProofForm busy={busy} goal={proof.goal} error={error} onSubmit={(caption, file) => sendProof(proof, caption, file)} />
+          )}
         </Sheet>
+      ) : null}
+
+      {activity ? (
+        <ActivityScreen goal={activity} busy={busy} reducedMotion={reducedMotion} onDone={finish} onClose={closeActivity} />
+      ) : null}
+
+      {after ? (
+        <AfterMission
+          key={after.goal.id}
+          info={after}
+          busy={busy}
+          onRepeat={repeatTomorrow}
+          onUndoRepeat={(copyId) => removeGoal(copyId)}
+          onReflect={reflect}
+          onClose={closeAfter}
+        />
       ) : null}
     </div>
   );
 }
+
+/** One gender-neutral line on what Proof is (playtest 24.11). */
+export const PROOF_WHAT = "Proof — фото того, что сделано своими руками. Оно попадёт в галерею.";
 
 function dayWord(count: number): string {
   const abs = Math.abs(count) % 100;
@@ -439,21 +608,29 @@ function pad2(value: number): string {
 }
 
 function Resources({ player }: { player: Player | null }) {
-  const spheres = player?.progress.xpBySphere ?? {};
-  const rows = Object.entries(spheres);
+  const rows = sphereRows(player?.progress.xpBySphere ?? {}, player?.progress.level ?? 1);
+  const empty = rows.every((row) => row.zero);
   return (
     <section className="panel">
       <h2>Ресурсы</h2>
-      {rows.length === 0 ? <p className="empty">Опыт по сферам появится после первой миссии.</p> : null}
+      {empty ? (
+        <div className="empty-state" data-empty="resources">
+          <p>Здесь будет видно, в каких сферах жизни копится XP: здоровье, разум, творчество и другие.</p>
+          <p className="empty">Пока пусто. Выполни любую миссию из «Сегодня», и первая полоса заполнится.</p>
+        </div>
+      ) : (
+        <p className="empty">XP по сферам: за каждую выполненную миссию с начислением.</p>
+      )}
       <ul className="bars">
-        {rows.map(([id, value]) => (
-          <li key={id}>
+        {rows.map((row) => (
+          <li key={row.id} className={row.zero ? "is-zero" : undefined} data-sphere={row.id}>
             <span className="sphere-name">
-              {SPHERE_ICON[id] ? <KitIcon name={SPHERE_ICON[id]} size={18} /> : null}
-              {LIFE_SPHERES.find((sphere) => sphere.id === id)?.name ?? id}
+              {SPHERE_ICON[row.id] ? <KitIcon name={SPHERE_ICON[row.id]!} size={18} /> : null}
+              {row.name}
             </span>
-            <i><b style={{ width: `${Math.min(100, value ?? 0)}%` }} /></i>
-            <strong>{value}</strong>
+            <i><b style={{ width: `${Math.min(100, row.xp)}%` }} /></i>
+            <strong>{row.xp}</strong>
+            {row.hint ? <small className="bars__hint">{row.hint}</small> : null}
           </li>
         ))}
       </ul>
@@ -508,7 +685,15 @@ function Profile({
         </div>
       </div>
       <h3>Галерея</h3>
-      {placements.length === 0 ? <p className="empty">Фото появятся после Proof.</p> : null}
+      {placements.length === 0 ? (
+        <div className="empty-state" data-empty="gallery">
+          <p>Галерея пока пуста.</p>
+          <p className="empty">
+            Здесь будут фото из Proof — того, что сделано своими руками.
+            {(player?.progress.level ?? 1) >= 2 ? " Proof — кнопка на карте." : " Proof открывается вместе с Мастерской на уровне 2."}
+          </p>
+        </div>
+      ) : null}
       <ul className="gallery">
         {placements.map((placement) => (
           <li key={placement.artifactId}>
@@ -604,6 +789,7 @@ function ProofForm({
   const place = placeName(placeForSphere(goal?.sphere ?? "creativity"));
   return (
     <form onSubmit={submit}>
+      <p className="proof-what">{PROOF_WHAT}</p>
       <p className="proof-for" data-proof-goal={goal?.id ?? "new"}>
         {goal ? (
           <>Миссия: <b>«{goal.title}»</b> · {place}</>

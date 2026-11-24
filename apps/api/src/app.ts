@@ -16,6 +16,8 @@ import {
   LIFE_SPHERE_IDS,
   listLifeSpheres,
   NICKNAME_MAX_LENGTH,
+  REFLECTION_FEELINGS,
+  REFLECTION_NOTE_MAX,
   TITLE_MAX_LENGTH,
 } from "@levex/domain";
 import {
@@ -33,6 +35,11 @@ import {
   InvalidPlayerUpdate,
   listArtifacts,
   listGoals,
+  deleteGoal,
+  GoalLimitReached,
+  GoalNotOpen,
+  PlaceLocked,
+  saveReflection,
   setAvatarConfig,
   updatePlayer,
   type ArtifactInput,
@@ -130,18 +137,57 @@ export function buildApp(opts: {
     schema: {
       body: {
         type: "object",
-        required: ["title"],
         additionalProperties: false,
+        // A new mission needs a title; a repeat or a template copy takes it from its source.
+        anyOf: [{ required: ["title"] }, { required: ["repeatOf"] }, { required: ["templateId"] }],
         properties: {
           title: { type: "string", minLength: 1, maxLength: 200 },
           sphere: { type: "string", enum: [...LIFE_SPHERE_IDS] },
+          templateId: { type: "string", minLength: 1, maxLength: 80 },
+          repeatOf: { type: "string", minLength: 1, maxLength: 80 },
+          forTomorrow: { type: "boolean" },
         },
       },
     },
   }, async (req, reply) => {
     try {
-      const goal = createGoal(req.body as Parameters<typeof createGoal>[0]);
-      return reply.code(201).send(goal);
+      const { goal, created } = createGoal(req.body as Parameters<typeof createGoal>[0], true);
+      return reply.code(created ? 201 : 200).send(goal);
+    } catch (err) {
+      if (err instanceof InvalidGoalUpdate || err instanceof PlaceLocked) return reply.code(400).send({ error: err.message });
+      if (err instanceof GoalLimitReached) return reply.code(409).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  // Open missions only; a done one stays in the record (409). XP never changes here.
+  app.delete<{ Params: { id: string } }>("/goals/:id", async (req, reply) => {
+    try {
+      if (!deleteGoal(req.params.id)) return reply.code(404).send({ error: "goal not found" });
+      return reply.code(204).send();
+    } catch (err) {
+      if (err instanceof GoalNotOpen) return reply.code(409).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.post<{ Params: { id: string } }>("/goals/:id/reflection", {
+    schema: {
+      body: {
+        type: "object",
+        required: ["felt"],
+        additionalProperties: false,
+        properties: {
+          felt: { type: "string", enum: [...REFLECTION_FEELINGS] },
+          note: { type: "string", maxLength: REFLECTION_NOTE_MAX },
+        },
+      },
+    },
+  }, async (req, reply) => {
+    try {
+      const goal = saveReflection(req.params.id, req.body as { felt: string; note?: string });
+      if (!goal) return reply.code(404).send({ error: "goal not found" });
+      return goal;
     } catch (err) {
       if (err instanceof InvalidGoalUpdate) return reply.code(400).send({ error: err.message });
       throw err;
@@ -152,8 +198,19 @@ export function buildApp(opts: {
     try {
       const result = completeGoal(req.params.id, readArtifactId(req.body));
       if (!result) return reply.code(404).send({ error: "goal not found" });
-      return { goal: result.goal, progress: result.progress };
+      // 200 also when the daily rules recorded the goal without XP: awarded false plus reason and message.
+      return {
+        goal: result.goal,
+        progress: result.progress,
+        awarded: result.awarded,
+        ...(result.reason ? { reason: result.reason, message: result.message } : {}),
+        awardedToday: result.today.awarded,
+        awardCap: result.today.awardCap,
+        ownAwardedToday: result.today.ownAwarded,
+        ownAwardCap: result.today.ownAwardCap,
+      };
     } catch (err) {
+      if (err instanceof PlaceLocked) return reply.code(400).send({ error: err.message });
       if (err instanceof ArtifactNotFound) return reply.code(400).send({ error: err.message });
       if (err instanceof ArtifactAlreadyLinked) return reply.code(409).send({ error: err.message });
       if (err instanceof InvalidGoalUpdate) return reply.code(400).send({ error: err.message });

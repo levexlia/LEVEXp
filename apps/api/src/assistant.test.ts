@@ -239,7 +239,7 @@ describe("POST /assistant/chat", () => {
     temps.push(dir);
     const file = path.join(dir, "levexp.json");
     openStore(file);
-    const goal = createGoal({ title: "Прогулка", sphere: "spirit" });
+    const goal = createGoal({ title: "Прогулка", sphere: "health" });
     completeGoal(goal.id);
     const before = { player: getPlayer(), goals: listGoals(), file: readFileSync(file, "utf8") };
     let writes = 0;

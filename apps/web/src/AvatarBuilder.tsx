@@ -24,11 +24,15 @@ const TABS = [
 
 const PART_LABEL = Object.fromEntries(manifest.parts.map((part) => [part.id, part.label_ru]));
 
+/**
+ * Gender-neutral nouns instead of the kit's feminine adjectives («Радостная», «Гордая»…): the
+ * player's character has no fixed gender (manifest.json label_ru is art data and stays as drawn).
+ */
 const EXPRESSION_LABEL: Record<Expression, string> = {
-  happy: PART_LABEL.face_happy ?? "Радостная",
-  proud: PART_LABEL.face_proud ?? "Гордая",
-  sleepy: PART_LABEL.face_sleepy ?? "Сонная",
-  surprised: PART_LABEL.face_surprised ?? "Удивлённая",
+  happy: "Радость",
+  proud: "Гордость",
+  sleepy: "Сонливость",
+  surprised: "Удивление",
 };
 
 const ACCESSORY_LABEL: Record<Accessory, string> = {

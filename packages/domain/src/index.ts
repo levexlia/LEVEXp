@@ -1,6 +1,7 @@
 // Доменные типы + чистые функции прогрессии.
 
 import type { AvatarConfig } from "./avatarConfig.js";
+import type { NoXpReason, Reflection } from "./daily.js";
 
 export type LifeSphereId =
   | "health" | "mind" | "career" | "finance" | "relationships"
@@ -164,6 +165,21 @@ export interface Goal {
    */
   xpReward: number;
   status: GoalStatus;
+  /**
+   * XP actually granted at completion: `xpReward`, or 0 when the daily rules (R-XP-6/7/10)
+   * recorded the goal without XP. Missing on goals finished before those rules.
+   */
+  xpGranted?: number;
+  /** Why a completion gave no XP. Only with `xpGranted: 0`. */
+  noXpReason?: NoXpReason;
+  /** Template of a repeated mission: `seed-walk`, `seed-read` or `own:<goal id>` (R-XP-9/10). */
+  templateId?: string;
+  /** The goal «Повторить завтра» copied. */
+  repeatOf?: string;
+  /** Player day (`YYYY-MM-DD`, Asia/Jerusalem) from which «Сегодня» shows the goal. */
+  availableFrom?: string;
+  /** Micro-reflection after completion. Never changes XP. */
+  reflection?: Reflection;
   // future: playerId, description, parentGoalId, deadline, skills
 }
 
@@ -256,3 +272,4 @@ export { ENERGY_MAX, ENERGY_PER_COMPLETION, energyForDay, streakDays, utcDay } f
 export { MAP_NODES, mapNodeStates } from "./map.js";
 export type { MapNode, MapNodeId, MapNodeState } from "./map.js";
 export * from "./assistant.js";
+export * from "./daily.js";

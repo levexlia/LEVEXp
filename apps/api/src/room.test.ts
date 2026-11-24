@@ -3,13 +3,16 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "./app.js";
-import { getProgress, getRoom, listArtifacts, listGoals, openStore, resetStore } from "./store.js";
+import { getProgress, getRoom, listArtifacts, listGoals, openStore, resetStore, setUnlockLevelForTests } from "./store.js";
 
 describe("photo room", () => {
   beforeEach(() => {
+    // Photo/save mechanics from before R-XP-8: Мастерская open, XP numbers unchanged.
+    setUnlockLevelForTests(99);
     openStore(null);
     resetStore(false);
   });
+  afterEach(() => setUnlockLevelForTests(null));
   const app = () => buildApp({ logger: false });
 
   it("places a photo in the room and links it to a creativity goal", async () => {
@@ -204,11 +207,13 @@ describe("room persistence", () => {
   const temps: string[] = [];
 
   beforeEach(() => {
+    setUnlockLevelForTests(99);
     openStore(null);
     resetStore(false);
   });
 
   afterEach(() => {
+    setUnlockLevelForTests(null);
     openStore(null);
     for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true });
   });

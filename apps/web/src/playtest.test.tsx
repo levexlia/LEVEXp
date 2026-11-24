@@ -13,13 +13,14 @@ function json(body: unknown, status = 200) {
 }
 
 /** A tiny in-memory server: completing a goal adds its XP, as the API does on the first completion only. */
-function server(initial: G[], options: { avatarAnswerWithoutDerived?: boolean } = {}) {
+function server(initial: G[], options: { avatarAnswerWithoutDerived?: boolean; level?: number } = {}) {
   const goals = initial.map((goal) => ({ ...goal }));
   const player = {
     id: "p1",
     nickname: "Игрок",
     avatarConfig: DEFAULT_AVATAR_CONFIG,
-    progress: { xp: 0, level: 1, xpBySphere: {} as Record<string, number> },
+    // Level 2 opens Мастерская (R-XP-8); level 1 keeps it locked as for a new player.
+    progress: { xp: ((options.level ?? 1) - 1) * 100, level: options.level ?? 1, xpBySphere: {} as Record<string, number> },
     streak: 1,
     energy: { current: 35, max: 50 },
   };
@@ -115,7 +116,7 @@ describe("playtest fixes", () => {
   });
 
   it("Миссии: Workshop missions are finished with Proof, which links the photo to that mission", async () => {
-    server([{ id: "w1", title: "Нарисовать закат", sphere: "creativity", xpReward: 10, status: "open" }]);
+    server([{ id: "w1", title: "Нарисовать закат", sphere: "creativity", xpReward: 10, status: "open" }], { level: 2 });
     await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Миссии" }));
     fireEvent.click(screen.getByRole("button", { name: "Proof: Нарисовать закат" }));
@@ -173,7 +174,7 @@ describe("playtest fixes", () => {
     expect(TOAST_MS).toBe(3000);
   });
 
-  it("«Сегодня» lists the same open missions and never says «нет» when all are done", async () => {
+  it("«Сегодня» lists the same open missions and offers a plan, not «нет», when all are done", async () => {
     server([{ ...OPEN[0]!, status: "done", completedAt: new Date().toISOString() }, OPEN[1]!]);
     await renderApp();
     const today = screen.getByRole("complementary", { name: "Сегодня" });
@@ -181,11 +182,13 @@ describe("playtest fixes", () => {
     expect(today.textContent).toContain("Выполнено сегодня: 1");
     expect(today.textContent).not.toContain("Миссий пока нет");
     fireEvent.click(within(today).getByRole("button", { name: "Выполнить: Прочитать 10 страниц" }));
-    await waitFor(() => expect(today.querySelector('[data-empty="today"]')?.textContent).toMatch(/^Все миссии выполнены/));
+    // Spec №1: an empty day shows «Можно снова:» with the seed chips instead of only the form.
+    await waitFor(() => expect(today.querySelector('[data-empty="today"]')?.textContent).toMatch(/^На сегодня дел нет\. Можно снова:/));
+    expect(today.querySelectorAll("[data-plan]")).toHaveLength(2);
   });
 
   it("Proof sheet: empty caption with a placeholder, Russian photo picker, closes on Esc and on the backdrop", async () => {
-    server(OPEN);
+    server(OPEN, { level: 2 });
     const { container } = await renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Proof" }));
     let sheet = screen.getByRole("dialog", { name: "Proof: фото к миссии" });
