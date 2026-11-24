@@ -142,6 +142,8 @@ export interface PlanChip {
   place: MapNodeId | null;
   /** «repeat»: the player has done this template before; «new»: never done yet. */
   kind: "repeat" | "new";
+  /** A repeat whose template already gave XP today: shown after the new ones, marked «без XP сегодня». */
+  noXpToday?: boolean;
   /** Copy this goal (a seed or a repeated own mission done before)… */
   repeatOf?: string;
   /** …or start the seed / placeless template. */
@@ -176,10 +178,11 @@ export function placelessBoard(goals: readonly Goal[], now = new Date()): Array<
 
 /**
  * Plan for an empty day: at most {@link PLAN_MAX} buttons.
- * 1. «Можно снова:» templates the player has finished before (seeds, placeless, repeated own):
- *    those that can still give XP today first, then newest first.
+ * 1. «Можно снова:» templates the player has finished before (seeds, placeless, repeated own) that
+ *    can still give XP today, newest first.
  * 2. «Можно взять:» templates never done yet (seeds and placeless), one per sphere, from the spheres
  *    with the least XP (`xpBySphere`); ties keep the domain order.
+ * 3. Repeats whose template already gave XP today, marked «без XP сегодня».
  * Skips templates already open and places that are still locked (R-XP-8).
  */
 export function planChips(
@@ -237,8 +240,12 @@ export function planChips(
     if (!added) break;
   }
 
-  const strip = ({ at: _at, rewarded: _rewarded, ...chip }: PlanChip & { at: string; rewarded: boolean }): PlanChip => chip;
-  return [...repeats.map(strip), ...news].slice(0, max);
+  const strip = ({ at: _at, rewarded, ...chip }: PlanChip & { at: string; rewarded: boolean }): PlanChip =>
+    rewarded ? { ...chip, noXpToday: true } : chip;
+  // Repeats that can still give XP, then new ones, then repeats already rewarded today (Игрок, 24.11).
+  const fresh = repeats.filter((chip) => !chip.rewarded).map(strip);
+  const stale = repeats.filter((chip) => chip.rewarded).map(strip);
+  return [...fresh, ...news, ...stale].slice(0, max);
 }
 
 /**

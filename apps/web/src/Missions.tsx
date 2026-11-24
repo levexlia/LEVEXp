@@ -290,6 +290,17 @@ function NewMission({
  * «Сегодня» beside / under the map: the same goals as the Missions tab, for today's player day.
  * An empty day shows a plan («Можно снова: …») instead of only pointing to the form (spec №1).
  */
+/** Consecutive chips of the same kind form one block, so the plan keeps its order (repeats · new · repeats без XP). */
+export function planBlocks(plan: readonly PlanChip[]): Array<{ kind: PlanChip["kind"]; chips: PlanChip[] }> {
+  const blocks: Array<{ kind: PlanChip["kind"]; chips: PlanChip[] }> = [];
+  for (const chip of plan) {
+    const last = blocks.at(-1);
+    if (last && last.kind === chip.kind) last.chips.push(chip);
+    else blocks.push({ kind: chip.kind, chips: [chip] });
+  }
+  return blocks;
+}
+
 export function TodayPanel({
   goals,
   streak,
@@ -331,12 +342,10 @@ export function TodayPanel({
       ) : plan.length > 0 && onPlan ? (
         <div className="today-plan" data-empty="today">
           <p className="empty">На сегодня дел нет.</p>
-          {(["repeat", "new"] as const).map((kind) => {
-            const chips = plan.filter((chip) => chip.kind === kind);
-            if (chips.length === 0) return null;
+          {planBlocks(plan).map(({ kind, chips }, index) => {
             const label = kind === "repeat" ? "Можно снова:" : "Можно взять:";
             return (
-              <div key={kind} className="today-plan__block" data-plan-block={kind}>
+              <div key={`${kind}-${index}`} className="today-plan__block" data-plan-block={kind}>
                 <p className="today-plan__label">{label}</p>
                 <div className="place-filter" role="group" aria-label={label}>
                   {chips.map((chip) => (
@@ -349,7 +358,7 @@ export function TodayPanel({
                       onClick={() => onPlan(chip)}
                       data-plan={chip.key}
                     >
-                      <span className="lx-chip__in">+ {chip.title}</span>
+                      <span className="lx-chip__in">+ {chip.title}{chip.noXpToday ? <small className="plan-chip__noxp"> · без XP сегодня</small> : null}</span>
                     </button>
                   ))}
                 </div>
