@@ -18,3 +18,14 @@ road, no traced packs, no pines, no Figma Mini Town, no Buggy Dark Mode.
   `/workspace/levex_design/kit/`.
 - Map-kit badges and nav icons are from the existing LEVEXp map kit.
 - Nunito is used in the mock (SIL Open Font License).
+
+## Sphere icons `sp_finance.svg`, `sp_relationships.svg` (2026-11, LEVEX artist)
+- Original work, drawn from scratch in SVG code (circles, ellipses, paths) by the
+  LEVEX artist to match the existing `sp_*.svg` kit: 300×300 viewBox, flat fills
+  in the kit palette (#7341ed / #5f36d9 violet, #25cbfd / #0ac0f9 cyan,
+  #fec130 / #fe9e0f gold), dark outline #081233 with #0a1c46 inner lines, no animation.
+- `sp_finance.svg`: a coin stack with a rising trend arrow.
+- `sp_relationships.svg`: two interlocked rings (violet and cyan), «связь» between people.
+- No third-party icon packs, stock art, or AI generation. Lucide (ISC) was
+  considered as a reference but no Lucide paths are used, so no attribution is needed.
+- Rights: LEVEX project.
