@@ -39,7 +39,11 @@ import {
 import { Avatar } from "./avatar/Avatar";
 import { AvatarBuilder } from "./AvatarBuilder";
 import { AssistantChat } from "./assistant/AssistantChat";
-import { ASSISTANT_ROBOT_SIZE, ROBOT_STATES, robotSrc, type RobotState } from "./assistant/art";
+import { ASSISTANT_ROBOT_SIZE, ROBOT_STATES, happyRobotSrc, robotSrc, type RobotState } from "./assistant/art";
+import { JoyMap, type MapJoy } from "./assistant/JoyMap";
+import { Milestone } from "./assistant/Milestone";
+import "./assistant/levex-joy.css";
+import { JOY_MAP_MS, JOY_MAP_STATIC_MS, mapRobotLook, milestoneLive, milestoneStore, pendingPraise, placeProgress, praiseFor, takeMilestone, type Praise } from "./assistant/joy";
 import { rememberChatOpened, shouldShowTapMarker, tapMarkerSrc } from "./assistant/tapMarker";
 import { HINT_TEXT, emptyDayActive, useAssistantHint } from "./assistant/hints";
 import { HintBubble, hintRobotSrc } from "./assistant/HintBubble";
@@ -95,6 +99,24 @@ export function App() {
     setChat(false);
     setRobotState("idle");
   }, []);
+  // scene16 joy: A on the map, B in the chat, C for new places. Visual only; nothing here changes XP or the API.
+  const [mapJoy, setMapJoy] = useState<MapJoy | null>(null);
+  const [robotHappy, setRobotHappy] = useState(false);
+  const joyTimers = useRef<number[]>([]);
+  const [lastPraise, setLastPraise] = useState<Praise | null>(null);
+  const praised = useRef(new Set<string>());
+  const [, setPraisedTick] = useState(0);
+  const onPraised = useCallback((key: string) => {
+    praised.current.add(key);
+    setPraisedTick((n) => n + 1);
+  }, []);
+  const [milestone, setMilestone] = useState<number | null>(null);
+  const [milestoneText, setMilestoneText] = useState("");
+  const closeMilestone = useCallback(() => {
+    setMilestone(null);
+    setMilestoneText("");
+  }, []);
+  useEffect(() => () => joyTimers.current.forEach((timer) => window.clearTimeout(timer)), []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
@@ -145,6 +167,14 @@ export function App() {
   const hintText = hint === "own_cap" ? HINT_TEXT.ownCap : plan.some((chip) => chip.kind === "repeat") ? HINT_TEXT.emptyDayRepeat : HINT_TEXT.emptyDayNew;
   // The bubble belongs to the map robot: not while the chat is open.
   const mapHint = hint && !chat ? hint : null;
+  // scene16 A: calm joy for a moment after a mark, then the usual art (hint pose or idle).
+  const robotLook = mapRobotLook({ hint: mapHint !== null, chat, joyUntil: robotHappy ? Number.POSITIVE_INFINITY : null, now: 0 });
+  // scene16 A: segments the last mark added glow gold (only with XP, never with reduced motion).
+  const goldFrom = mapJoy && mapJoy.gainedXp > 0 && !reducedMotion
+    ? Math.floor(xp / XP_PER_LEVEL) !== Math.floor((xp - mapJoy.gainedXp) / XP_PER_LEVEL)
+      ? 0
+      : Math.round((((xp - mapJoy.gainedXp) % XP_PER_LEVEL) / XP_PER_LEVEL) * 20)
+    : Number.POSITIVE_INFINITY;
 
   // Preload the robot states so switching does not flash (scene15 INTEGRATION.md).
   useEffect(() => {
@@ -205,15 +235,39 @@ export function App() {
     window.setTimeout(() => setCheer(false), 1600);
   }
 
+  /**
+   * scene16: joy after a successful mark (button, Proof, «Вернуть»). Never after «Отменить».
+   * A: robot calm joy 2.5 s (2 s static with reduced motion); B: one praise for this record; C: only when
+   * a place level (2, 4) is crossed for the first time for this player (flag written before the show).
+   */
+  function joy(beforeXp: number, beforeLevel: number, done: Awaited<ReturnType<typeof completeGoal>>, list: readonly Goal[], playerId: string | undefined) {
+    const gainedXp = Math.max(0, done.progress.xp - beforeXp);
+    const place = placeProgress(done.goal, list);
+    joyTimers.current.forEach((timer) => window.clearTimeout(timer));
+    setMapJoy({ id: Date.now(), gainedXp, place: place ? { id: place.id, done: place.done, total: place.total } : null });
+    setRobotHappy(true);
+    joyTimers.current = [
+      window.setTimeout(() => setRobotHappy(false), reducedMotion ? JOY_MAP_STATIC_MS : JOY_MAP_MS),
+      window.setTimeout(() => setMapJoy(null), reducedMotion ? JOY_MAP_STATIC_MS : JOY_MAP_MS + 500),
+    ];
+    setLastPraise(praiseFor(done.goal, gainedXp, list));
+    const level = takeMilestone(beforeLevel, done.progress.level, playerId, milestoneStore());
+    if (level !== null) {
+      setMilestone(level);
+      setMilestoneText(milestoneLive(level));
+    }
+  }
+
   function gained(before: number, after: number, title: string, message?: string) {
     say(after > before ? `+${after - before} XP · «${title}» выполнена` : message ?? `«${title}» выполнена`);
     if (after > before) burst();
   }
 
   /** After a first completion: toast, then the short «Повторить завтра? / Как прошло?» sheet. */
-  async function completed(before: number, done: Awaited<ReturnType<typeof completeGoal>>, wasOpen: boolean) {
+  async function completed(before: number, done: Awaited<ReturnType<typeof completeGoal>>, wasOpen: boolean, beforeLevel = level) {
     const data = await refresh();
     gained(before, done.progress.xp, done.goal.title, done.message);
+    if (wasOpen) joy(before, beforeLevel, done, data.goals, data.player.id);
     if (!wasOpen) return;
     setAfter({
       goal: done.goal,
@@ -230,10 +284,11 @@ export function App() {
     try {
       const before = player?.progress.xp ?? 0;
       const wasOpen = goals.find((goal) => goal.id === goalId)?.status !== "done";
+      const beforeLevel = level;
       const done = await completeGoal(goalId);
       setActivity(null);
       applyAnswer(done.goal, done.progress);
-      await completed(before, done, wasOpen);
+      await completed(before, done, wasOpen, beforeLevel);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -270,10 +325,12 @@ export function App() {
     setError(null);
     try {
       const before = player?.progress.xp ?? 0;
+      const beforeLevel = level;
       const done = await completeGoal(goal.id);
       applyAnswer(done.goal, done.progress);
-      await refresh();
+      const data = await refresh();
       gained(before, done.progress.xp, done.goal.title, done.message);
+      joy(before, beforeLevel, done, data.goals, data.player.id);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -303,6 +360,7 @@ export function App() {
     setError(null);
     try {
       const before = player?.progress.xp ?? 0;
+      const beforeLevel = level;
       const title = caption || target.goal?.title || "Фото";
       // A Workshop mission gets the photo linked; the map button makes a new Workshop mission, as before.
       const goal = target.goal ?? (await createGoal(title, "creativity"));
@@ -311,7 +369,7 @@ export function App() {
       const done = await completeGoal(goal.id);
       setProof(null);
       applyAnswer(done.goal, done.progress);
-      await completed(before, done, goal.status !== "done");
+      await completed(before, done, goal.status !== "done", beforeLevel);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -410,7 +468,7 @@ export function App() {
         <div className="xp-line">
           <em>XP</em>
           <div className="xp-seg" role="progressbar" aria-label="XP до следующего уровня" aria-valuenow={into} aria-valuemin={0} aria-valuemax={XP_PER_LEVEL}>
-            {segments(into, XP_PER_LEVEL, 20).map((on, index) => <i key={index} className={on ? "on" : undefined} />)}
+            {segments(into, XP_PER_LEVEL, 20).map((on, index) => <i key={index} className={on ? (index >= goldFrom ? "on lxadd" : "on") : undefined} />)}
           </div>
           <em>{into}/{XP_PER_LEVEL}</em>
         </div>
@@ -494,11 +552,11 @@ export function App() {
                   aria-expanded={chat}
                 >
                   <img
-                    src={mapHint ? hintRobotSrc(reducedMotion) : robotSrc(chat ? robotState : "idle", reducedMotion)}
+                    src={robotLook === "happysoft" ? happyRobotSrc("soft", reducedMotion) : robotLook === "hint" ? hintRobotSrc(reducedMotion) : robotSrc(robotLook === "chat" ? robotState : "idle", reducedMotion)}
                     alt=""
                     width={ASSISTANT_ROBOT_SIZE.width}
                     height={ASSISTANT_ROBOT_SIZE.height}
-                    data-state={mapHint ? "hint" : chat ? robotState : "idle"}
+                    data-state={robotLook === "chat" ? robotState : robotLook}
                   />
                   {/* scene17: the «нажми» marker hides while the bubble is visible. */}
                   {tapMarker && !mapHint ? (
@@ -511,7 +569,8 @@ export function App() {
                     />
                   ) : null}
                 </button>
-                {mapHint ? <HintBubble key={mapHint} id={mapHint} text={hintText} onDismiss={dismissHint} /> : null}
+                {mapHint ? <HintBubble key={mapHint} id={mapHint} text={hintText} onDismiss={dismissHint} onOpenChat={openChat} /> : null}
+                {mapJoy ? <JoyMap key={mapJoy.id} joy={mapJoy} reducedMotion={reducedMotion} robotRef={robotRef} /> : null}
               </div>
 
               <div className="proof-row">
@@ -618,8 +677,16 @@ export function App() {
           returnFocus={robotRef}
           onRobotState={setRobotState}
           reducedMotion={reducedMotion}
+          praise={pendingPraise(lastPraise, goals, new Date(), praised.current)}
+          onPraised={onPraised}
         />
       ) : null}
+
+      {milestone !== null ? (
+        <Milestone level={milestone} reducedMotion={reducedMotion} onClose={closeMilestone} onMap={() => { closeMilestone(); pick("map"); }} fallbackFocus={robotRef} />
+      ) : null}
+      {/* scene16 C: the polite announcement; always in the DOM, filled while C is shown, empty after. */}
+      <div className="lxC-live" aria-live="polite" data-milestone-live="">{milestoneText}</div>
 
       {proof ? (
         <Sheet title="Proof: фото к миссии" onClose={() => setProof(null)}>
@@ -644,7 +711,8 @@ export function App() {
         <ActivityScreen goal={activity} busy={busy} reducedMotion={reducedMotion} onDone={finish} onClose={closeActivity} />
       ) : null}
 
-      {after ? (
+      {/* «Как прошло?» waits until the new-level moment (C) is closed: never under its dimmer. */}
+      {after && milestone === null ? (
         <AfterMission
           key={after.goal.id}
           info={after}

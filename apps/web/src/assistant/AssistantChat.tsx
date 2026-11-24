@@ -16,7 +16,9 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from "react";
-import { CHAT_ART, avatarFrameSrc, robotSrc, robotStateFor, typingSrc, type RobotState } from "./art";
+import { REWARD_ICON_URL } from "../theme/uiArt";
+import { CHAT_ART, avatarFrameSrc, happyFrameSrc, happyRobotSrc, robotSrc, robotStateFor, typingSrc, type RobotState } from "./art";
+import { JOY_CHAT_MS, type Praise } from "./joy";
 import "./levex-chat.css";
 
 export const GREETING = "Привет! Я помощник LEVEX. Помогу выбрать миссию или разбить её на маленькие шаги. О чём поговорим?";
@@ -28,6 +30,8 @@ export interface ChatLine extends AssistantTurn {
   id: number;
   at: string;
   offline?: boolean;
+  /** scene16 B: a local praise (template), never sent to the model as history. */
+  praise?: Praise;
 }
 
 export type AskFn = (message: string, history: AssistantTurn[], signal?: AbortSignal) => Promise<AssistantReply>;
@@ -37,6 +41,9 @@ const STATUS: Partial<Record<RobotState, { label: string; color: string }>> = {
   thinking: { label: "ДУМАЕТ", color: "#b47bff" },
   speaking: { label: "ГОВОРИТ", color: "#22e1ff" },
 };
+
+/** scene16 B: the header status during one happy cycle. */
+export const HAPPY_STATUS = { label: "РАДУЕТСЯ", color: "#ffd23d" } as const;
 
 function clock(): string {
   return new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
@@ -48,7 +55,7 @@ export function historyFor(lines: readonly ChatLine[]): AssistantTurn[] {
   let total = 0;
   for (let i = lines.length - 1; i >= 0 && picked.length < ASSISTANT_HISTORY_MAX_ITEMS; i -= 1) {
     const line = lines[i]!;
-    if (line.offline) continue;
+    if (line.offline || line.praise) continue;
     const content = line.content.slice(0, ASSISTANT_HISTORY_ITEM_MAX_LENGTH);
     if (total + content.length > ASSISTANT_HISTORY_MAX_TOTAL) break;
     total += content.length;
@@ -67,6 +74,8 @@ export function AssistantChat({
   returnFocus,
   onRobotState,
   reducedMotion,
+  praise = null,
+  onPraised,
 }: {
   ask: AskFn;
   onClose: () => void;
@@ -76,6 +85,10 @@ export function AssistantChat({
   /** The map robot mirrors the chat's state. */
   onRobotState?: (state: RobotState) => void;
   reducedMotion: boolean;
+  /** scene16 B: one praise to add now (the App passes only the last record of today, once per session). */
+  praise?: Praise | null;
+  /** Called once the praise is in the feed, so the App does not pass it again. */
+  onPraised?: (key: string) => void;
 }) {
   const titleId = useId();
   const counterId = useId();
@@ -89,12 +102,27 @@ export function AssistantChat({
   const pending = useRef<AbortController | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const log = useRef<HTMLDivElement>(null);
+  const [happy, setHappy] = useState(false);
+  const shown = useRef(new Set<string>());
+  const happyTimer = useRef<number | undefined>(undefined);
+
+  // scene16 B: add the praise once, then one happy cycle of the header (2.4 s), then the usual state.
+  useEffect(() => {
+    if (!praise || shown.current.has(praise.key)) return;
+    shown.current.add(praise.key);
+    setLines((current) => [...current, { id: nextId.current++, role: "assistant", content: praise.text, at: clock(), praise }]);
+    onPraised?.(praise.key);
+    setHappy(true);
+    window.clearTimeout(happyTimer.current);
+    happyTimer.current = window.setTimeout(() => setHappy(false), JOY_CHAT_MS);
+  }, [praise, onPraised]);
+  useEffect(() => () => window.clearTimeout(happyTimer.current), []);
 
   const state = robotStateFor({
     open: true,
     loading,
     typing: focused && draft.trim().length > 0,
-    answerShown: lines.at(-1)?.role === "assistant",
+    answerShown: lines.at(-1)?.role === "assistant" && !lines.at(-1)?.praise,
   });
 
   useEffect(() => {
@@ -171,19 +199,19 @@ export function AssistantChat({
     }
   }
 
-  const status = STATUS[state];
+  const status = happy ? HAPPY_STATUS : STATUS[state];
 
   return (
-    <div className="lx-chat-root" data-robot-state={state}>
+    <div className="lx-chat-root" data-robot-state={state} data-happy={happy || undefined}>
       <div className="lx-chat-dim" aria-hidden="true" onClick={onClose} />
       <section className="lx-chat" role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="lx-chat__in">
           <div className="lx-chat__grab" aria-hidden="true" />
           <header className="lx-chat__head">
             <div className="lx-chat__ava" aria-hidden="true">
-              <img className="fr" src={avatarFrameSrc(reducedMotion)} width={64} height={64} alt="" />
+              <img className="fr" src={happy ? happyFrameSrc(reducedMotion) : avatarFrameSrc(reducedMotion)} width={64} height={64} alt="" />
               <div className="cr">
-                <img className="lx-chat__robot" src={robotSrc(state, reducedMotion)} alt="" />
+                <img className="lx-chat__robot" src={happy ? happyRobotSrc("soft", reducedMotion) : robotSrc(state, reducedMotion)} alt="" />
               </div>
             </div>
             <div>
@@ -206,13 +234,15 @@ export function AssistantChat({
               <div className="lx-msg__meta" aria-hidden="true">ИИ-ПОМОЩНИК · {openedAt}</div>
               <p className="lx-msg__b">{GREETING}</p>
             </div>
-            {lines.map((line) => (
+            {lines.map((line) => line.praise ? (
+              <PraiseLine key={line.id} line={line} praise={line.praise} />
+            ) : (
               <div key={line.id} className={`lx-msg ${line.role === "user" ? "lx-msg--me" : "lx-msg--bot"}${line.offline ? " is-offline" : ""}`}>
                 <div className="lx-msg__meta" aria-hidden="true">
                   {line.role === "user" ? "ТЫ" : "ИИ-ПОМОЩНИК"} · {line.at}
                 </div>
                 <p className="lx-msg__b">
-                  <span className="sr-only">{line.role === "user" ? "Ты: " : "Помощник: "}</span>
+                  <span className="sr-only">{line.role === "user" ? "Ты: " : "ИИ-помощник: "}</span>
                   {line.content}
                 </p>
               </div>
@@ -265,6 +295,29 @@ export function AssistantChat({
           </small>
         </div>
       </section>
+    </div>
+  );
+}
+
+/** scene16 B: «ПОХВАЛА» bubble. With XP: a «+N XP» chip; after the cap: «Записано», no XP and no numbers of reward. */
+function PraiseLine({ line, praise }: { line: ChatLine; praise: Praise }) {
+  return (
+    <div className="lx-msg lx-msg--bot lx-msg--praise" data-praise={praise.key}>
+      <div className="lx-msg__meta" aria-hidden="true">
+        ИИ-ПОМОЩНИК · {line.at} · <span className="lx-msg__tag">ПОХВАЛА</span>
+      </div>
+      <div className="lx-msg__b">
+        <span className="sr-only">ИИ-помощник: </span>
+        {praise.text}
+        <span className="lx-rw">
+          {praise.gainedXp > 0 ? (
+            <span className="lx-msg__act g"><img src={REWARD_ICON_URL} width={18} height={18} alt="" />+{praise.gainedXp} XP</span>
+          ) : (
+            <span className="lx-msg__act n">Записано</span>
+          )}
+          {praise.place ? <span className="lx-msg__act">{praise.place.name} · {praise.place.done} / {praise.place.total}</span> : null}
+        </span>
+      </div>
     </div>
   );
 }

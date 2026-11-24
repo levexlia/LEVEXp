@@ -38,5 +38,17 @@ describe("scene17/18 assets (PR-A)", () => {
     expect(styles).toMatch(/\.map-hint \.lx-hint__x \{ pointer-events: auto; \}/);
     expect(styles).toMatch(/\.map-hint \.lx-hint__x \{ left: 0; right: auto; \}/);
     expect(styles).toMatch(/\.lx-hint__x \{[^}]*width: 44px; height: 44px;/);
+    // scene16 fix: «Открыть чат» is the second real button, a 120×44 zone.
+    expect(styles).toMatch(/\.map-hint \.lx-hint__chat \{ pointer-events: auto; \}/);
+    expect(styles).toMatch(/\.lx-hint__chat \{[^}]*width: 120px; height: 44px;/);
+  });
+});
+
+describe("scene16 review: chat log layout", () => {
+  it("messages flow from the top and the log scrolls: no empty band pushed above them", () => {
+    const styles = readFileSync(fileURLToPath(new URL("../styles.css", import.meta.url)), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(styles).not.toMatch(/\.lx-chat__log > :first-child \{ margin-top: auto; \}/);
+    expect(styles).toMatch(/\.lx-chat__log \{ min-height: 0; overflow-y: auto;[^}]*justify-content: flex-start;/);
+    expect(styles).toMatch(/\.lx-chat \{[^}]*max-height: min\(672px, 86vh\);/);
   });
 });
