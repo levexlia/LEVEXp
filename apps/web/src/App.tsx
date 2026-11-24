@@ -20,6 +20,7 @@ import { Avatar } from "./avatar/Avatar";
 import { AvatarBuilder } from "./AvatarBuilder";
 import { AssistantChat } from "./assistant/AssistantChat";
 import { ASSISTANT_ROBOT_SIZE, ROBOT_STATES, robotSrc, type RobotState } from "./assistant/art";
+import { rememberChatOpened, shouldShowTapMarker, tapMarkerSrc } from "./assistant/tapMarker";
 import { Check, PhotoPick, Toast } from "./Controls";
 import { HomeMap, mapStates } from "./HomeMap";
 import { MissionsView, TodayPanel, type MissionActions } from "./Missions";
@@ -52,6 +53,12 @@ export function App() {
   const [chat, setChat] = useState(false);
   const [robotState, setRobotState] = useState<RobotState>("idle");
   const robotRef = useRef<HTMLButtonElement>(null);
+  const [tapMarker, setTapMarker] = useState(shouldShowTapMarker);
+  const openChat = useCallback(() => {
+    setChat(true);
+    rememberChatOpened();
+    setTapMarker(false);
+  }, []);
   const closeChat = useCallback(() => {
     setChat(false);
     setRobotState("idle");
@@ -274,7 +281,7 @@ export function App() {
                   ref={robotRef}
                   type="button"
                   className="map-robot"
-                  onClick={() => setChat(true)}
+                  onClick={openChat}
                   aria-label="ИИ-помощник: открыть чат"
                   aria-haspopup="dialog"
                   aria-expanded={chat}
@@ -286,6 +293,15 @@ export function App() {
                     height={ASSISTANT_ROBOT_SIZE.height}
                     data-state={chat ? robotState : "idle"}
                   />
+                  {tapMarker ? (
+                    <img
+                      className="map-robot__marker"
+                      src={tapMarkerSrc(reducedMotion)}
+                      alt=""
+                      width={34}
+                      height={34}
+                    />
+                  ) : null}
                 </button>
               </div>
 

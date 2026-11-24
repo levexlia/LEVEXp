@@ -100,6 +100,8 @@ button { cursor: pointer; }
   z-index: 4;
 }
 .map-robot img { position: absolute; left: -16px; top: -20px; display: block; width: 80px; height: 120px; pointer-events: none; }
+/* «Нажми» marker (scene15): 34×34, centred 4 px above the helmet (box left + 24, box top − 10). Part of the tap target. */
+.map-robot img.map-robot__marker { left: 8px; top: -30px; width: 34px; height: 34px; pointer-events: auto; }
 .map-robot:focus-visible { outline: 2px solid var(--lx-cyan); outline-offset: 4px; }
 
 .profile-hero {
