@@ -1,4 +1,4 @@
-import { ACTIVE_OWN_MISSIONS_MAX, MAP_NODES, activeOwnCount, activeOwnLimitMessage, dailyCapHint, type LifeSphereId, type MapNodeId, type MapNodeState } from "@levex/domain";
+import { ACTIVE_OWN_MISSIONS_MAX, MAP_NODES, XP_REWARD_STANDARD, dailyLedger, xpDoneLabel, xpPromiseLabel, activeOwnCount, activeOwnLimitMessage, dailyCapHint, type LifeSphereId, type MapNodeId, type MapNodeState } from "@levex/domain";
 import { useState, type FormEvent } from "react";
 import type { Goal, TodayAwards } from "./api";
 import { activityAid } from "./daily/activity";
@@ -73,7 +73,7 @@ export function MissionItem({ row, goal, actions, reducedMotion }: { row: Missio
         ) : null}
       </div>
       <div className="mission__act">
-        <span className="mission__xp">{row.done ? (row.noXp ? "без XP · записано" : `+${row.xp} XP получено`) : row.noXpToday ? "без XP сегодня" : `+${row.xp} XP`}</span>
+        <span className="mission__xp">{row.done ? xpDoneLabel(row.noXp ? 0 : row.xp) : xpPromiseLabel(row.noXpToday, row.xp)}</span>
         {row.done ? null : locked ? (
           <button type="button" className="lx-btn lx-btn--sm" disabled aria-label={`${locked}: ${row.title}`}>
             <span className="lx-btn__in"><img src="/art/scene14/ui/ic_lock.svg" width={14} height={14} alt="" />Закрыто</span>
@@ -194,12 +194,23 @@ export function MissionsView({
  * «Без места на карте»: Карьера, Финансы, Отношения have no map place yet, so their missions are added
  * here, from level 1. Each gives +10 XP under the same daily rules (one award per template a day).
  */
+/** R-XP-6: today's 5/5 is used up (player day in Asia/Jerusalem). */
+function dailyLedgerCapped(goals: readonly Goal[], now = new Date()): boolean {
+  const ledger = dailyLedger(goals, now);
+  return ledger.awarded >= ledger.awardCap;
+}
+
 function Placeless({ goals, busy, onTemplate }: { goals: readonly Goal[]; busy: boolean; onTemplate: (templateId: string) => void }) {
   const groups = placelessBoard(goals);
+  const capped = dailyLedgerCapped(goals);
   return (
     <section className="placeless" aria-labelledby="placeless-title">
       <h3 id="placeless-title">Без места на карте</h3>
-      <p className="missions-note">Короткие дела на 5–25 минут, доступны с первого уровня. +10 XP, один раз в день за каждое.</p>
+      <p className="missions-note" data-capped={capped || undefined}>
+        {capped
+          ? "Короткие дела на 5–25 минут, доступны с первого уровня. Сегодня лимит XP уже набран: дела запишутся без XP."
+          : `Короткие дела на 5–25 минут, доступны с первого уровня. +${XP_REWARD_STANDARD} XP, один раз в день за каждое.`}
+      </p>
       <div className="placeless__groups">
       {groups.map((group) => (
         <div key={group.sphere} className="placeless__group" data-sphere={group.sphere}>
@@ -220,7 +231,7 @@ function Placeless({ goals, busy, onTemplate }: { goals: readonly Goal[]; busy: 
                 >
                   <span className="placeless__ttl">{state === "open" ? "✓" : "+"} {template.title}</span>
                   <span className="placeless__meta">
-                    ~{template.minutes} мин · {state === "open" ? "уже в списке" : state === "awarded" ? "без XP сегодня" : "+10 XP"}
+                    ~{template.minutes} мин · {state === "open" ? "уже в списке" : xpPromiseLabel(state === "noXp", XP_REWARD_STANDARD)}
                   </span>
                 </button>
               </li>
@@ -358,7 +369,7 @@ export function TodayPanel({
                       onClick={() => onPlan(chip)}
                       data-plan={chip.key}
                     >
-                      <span className="lx-chip__in">+ {chip.title}{chip.noXpToday ? <small className="plan-chip__noxp"> · без XP сегодня</small> : null}</span>
+                      <span className="lx-chip__in">+ {chip.title}{chip.noXpToday ? <small className="plan-chip__noxp"> · {xpPromiseLabel(true, 0)}</small> : null}</span>
                     </button>
                   ))}
                 </div>

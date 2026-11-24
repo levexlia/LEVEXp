@@ -1,4 +1,4 @@
-import type { MapNodeId, MapNodeState } from "@levex/domain";
+import { xpDoneLabel, xpPromiseLabel, type MapNodeId, type MapNodeState } from "@levex/domain";
 import { useEffect } from "react";
 import type { Goal } from "./api";
 import { placeIconUrl } from "./map/placeIcons";
@@ -142,7 +142,7 @@ export function PlaceSheet({
                     alt={mission.done ? "Выполнена" : ""}
                   />
                   <span className="ttl">{mission.title}</span>
-                  <span className="xpv">{!mission.done && mission.noXpToday ? "без XP сегодня" : `+${mission.xp} XP`}</span>
+                  <span className="xpv">{mission.done ? xpDoneLabel(mission.xp) : xpPromiseLabel(mission.noXpToday, mission.xp)}</span>
                   {!mission.done && id === "workshop" && onProof ? (
                     <button type="button" className="lx-btn lx-btn--secondary lx-btn--sm" disabled={busy} onClick={() => onProof(mission.id)} aria-label={`Proof: ${mission.title}`}>
                       <span className="lx-btn__in">Proof</span>
