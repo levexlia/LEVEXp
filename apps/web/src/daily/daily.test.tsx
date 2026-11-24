@@ -635,6 +635,8 @@ describe("honest XP labels at the caps (R-XP-6 / R-XP-7)", () => {
     server(fiveToday(), { awarded: 5 });
     await renderApp();
     const today = screen.getByRole("complementary", { name: "Сегодня" });
+    // cycle2 P-C5: five records today — the plan opens under «Ещё идеи».
+    fireEvent.click(within(today).getByRole("button", { name: "Ещё идеи" }));
     const chips = today.querySelectorAll("[data-plan]");
     expect(chips).toHaveLength(3);
     for (const chip of chips) expect(chip.textContent).toContain("без XP сегодня");

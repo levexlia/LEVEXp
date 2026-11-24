@@ -41,7 +41,7 @@ import { AvatarBuilder } from "./AvatarBuilder";
 import { AssistantChat } from "./assistant/AssistantChat";
 import { ASSISTANT_ROBOT_SIZE, ROBOT_STATES, robotSrc, type RobotState } from "./assistant/art";
 import { rememberChatOpened, shouldShowTapMarker, tapMarkerSrc } from "./assistant/tapMarker";
-import { HINT_TEXT, useAssistantHint } from "./assistant/hints";
+import { HINT_TEXT, emptyDayActive, useAssistantHint } from "./assistant/hints";
 import { HintBubble, hintRobotSrc } from "./assistant/HintBubble";
 import { Check, PhotoPick, Toast } from "./Controls";
 import { HomeMap, mapStates } from "./HomeMap";
@@ -123,11 +123,12 @@ export function App() {
   const now = new Date();
   const plan = planChips(goals, level, now, player?.progress.xpBySphere ?? {});
   const ledger = dailyLedger(goals, now);
+  const todayNow = todayBoard(goals, now);
   // Assistant hints (scene17): only once the room is loaded, so an empty first render does not count.
   const { hint, dismiss: dismissHint } = useAssistantHint(
     {
       own_cap: player !== null && ledger.ownAwarded >= ledger.ownAwardCap,
-      empty_day: player !== null && plan.length > 0 && todayBoard(goals, now).open.length === 0,
+      empty_day: emptyDayActive({ loaded: player !== null, planCount: plan.length, openToday: todayNow.open.length, doneToday: todayNow.doneToday }),
     },
     now,
   );

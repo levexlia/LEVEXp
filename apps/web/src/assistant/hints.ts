@@ -20,6 +20,14 @@ export const HINT_TEXT = {
   ownCap: "Свои миссии с XP на сегодня есть. Дальше они запишутся без XP.",
 } as const;
 
+/**
+ * `empty_day` reason (cycle2 P-C5): a plan exists, nothing is open for today and nothing was recorded today.
+ * A day where everything is already done is not an empty day: the robot does not ask for more.
+ */
+export function emptyDayActive(day: { loaded: boolean; planCount: number; openToday: number; doneToday: number }): boolean {
+  return day.loaded && day.planCount > 0 && day.openToday === 0 && day.doneToday === 0;
+}
+
 /** Width of the bubble (scene17: 206 px for the map text, 256 px for the longer «3/3» text). */
 export const HINT_WIDTH: Record<HintId, number> = { empty_day: 206, own_cap: 256 };
 

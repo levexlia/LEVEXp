@@ -99,7 +99,9 @@ describe("playtest fixes", () => {
     await waitFor(() => expect(view.querySelector('[data-mission="g1"]')?.getAttribute("data-status")).toBe("done"));
     expect(view.querySelector('[data-mission="g1"]')!.textContent).toContain("выполнена");
     expect(api.calls.some((call) => call.method === "POST" && call.url === "/goals/g1/complete")).toBe(true);
-    expect(within(view).getByText("Выполненная миссия повторно XP не даёт.")).toBeTruthy();
+    // cycle2 P-C2: the old «no XP again» caption is replaced by an honest one about «Повторить завтра».
+    expect(within(view).queryByText("Выполненная миссия повторно XP не даёт.")).toBeNull();
+    expect(within(view).getByText(/Повторить дело можно кнопкой «Повторить завтра» после выполнения\./)).toBeTruthy();
     // No dead end: the done mission has no action, the open one still does.
     expect(within(view).queryByRole("button", { name: "Выполнить: Утренняя прогулка 20 мин" })).toBeNull();
     expect(within(view).getByRole("button", { name: "Выполнить: Прочитать 10 страниц" })).toBeTruthy();
@@ -184,9 +186,14 @@ describe("playtest fixes", () => {
     expect(today.textContent).toContain("Выполнено сегодня: 1");
     expect(today.textContent).not.toContain("Миссий пока нет");
     fireEvent.click(within(today).getByRole("button", { name: "Выполнить: Прочитать 10 страниц" }));
-    // Spec №1: an empty day shows a plan instead of only the form: «Можно снова:» first, max 3 buttons.
-    // Both seeds already gave XP today: new missions come first and fill the 3 buttons, so no «Можно снова» block.
-    await waitFor(() => expect(today.querySelector('[data-empty="today"]')?.textContent).toMatch(/^На сегодня дел нет — день свободен\.Можно взять:/));
+    // cycle2 P-C5: all done today is not an empty day — the record is acknowledged, the plan waits under «Ещё идеи».
+    await waitFor(() => expect(today.querySelector('[data-empty="today-done"]')).not.toBeNull());
+    expect(within(today).getByText("Сегодня записано: 2. Можно на этом остановиться.")).toBeTruthy();
+    expect(today.querySelector('[data-empty="today"]')).toBeNull();
+    expect(today.querySelectorAll("[data-plan]")).toHaveLength(0);
+    fireEvent.click(within(today).getByRole("button", { name: "Ещё идеи" }));
+    // Spec №1 plan, max 3 buttons. Both seeds already gave XP today: new missions come first, so no «Можно снова» block.
+    expect(today.querySelector("#today-ideas [data-plan-block]")?.textContent).toMatch(/^Можно взять:/);
     expect(today.querySelectorAll("[data-plan]")).toHaveLength(3);
     expect(today.querySelector('[data-plan-block="repeat"]')).toBeNull();
   });
@@ -215,11 +222,16 @@ describe("playtest fixes", () => {
     const { container } = await renderApp();
     fireEvent.click(container.querySelector('.map-node[data-node="home"]')!);
     const sheet = await screen.findByRole("dialog", { name: "Дом" });
-    expect(within(sheet).getByText("Пройденные миссии повторно XP не дают.")).toBeTruthy();
+    // cycle2: the same honest note as in «Выполнены» (one shared constant), the old «no XP again» line is gone.
+    expect(within(sheet).queryByText("Пройденные миссии повторно XP не дают.")).toBeNull();
+    expect(within(sheet).getByText("Повторить дело можно кнопкой «Повторить завтра» после выполнения.")).toBeTruthy();
     expect(within(sheet).queryByRole("button", { name: /Повторить/ })).toBeNull();
     fireEvent.click(within(sheet).getByRole("button", { name: "Миссии места" }));
     const view = screen.getByRole("region", { name: "Миссии" });
     expect(within(view).getByRole("button", { name: "Дом" }).getAttribute("aria-pressed")).toBe("true");
+    // cycle2 P-C2: a record older than yesterday waits behind «Показать более ранние»; nothing is lost.
+    expect(view.querySelectorAll(".mission")).toHaveLength(0);
+    fireEvent.click(within(view).getByRole("button", { name: /Показать более ранние/ }));
     expect(view.querySelectorAll(".mission")).toHaveLength(1);
   });
 

@@ -157,10 +157,76 @@ describe("daily XP rules", () => {
     const twice = await post("/goals", { repeatOf: walk, forTomorrow: true });
     expect(twice.statusCode).toBe(200);
     expect(twice.json().id).toBe(first.json().id);
-    // Closing the copy today: done, but no second award for seed-walk.
-    const early = (await complete(first.json().id)).json();
-    expect(early).toMatchObject({ awarded: false, reason: "template_already_awarded" });
-    expect(early.message).toContain("Утренняя прогулка 20 мин");
+    // cycle2 P-C3: tomorrow's copy cannot be closed today (see the not_yet tests below).
+    expect((await complete(first.json().id)).statusCode).toBe(409);
+    expect(await xp()).toBe(10);
+  });
+
+  it("cycle2 P-C3: tomorrow's copy today → 409 not_yet, nothing changes; on its Israeli day → 200 by R-XP-10", async () => {
+    const walk = seedId("seed-walk");
+    await complete(walk);
+    const copy = (await post("/goals", { repeatOf: walk, forTomorrow: true })).json();
+    const before = (await app().inject({ method: "GET", url: "/player" })).json();
+    const early = await complete(copy.id);
+    expect(early.statusCode).toBe(409);
+    expect(early.json()).toEqual({ error: "not_yet", message: "Эта миссия на 25.11", availableFrom: "2026-11-25" });
+    const after = (await app().inject({ method: "GET", url: "/player" })).json();
+    expect(after.progress).toEqual(before.progress);
+    expect(after.today).toEqual(before.today);
+    const stored = listGoals().find((goal) => goal.id === copy.id)!;
+    expect(stored.status).toBe("open");
+    expect(stored.completedAt).toBeUndefined();
+    expect(stored.xpGranted).toBeUndefined();
+    expect(stored.noXpReason).toBeUndefined();
+    // Late evening, still 24.11 in Israel: still not yet.
+    at("2026-11-24T21:59:00.000Z");
+    expect((await complete(copy.id)).statusCode).toBe(409);
+    // 00:01 on 25.11 in Israel (22:01 UTC on 24.11): the copy pays the standard 10 once.
+    at("2026-11-24T22:01:00.000Z");
+    const due = await complete(copy.id);
+    expect(due.statusCode).toBe(200);
+    expect(due.json()).toMatchObject({ awarded: true, awardedToday: 1 });
+    expect(due.json().goal.xpGranted).toBe(10);
+    expect(await xp()).toBe(20);
+    // R-XP-10: one template, one award per day — another seed-walk the same day is recorded without XP.
+    const more = await make({ templateId: "seed-walk" });
+    expect((await complete(more)).json()).toMatchObject({ awarded: false, reason: "template_already_awarded" });
+    expect(await xp()).toBe(20);
+  });
+
+  it("cycle2 P-C3: an own-mission copy for tomorrow is also not_yet; the own cap is not touched", async () => {
+    const own = await make({ title: "Растяжка 10 мин", sphere: "health" });
+    await complete(own);
+    const copy = (await post("/goals", { repeatOf: own, forTomorrow: true })).json();
+    const early = await complete(copy.id);
+    expect(early.statusCode).toBe(409);
+    expect(early.json().error).toBe("not_yet");
+    const today = (await app().inject({ method: "GET", url: "/player" })).json().today;
+    expect(today).toMatchObject({ awarded: 1, ownAwarded: 1 });
+  });
+
+  it("cycle2 P-C3: old data where tomorrow's copy was already closed early stays as it was", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "levexp-early-"));
+    temps.push(dir);
+    const file = path.join(dir, "levexp.json");
+    openStore(file);
+    const walk = seedId("seed-walk");
+    await complete(walk);
+    const copy = (await post("/goals", { repeatOf: walk, forTomorrow: true })).json();
+    openStore(null);
+    // Write the record the old server produced: the copy done on 24.11 without XP.
+    const raw = JSON.parse(readFileSync(file, "utf8"));
+    const goal = raw.goals.find((g: { id: string }) => g.id === copy.id);
+    Object.assign(goal, { status: "done", completedAt: "2026-11-24T08:05:00.000Z", xpGranted: 0, noXpReason: "template_already_awarded" });
+    writeFileSync(file, JSON.stringify(raw));
+    resetStore(false);
+    openStore(file);
+    const list = (await app().inject({ method: "GET", url: "/goals" })).json() as Array<Record<string, unknown>>;
+    expect(list.find((g) => g.id === copy.id)).toMatchObject({ status: "done", availableFrom: "2026-11-25", xpGranted: 0, completedAt: "2026-11-24T08:05:00.000Z" });
+    // Completing it again is the old idempotent 200, no XP and no change.
+    const again = await complete(copy.id);
+    expect(again.statusCode).toBe(200);
+    expect(again.json().awarded).toBe(false);
     expect(await xp()).toBe(10);
   });
 

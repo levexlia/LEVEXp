@@ -17,7 +17,7 @@ describe("place sheet by state", () => {
     expect(sheet.actions.map((a) => ACTION_LABEL[a])).toEqual(["Позже", "Начать"]);
     expect(sheet.status).toBe("Доступно");
     expect(sheet.meta).toBe("Место 04");
-    expect(sheet.missions).toEqual([{ id: "g4", title: "Скетч", xp: 15, done: false, noXpToday: false }]);
+    expect(sheet.missions).toEqual([{ id: "g4", title: "Скетч", xp: 15, done: false, noXpToday: false, from: null }]);
     expect(sheet.progress).toEqual({ done: 0, total: 1 });
     expect(sheet.missionsHidden).toBe(false);
     expect(sheet.condition).toBeNull();

@@ -31,7 +31,8 @@ describe("missions model", () => {
 
   it("«Сегодня» uses the same goals", () => {
     const today = todayBoard(goals, new Date("2026-11-22T12:00:00.000Z"));
-    expect(today.open.map((row) => row.id)).toEqual(["b", "d"]);
+    // cycle2 P-C1: own missions (no template) newest first.
+    expect(today.open.map((row) => row.id)).toEqual(["d", "b"]);
     expect(today.openTotal).toBe(2);
     expect(today.doneToday).toBe(1);
   });

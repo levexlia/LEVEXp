@@ -2,7 +2,7 @@ import { ACTIVE_OWN_MISSIONS_MAX, MAP_NODES, XP_REWARD_STANDARD, dailyLedger, xp
 import { useState, type FormEvent } from "react";
 import type { Goal, TodayAwards } from "./api";
 import { activityAid } from "./daily/activity";
-import { ANYWHERE, MISSION_STATUS, missionBoard, ownBoard, placelessBoard, rowWhere, todayBoard, type MissionFilter, type MissionRow, type PlanChip } from "./map/missions";
+import { ANYWHERE, MISSION_STATUS, REPEAT_NOTE, missionBoard, ownBoard, placelessBoard, rowWhere, todayBoard, type MissionFilter, type MissionRow, type PlanChip } from "./map/missions";
 import { KitIcon, SPHERE_ICON, kitIconUrl } from "./map/KitIcon";
 import { uiIconUrl } from "./theme/uiArt";
 
@@ -69,7 +69,9 @@ export function MissionItem({
   variant?: "list" | "own";
 }) {
   void reducedMotion;
-  const status = row.done ? MISSION_STATUS.done : MISSION_STATUS.open;
+  // cycle2 P-C3: an open copy for a later day («Повторить завтра») cannot be done before its day.
+  const waiting = !row.done && row.from !== null;
+  const status = row.done ? MISSION_STATUS.done : waiting ? MISSION_STATUS.later : MISSION_STATUS.open;
   const locked = row.done ? null : actions.lockedText?.(row) ?? null;
   const startable = !row.done && !row.proof && !locked && actions.onStart && activityAid(row.title, goal.templateId).kind !== "stopwatch";
   const [confirming, setConfirming] = useState(false);
@@ -105,9 +107,13 @@ export function MissionItem({
         <span className="mission__meta">
           {own ? row.placeName : rowWhere(row)} · <b className="mission__st">{status.toLowerCase()}</b>
           {row.doneOn && !own ? ` · ${row.doneOn}` : null}
-          {row.from ? ` · с ${row.from}` : null}
-          {" · "}
-          <span className="mission__xp">{row.done ? xpDoneLabel(row.noXp ? 0 : row.xp) : xpPromiseLabel(row.noXpToday, row.xp)}</span>
+          {/* cycle2 P-C3: a copy for a later day promises no XP today; its day is shown instead (list rows: on the right). */}
+          {waiting ? (own ? ` · с ${row.from}` : null) : (
+            <>
+              {" · "}
+              <span className="mission__xp">{row.done ? xpDoneLabel(row.noXp ? 0 : row.xp) : xpPromiseLabel(row.noXpToday, row.xp)}</span>
+            </>
+          )}
         </span>
         {row.reflection && !own ? <span className="mission__refl">{row.reflection}</span> : null}
         {locked && !own ? <span className="mission__refl">{locked}</span> : null}
@@ -119,7 +125,11 @@ export function MissionItem({
         ) : null
       ) : (
         <div className="mission__act">
-          {row.done ? null : locked ? (
+          {row.done ? null : waiting ? (
+            <span className="mission__from" data-from={row.from} aria-label={`Можно выполнить с ${row.from}: ${row.title}`}>
+              с {row.from}
+            </span>
+          ) : locked ? (
             <button type="button" className="lx-btn lx-btn--sm" disabled aria-label={`${locked}: ${row.title}`}>
               <span className="lx-btn__in"><img src="/art/scene14/ui/ic_lock.svg" width={14} height={14} alt="" />Закрыто</span>
             </button>
@@ -237,22 +247,47 @@ export function MissionsView({
 
       {(place === null || place === ANYWHERE) && onTemplate ? <Placeless goals={goals} busy={actions.busy} onTemplate={onTemplate} /> : null}
 
-      {board.done.length > 0 ? (
-        <>
-          <h3>Выполнены</h3>
-          <p className="missions-note">Выполненная миссия повторно XP не даёт.</p>
-          <List rows={board.done} goals={goals} actions={actions} reducedMotion={reducedMotion} />
-        </>
-      ) : null}
-
       <OwnMissions rows={own.rows} count={own.count} goals={goals} actions={actions} reducedMotion={reducedMotion} />
 
       <NewMission key={place ?? "all"} states={states} place={place === ANYWHERE ? null : place} busy={actions.busy} onCreate={onCreate} full={activeOwnCount(goals) >= ACTIVE_OWN_MISSIONS_MAX} />
+
+      {board.done.length > 0 ? (
+        <DoneHistory key={place ?? "all"} rows={board.done} recent={board.doneRecent} goals={goals} actions={actions} reducedMotion={reducedMotion} />
+      ) : null}
     </section>
   );
 }
 
 const ANYWHERE_GLYPH = "/art/scene18/ic_anywhere_a_glyph.svg";
+
+/** «Показать более ранние (N)» in «Выполнены» adds this many older records (cycle2 P-C2); N = still hidden. */
+export const DONE_MORE_STEP = 20;
+
+/**
+ * «Выполнены» (cycle2 P-C2), under «Свои миссии» and the form: today's and yesterday's records, older ones
+ * behind «Показать более ранние (N)». Nothing is deleted; the full history stays in the data and the week journal.
+ */
+function DoneHistory({ rows, recent, goals, actions, reducedMotion }: { rows: MissionRow[]; recent: number; goals: readonly Goal[]; actions: MissionActions; reducedMotion: boolean }) {
+  const [shown, setShown] = useState(recent);
+  const visible = rows.slice(0, Math.max(shown, 0));
+  const rest = rows.length - visible.length;
+  return (
+    <section className="done-history" aria-labelledby="done-title" data-done-total={rows.length}>
+      <h3 id="done-title">Выполнены</h3>
+      <p className="missions-note">{shown <= recent ? "Сегодня и вчера." : "Сегодня, вчера и раньше."} {REPEAT_NOTE}</p>
+      {visible.length > 0 ? (
+        <List rows={visible} goals={goals} actions={actions} reducedMotion={reducedMotion} />
+      ) : (
+        <p className="empty" data-empty="done-recent">За сегодня и вчера записей нет.</p>
+      )}
+      {rest > 0 ? (
+        <button type="button" className="quiet done-more" onClick={() => setShown(visible.length + DONE_MORE_STEP)}>
+          Показать более ранние ({rest})
+        </button>
+      ) : null}
+    </section>
+  );
+}
 
 /** Calm empty state (scene17 .lx-empty): art and one line. Static art under reduced motion. */
 export function EmptyState({ kind, art, line, reducedMotion }: { kind?: string; art: "empty_day" | "empty_own" | "empty_resources"; line: string; reducedMotion: boolean }) {
@@ -406,6 +441,59 @@ export function planBlocks(plan: readonly PlanChip[]): Array<{ kind: PlanChip["k
   return blocks;
 }
 
+/** The plan chips («Можно снова:» / «Можно взять:»), in their blocks. */
+function PlanBlocks({ plan, busy, onPlan }: { plan: readonly PlanChip[]; busy: boolean; onPlan: (chip: PlanChip) => void }) {
+  return (
+    <>
+      {planBlocks(plan).map(({ kind, chips }, index) => {
+        const label = kind === "repeat" ? "Можно снова:" : "Можно взять:";
+        return (
+          <div key={`${kind}-${index}`} className="today-plan__block" data-plan-block={kind}>
+            <p className="today-plan__label">{label}</p>
+            <div className="place-filter" role="group" aria-label={label}>
+              {chips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  className="lx-chip filter-chip plan-chip"
+                  style={{ ["--place" as string]: chip.place ? `var(--lx-place-${chip.place})` : "var(--lx-cyan)" }}
+                  disabled={busy}
+                  onClick={() => onPlan(chip)}
+                  data-plan={chip.key}
+                >
+                  <span className="lx-chip__in">+ {chip.title}{chip.noXpToday ? <small className="plan-chip__noxp"> · {xpPromiseLabel(true, 0)}</small> : null}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/** «Сегодня записано: N» with the plan folded under «Ещё идеи» (cycle2 P-C5). Folded on every mount. */
+function TodayDone({ count, plan, busy, onPlan }: { count: number; plan: readonly PlanChip[]; busy: boolean; onPlan?: (chip: PlanChip) => void }) {
+  const [ideasOpen, setIdeasOpen] = useState(false);
+  return (
+    <div className="today-done" data-empty="today-done">
+      <p className="today-done__line" role="status">Сегодня записано: {count}. Можно на этом остановиться.</p>
+      {plan.length > 0 && onPlan ? (
+        <>
+          <button type="button" className="quiet today-ideas" aria-expanded={ideasOpen} aria-controls="today-ideas" onClick={() => setIdeasOpen((value) => !value)}>
+            Ещё идеи
+          </button>
+          {ideasOpen ? (
+            <div className="today-plan" id="today-ideas">
+              <PlanBlocks plan={plan} busy={busy} onPlan={onPlan} />
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function TodayPanel({
   goals,
   streak,
@@ -443,33 +531,23 @@ export function TodayPanel({
       </p>
       {capped && awards ? <p className="today-cap" role="status">{dailyCapHint(awards.awardCap)}</p> : null}
       {today.open.length > 0 ? (
-        <List rows={today.open} goals={goals} actions={actions} reducedMotion={reducedMotion} />
+        <>
+          <List rows={today.open} goals={goals} actions={actions} reducedMotion={reducedMotion} />
+          {today.openTotal > today.open.length ? (
+            <p className="today-more" data-today-more={today.openTotal - today.open.length}>
+              Ещё {today.openTotal - today.open.length} — во вкладке «Миссии»
+            </p>
+          ) : null}
+        </>
+      ) : today.doneToday > 0 ? (
+        // cycle2 P-C5: everything for today is done — acknowledge it; more ideas only on request.
+        // Own state, remounted per record count: «Ещё идеи» starts folded every time this state is reached
+        // (e.g. ideas opened → a plan chip taken → done again), not left open from an earlier visit.
+        <TodayDone key={`done-${today.doneToday}`} count={today.doneToday} plan={plan} busy={actions.busy} onPlan={onPlan} />
       ) : plan.length > 0 && onPlan ? (
         <div className="today-plan" data-empty="today">
           <EmptyState art="empty_day" line="На сегодня дел нет — день свободен." reducedMotion={reducedMotion} />
-          {planBlocks(plan).map(({ kind, chips }, index) => {
-            const label = kind === "repeat" ? "Можно снова:" : "Можно взять:";
-            return (
-              <div key={`${kind}-${index}`} className="today-plan__block" data-plan-block={kind}>
-                <p className="today-plan__label">{label}</p>
-                <div className="place-filter" role="group" aria-label={label}>
-                  {chips.map((chip) => (
-                    <button
-                      key={chip.key}
-                      type="button"
-                      className="lx-chip filter-chip plan-chip"
-                      style={{ ["--place" as string]: chip.place ? `var(--lx-place-${chip.place})` : "var(--lx-cyan)" }}
-                      disabled={actions.busy}
-                      onClick={() => onPlan(chip)}
-                      data-plan={chip.key}
-                    >
-                      <span className="lx-chip__in">+ {chip.title}{chip.noXpToday ? <small className="plan-chip__noxp"> · {xpPromiseLabel(true, 0)}</small> : null}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+          <PlanBlocks plan={plan} busy={actions.busy} onPlan={onPlan} />
           <p className="field-hint">Отдых тоже нормален.</p>
         </div>
       ) : (
