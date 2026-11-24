@@ -8,6 +8,7 @@ import {
   type SphereTemplate,
   REFLECTION_LABEL,
   SEED_TEMPLATES,
+  OWN_TEMPLATE_PREFIX,
   dailyLedger,
   noXpTodayReason,
   templateNoXpReason,
@@ -150,16 +151,27 @@ export function todayBoard(
 }
 
 /**
- * «Свои миссии» (scene17): open own missions (no template, the ones the 20 limit counts) and own
- * missions finished today. `count` is the «N из 20» counter: open ones only, as the limit counts.
+ * A mission the player created: no built-in template (a «Повторить завтра» copy of an own mission keeps
+ * `own:<id>`), and not a copy of a catalog / seed mission by title + sphere (such a goal can only come from
+ * the API, e.g. a preview seed, never from the «Новая миссия» form).
+ */
+export function isOwnMission(goal: Goal): boolean {
+  if (goal.templateId && !goal.templateId.startsWith(OWN_TEMPLATE_PREFIX)) return false;
+  if (!goal.templateId && templateKeyOf(goal) !== null) return false;
+  return ![...SEED_TEMPLATES, ...SPHERE_TEMPLATES].some((template) => template.title === goal.title && template.sphere === goal.sphere);
+}
+
+/**
+ * «Свои миссии» (scene17): only missions the player created — open ones and those finished today.
+ * `count` is the «N из 20» counter: open own missions without a template, as the 20 limit counts them.
  */
 export function ownBoard(goals: readonly Goal[], now = new Date()): { rows: MissionRow[]; count: number } {
   const today = playerDay(now);
   const ledger = dailyLedger(goals, now);
-  const own = goals.filter((goal) => templateKeyOf(goal) === null);
+  const own = goals.filter(isOwnMission);
   const open = own.filter((goal) => goal.status === "open");
   const doneToday = own.filter((goal) => goal.status === "done" && playerDayOf(goal.completedAt) === today);
-  return { rows: [...open, ...doneToday].map((goal) => missionRow(goal, today, ledger)), count: open.length };
+  return { rows: [...open, ...doneToday].map((goal) => missionRow(goal, today, ledger)), count: open.filter((goal) => templateKeyOf(goal) === null).length };
 }
 
 /** A chip of the empty-day plan: «Можно снова:» (done before) or «Можно взять:» (new). */

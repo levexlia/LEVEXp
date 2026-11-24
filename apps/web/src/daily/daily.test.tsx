@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_AVATAR_CONFIG, SEED_TEMPLATES as SEED_TEMPLATES_FOR_TEST, SPHERE_TEMPLATES, builtInTemplate, dailyLedger, noXpMessage, templateNoXpReason, xpPromiseLabel } from "@levex/domain";
 import { App } from "../App";
 import type { Goal } from "../api";
-import { placelessBoard, planChips, todayBoard } from "../map/missions";
+import { ownBoard, placelessBoard, planChips, todayBoard } from "../map/missions";
 import { sphereHint, sphereRows } from "../map/resources";
 import { activityAid, clock } from "./activity";
 import { notePlaceholder } from "./AfterMission";
@@ -735,6 +735,29 @@ describe("scene17/18 UI: B2 «где угодно», empty states, «Свои м
     fireEvent.click(yes);
     await waitFor(() => expect(own.querySelector('[data-mission="o2"]')).toBeNull());
     expect(api.calls.some((call) => call.method === "DELETE" && call.url === "/goals/o2")).toBe(true);
+    expect(own.querySelector(".own-missions__count")?.textContent).toBe("1 из 20");
+  });
+
+  it("«Свои миссии» lists only missions the player created: no template / catalog / seed missions, even done today", async () => {
+    const today = nowIso();
+    const goals: Goal[] = [
+      { id: "tpl", title: "Написать близкому человеку", sphere: "relationships", xpReward: 10, status: "done", completedAt: today, xpGranted: 10, templateId: "rel-write" },
+      // Same title + sphere as the catalog mission but without templateId (only possible through the API).
+      { id: "dup", title: "Написать близкому человеку", sphere: "relationships", xpReward: 10, status: "done", completedAt: today, xpGranted: 10 },
+      { ...WALK, status: "done", completedAt: today, xpGranted: 10 },
+      { id: "o1", title: "Зарядка 10 мин", sphere: "health", xpReward: 10, status: "done", completedAt: today, xpGranted: 10 },
+      { id: "o2", title: "Разобрать стол", sphere: "health", xpReward: 10, status: "open" },
+      { id: "o1r", title: "Зарядка 10 мин", sphere: "health", xpReward: 10, status: "open", templateId: "own:o1", repeatOf: "o1", availableFrom: "2099-01-01" },
+    ];
+    expect(ownBoard(goals).rows.map((row) => row.id)).toEqual(["o2", "o1r", "o1"]);
+    expect(ownBoard(goals).count).toBe(1);
+    server(goals);
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Миссии" }));
+    const own = screen.getByRole("region", { name: "Свои миссии" });
+    expect([...own.querySelectorAll("[data-mission]")].map((row) => row.getAttribute("data-mission"))).toEqual(["o2", "o1r", "o1"]);
+    expect(own.textContent).not.toContain("Написать близкому человеку");
+    expect(own.textContent).not.toContain("Утренняя прогулка");
     expect(own.querySelector(".own-missions__count")?.textContent).toBe("1 из 20");
   });
 
