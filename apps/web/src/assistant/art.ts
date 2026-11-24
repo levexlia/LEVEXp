@@ -4,8 +4,9 @@
  */
 export const ROBOT_STATES = ["idle", "listening", "thinking", "speaking"] as const;
 /**
- * States the app shows. `happy` (robot_happy.svg) is in public/ but not used:
- * when to show it is Лия's call.
+ * States the chat and the map mirror. Joy is not one of them: scene16 shows `happysoft` / `happy`
+ * (bright) only for a moment after a record, see {@link happyRobotSrc} and assistant/joy.ts.
+ * scene15 robot_happy.svg stays a file only.
  */
 export type RobotState = (typeof ROBOT_STATES)[number];
 
@@ -56,4 +57,24 @@ export function robotStateFor(chat: {
   if (chat.typing) return "listening";
   if (chat.answerShown) return "speaking";
   return "idle";
+}
+
+/** scene16 joy art (levex_design/scene16): calm joy (A, B) and the bright one (only C). */
+const SCENE16 = "/art/scene16";
+
+export type HappyKind = "soft" | "bright";
+
+export function happyRobotSrc(kind: HappyKind, reducedMotion: boolean): string {
+  return reducedMotion ? `${SCENE16}/static/robot_happy_${kind}_static.svg` : `${SCENE16}/robot_happy_${kind}.svg`;
+}
+
+/** Gold hex frame of the chat avatar while the chat is happy (B). */
+export function happyFrameSrc(reducedMotion: boolean): string {
+  return reducedMotion ? `${SCENE16}/static/chat_avatar_frame_happy_static.svg` : `${SCENE16}/chat_avatar_frame_happy.svg`;
+}
+
+export type JoyFx = "fx_spark" | "fx_dome_hit" | "milestone_token";
+
+export function joyFxSrc(name: JoyFx, reducedMotion: boolean): string {
+  return reducedMotion ? `${SCENE16}/static/${name}_static.svg` : `${SCENE16}/${name}.svg`;
 }
