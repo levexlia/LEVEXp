@@ -196,6 +196,10 @@ button { cursor: pointer; }
 .bars b { display: block; height: 100%; background: var(--lx-grad-neon); }
 .bars strong { font-family: var(--lx-font-mono); }
 .sphere-name { display: inline-flex; align-items: center; gap: 0.35rem; }
+.bars li { flex-wrap: wrap; }
+.bars li.is-zero .sphere-name, .bars li.is-zero strong { opacity: 0.5; }
+.bars li.is-zero i { opacity: 0.4; }
+.bars__hint { flex-basis: 100%; font-size: 12px; font-weight: 400; color: var(--lx-text-muted); line-height: 1.35; padding-bottom: 2px; }
 /* Gallery card: the whole photo (contain) in a 4:3 well, caption on its own line inside the frame. */
 .gallery { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .gallery li {
@@ -621,8 +625,19 @@ button { cursor: pointer; }
 /* «Сегодня» is narrow (300px beside the map): text on top, buttons on their own row under it. */
 .stage-side .mission { grid-template-columns: 24px minmax(0, 1fr); row-gap: 0.4rem; }
 .stage-side .mission__act { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
-.mission__del { justify-self: start; padding: 0; font-size: 0.7rem; color: var(--lx-text-muted); }
-.mission__del:hover, .mission__del:focus-visible { color: var(--lx-violet); }
+/* «Удалить»: a real button (≥44px tap target) with a confirmation step. */
+.mission__del {
+  justify-self: start; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px; min-width: 44px; padding: 0 14px; margin-top: 4px;
+  border: 1px solid #3a4580; background: rgba(18, 26, 70, 0.8); color: var(--lx-text-2);
+  font: 600 13px var(--lx-font-text); cursor: pointer;
+}
+.mission__del:hover, .mission__del:focus-visible { border-color: var(--lx-violet); color: #fff; }
+.mission__del:disabled { opacity: 0.5; cursor: default; }
+.mission__del.is-danger { border-color: #ff5c8a; color: #ffd6e2; background: rgba(90, 20, 50, 0.6); }
+.mission__confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.mission__confirm .mission__del { margin-top: 0; }
+.mission__ask { font-size: 13px; color: var(--lx-text); }
 .activity__start { min-width: 220px; height: 48px; }
 .activity__goal { margin: 0; font: 700 12px var(--lx-font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--lx-cyan-soft); }
 .after__ok { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
@@ -632,3 +647,10 @@ button { cursor: pointer; }
 .proof-what { margin: 0 0 0.6rem; font-size: 0.85rem; color: var(--lx-text-2); }
 .empty-state { display: grid; gap: 0.3rem; padding: 0.8rem 0.9rem; border: 1px dashed #2c3770; }
 .empty-state p { margin: 0; }
+
+/* Activity sheet: «Не сейчас» stays on one line at 360–390 px. */
+.activity .ps-actions { gap: 8px; }
+.activity .ps-actions .lx-btn { white-space: nowrap; min-width: 0; }
+.activity .ps-actions .ps-later { width: auto; flex: none; letter-spacing: 0.12em; }
+.activity .ps-actions .ps-later > .lx-btn__in, .activity .ps-actions .ps-primary > .lx-btn__in { padding: 0 12px; }
+.activity .ps-actions .ps-primary { font-size: 14px; letter-spacing: 0.14em; }

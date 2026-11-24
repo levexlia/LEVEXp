@@ -1,6 +1,5 @@
 import {
   DEFAULT_AVATAR_CONFIG,
-  LIFE_SPHERES,
   MAP_NODES,
   NICKNAME_MAX_LENGTH,
   XP_PER_LEVEL,
@@ -47,6 +46,7 @@ import { ActivityScreen } from "./daily/ActivityScreen";
 import { AfterMission, type AfterMissionInfo } from "./daily/AfterMission";
 import { availableOn, planChips, placeName, placeForSphere, xpHint, type PlanChip } from "./map/missions";
 import { segments } from "./map/placeSheet";
+import { sphereRows } from "./map/resources";
 import { HEX_LEVEL_URL, tabIconUrl, uiIconUrl, type HeaderIcon, type TabIcon } from "./theme/uiArt";
 import { useReducedMotion } from "./theme/useReducedMotion";
 import { KitIcon, SPHERE_ICON } from "./map/KitIcon";
@@ -592,28 +592,29 @@ function pad2(value: number): string {
 }
 
 function Resources({ player }: { player: Player | null }) {
-  const spheres = player?.progress.xpBySphere ?? {};
-  const rows = Object.entries(spheres);
+  const rows = sphereRows(player?.progress.xpBySphere ?? {}, player?.progress.level ?? 1);
+  const empty = rows.every((row) => row.zero);
   return (
     <section className="panel">
       <h2>Ресурсы</h2>
-      {rows.length === 0 ? (
+      {empty ? (
         <div className="empty-state" data-empty="resources">
           <p>Здесь будет видно, в каких сферах жизни копится XP: здоровье, разум, творчество и другие.</p>
-          <p className="empty">Пока пусто. Выполни любую миссию из «Сегодня», и первая полоса появится здесь.</p>
+          <p className="empty">Пока пусто. Выполни любую миссию из «Сегодня», и первая полоса заполнится.</p>
         </div>
       ) : (
         <p className="empty">XP по сферам: за каждую выполненную миссию с начислением.</p>
       )}
       <ul className="bars">
-        {rows.map(([id, value]) => (
-          <li key={id}>
+        {rows.map((row) => (
+          <li key={row.id} className={row.zero ? "is-zero" : undefined} data-sphere={row.id}>
             <span className="sphere-name">
-              {SPHERE_ICON[id] ? <KitIcon name={SPHERE_ICON[id]} size={18} /> : null}
-              {LIFE_SPHERES.find((sphere) => sphere.id === id)?.name ?? id}
+              {SPHERE_ICON[row.id] ? <KitIcon name={SPHERE_ICON[row.id]!} size={18} /> : null}
+              {row.name}
             </span>
-            <i><b style={{ width: `${Math.min(100, value ?? 0)}%` }} /></i>
-            <strong>{value}</strong>
+            <i><b style={{ width: `${Math.min(100, row.xp)}%` }} /></i>
+            <strong>{row.xp}</strong>
+            {row.hint ? <small className="bars__hint">{row.hint}</small> : null}
           </li>
         ))}
       </ul>

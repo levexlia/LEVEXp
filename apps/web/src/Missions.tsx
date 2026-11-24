@@ -29,6 +29,7 @@ export function MissionItem({ row, goal, actions, reducedMotion }: { row: Missio
   const status = row.done ? MISSION_STATUS.done : MISSION_STATUS.open;
   const locked = row.done ? null : actions.lockedText?.(row) ?? null;
   const startable = !row.done && !row.proof && !locked && actions.onStart && activityAid(row.title).kind !== "stopwatch";
+  const [confirming, setConfirming] = useState(false);
   return (
     <li
       className={row.done ? "mission is-done" : "mission"}
@@ -53,9 +54,21 @@ export function MissionItem({ row, goal, actions, reducedMotion }: { row: Missio
         {row.reflection ? <span className="mission__refl">{row.reflection}</span> : null}
         {locked ? <span className="mission__refl">{locked}</span> : null}
         {!row.done && actions.onDelete ? (
-          <button type="button" className="quiet mission__del" disabled={actions.busy} onClick={() => actions.onDelete!(goal)} aria-label={`Удалить: ${row.title}`}>
-            Удалить
-          </button>
+          confirming ? (
+            <div className="mission__confirm" role="group" aria-label={`Удалить «${row.title}»?`}>
+              <span className="mission__ask">Удалить миссию?</span>
+              <button type="button" className="mission__del is-danger" disabled={actions.busy} onClick={() => { setConfirming(false); actions.onDelete!(goal); }}>
+                Да, удалить
+              </button>
+              <button type="button" className="mission__del" onClick={() => setConfirming(false)}>
+                Отмена
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="mission__del" disabled={actions.busy} onClick={() => setConfirming(true)} aria-label={`Удалить: ${row.title}`}>
+              <span aria-hidden="true">✕</span>Удалить
+            </button>
+          )
         ) : null}
       </div>
       <div className="mission__act">

@@ -6,6 +6,7 @@ import { DEFAULT_AVATAR_CONFIG, noXpMessage } from "@levex/domain";
 import { App } from "../App";
 import type { Goal } from "../api";
 import { planChips, todayBoard } from "../map/missions";
+import { sphereHint, sphereRows } from "../map/resources";
 import { activityAid, clock } from "./activity";
 
 function json(body: unknown, status = 200) {
@@ -13,14 +14,14 @@ function json(body: unknown, status = 200) {
 }
 
 /** In-memory API with the new fields. `capped` makes the next completion a no-XP record (daily_cap). */
-function server(initial: Goal[], options: { level?: number; awarded?: number; capped?: boolean } = {}) {
+function server(initial: Goal[], options: { level?: number; awarded?: number; capped?: boolean; xpBySphere?: Record<string, number> } = {}) {
   const goals = initial.map((goal) => ({ ...goal }));
   const level = options.level ?? 1;
   const player = {
     id: "p1",
     nickname: "Игрок",
     avatarConfig: DEFAULT_AVATAR_CONFIG,
-    progress: { xp: (level - 1) * 100, level, xpBySphere: {} as Record<string, number> },
+    progress: { xp: (level - 1) * 100, level, xpBySphere: { ...(options.xpBySphere ?? {}) } as Record<string, number> },
     streak: 1,
     energy: { current: 50, max: 50 },
     today: { day: "2026-11-24", awarded: options.awarded ?? 0, awardCap: 5, ownAwarded: 0, ownAwardCap: 3 },
@@ -311,7 +312,14 @@ describe("App: usefulness v1", () => {
     expect(within(view).getByText("Активных своих миссий уже 20. Закрой или удали одну, чтобы добавить новую.")).toBeTruthy();
     fireEvent.change(within(view).getByLabelText("Что сделать"), { target: { value: "Ещё" } });
     expect((within(view).getByRole("button", { name: "Добавить миссию" }) as HTMLButtonElement).disabled).toBe(true);
+    // «Удалить» asks first: «Отмена» keeps the mission, nothing is sent.
     fireEvent.click(within(view).getByRole("button", { name: "Удалить: Своя 0" }));
+    expect(within(view).getByText("Удалить миссию?")).toBeTruthy();
+    fireEvent.click(within(view).getByRole("button", { name: "Отмена" }));
+    expect(within(view).queryByText("Удалить миссию?")).toBeNull();
+    expect(api.calls.some((call) => call.method === "DELETE")).toBe(false);
+    fireEvent.click(within(view).getByRole("button", { name: "Удалить: Своя 0" }));
+    fireEvent.click(within(view).getByRole("button", { name: "Да, удалить" }));
     await waitFor(() => expect(view.querySelector('[data-own-full="true"]')).toBeNull());
     expect(api.calls.some((call) => call.method === "DELETE" && call.url === "/goals/o0")).toBe(true);
     expect((within(view).getByRole("button", { name: "Добавить миссию" }) as HTMLButtonElement).disabled).toBe(false);
@@ -354,6 +362,30 @@ describe("App: usefulness v1", () => {
     // A fresh player needs 100 XP: at most 50 a day, so honestly 2–3 days (1–2 once 50 XP are in).
     expect(within(sheet).getByText("За день можно получить до 50 XP, поэтому обычно это 2–3 дня.")).toBeTruthy();
     expect(within(sheet).getByText("Войти можно с уровня 2")).toBeTruthy();
+  });
+
+  it("Ресурсы: all 8 spheres; the empty ones are dimmed with a hint where they grow", async () => {
+    server([WALK], { xpBySphere: { health: 20, mind: 10 } });
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Ресурсы" }));
+    const rows = document.querySelectorAll(".bars li");
+    expect(rows.length).toBe(8);
+    expect(document.querySelectorAll(".bars li.is-zero").length).toBe(6);
+    const health = document.querySelector('[data-sphere="health"]')!;
+    expect(health.classList.contains("is-zero")).toBe(false);
+    expect(health.querySelector(".bars__hint")).toBeNull();
+    const park = document.querySelector('[data-sphere="spirit"]')!;
+    expect(park.querySelector(".bars__hint")?.textContent).toBe("Растёт от миссий в месте «Парк»: тишина, прогулка без телефона. Место откроется на уровне 2.");
+    expect(document.querySelector('[data-sphere="finance"] .bars__hint')?.textContent).toBe("Миссий для этой сферы пока нет: они появятся в новых местах.");
+  });
+
+  it("sphereRows: domain order, 0 for missing, the lock note disappears once the place is open", () => {
+    const rows = sphereRows({ creativity: 15 }, 2);
+    expect(rows.map((row) => row.id)).toEqual(["health", "mind", "career", "finance", "relationships", "creativity", "spirit", "community"]);
+    expect(rows.find((row) => row.id === "creativity")).toMatchObject({ xp: 15, zero: false, hint: null });
+    expect(rows.find((row) => row.id === "spirit")?.hint).toBe("Растёт от миссий в месте «Парк»: тишина, прогулка без телефона.");
+    expect(sphereHint("community", 2)).toBe("Растёт от миссий в месте «Центр LEVEX»: помощь другим. Место откроется на уровне 4.");
+    expect(sphereHint("health", 1)).toBe("Растёт от миссий в месте «Дом»: прогулка, зарядка, сон.");
   });
 
   it("Ресурсы and Профиль have clear empty states", async () => {
