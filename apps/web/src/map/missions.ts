@@ -55,6 +55,9 @@ export interface MissionRow {
   noXpToday: boolean;
 }
 
+/** Honest note under finished missions (Missions tab «Выполнены» and the place sheet, cycle2 P-C2). */
+export const REPEAT_NOTE = "Повторить дело можно кнопкой «Повторить завтра» после выполнения.";
+
 export const MISSION_STATUS = { open: "Доступна", done: "Выполнена", later: "Запланирована" } as const;
 
 export function placeForSphere(sphere: string | undefined): MapNodeId | null {

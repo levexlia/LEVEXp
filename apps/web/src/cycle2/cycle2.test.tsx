@@ -8,7 +8,7 @@ import { DEFAULT_AVATAR_CONFIG, playerDay, shiftDay } from "@levex/domain";
 import { App } from "../App";
 import type { Goal } from "../api";
 import { emptyDayActive, pickHint } from "../assistant/hints";
-import { missionBoard, todayBoard } from "../map/missions";
+import { REPEAT_NOTE, missionBoard, todayBoard } from "../map/missions";
 import { placeSheet } from "../map/placeSheet";
 
 function json(body: unknown, status = 200) {
@@ -205,6 +205,21 @@ describe("P-C3: tomorrow's copy is not done today", () => {
     // Progress and earned XP still count every record.
     expect(sheet.progress).toEqual({ done: 14, total: 15 });
     expect(sheet.earnedXp).toBe(140);
+  });
+});
+
+describe("P-C2: one honest repeat note", () => {
+  it("the place sheet of a done place and «Выполнены» show the same REPEAT_NOTE, no «повторно XP не дают»", async () => {
+    expect(REPEAT_NOTE).toBe("Повторить дело можно кнопкой «Повторить завтра» после выполнения.");
+    const { container } = await (async () => { server(anya(playerDay(new Date()), 14)); return renderApp(); })();
+    fireEvent.click(container.querySelector('.map-node[data-node="home"]')!);
+    const sheet = await screen.findByRole("dialog", { name: "Дом" });
+    expect(sheet.querySelector(".ps-note")?.textContent).toBe(REPEAT_NOTE);
+    expect(sheet.textContent).not.toMatch(/повторно XP не да/);
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "Миссии" }));
+    const history = within(screen.getByRole("region", { name: "Миссии" })).getByRole("region", { name: "Выполнены" });
+    expect(history.querySelector(".missions-note")?.textContent).toContain(REPEAT_NOTE);
   });
 });
 

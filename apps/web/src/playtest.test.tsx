@@ -222,7 +222,9 @@ describe("playtest fixes", () => {
     const { container } = await renderApp();
     fireEvent.click(container.querySelector('.map-node[data-node="home"]')!);
     const sheet = await screen.findByRole("dialog", { name: "Дом" });
-    expect(within(sheet).getByText("Пройденные миссии повторно XP не дают.")).toBeTruthy();
+    // cycle2: the same honest note as in «Выполнены» (one shared constant), the old «no XP again» line is gone.
+    expect(within(sheet).queryByText("Пройденные миссии повторно XP не дают.")).toBeNull();
+    expect(within(sheet).getByText("Повторить дело можно кнопкой «Повторить завтра» после выполнения.")).toBeTruthy();
     expect(within(sheet).queryByRole("button", { name: /Повторить/ })).toBeNull();
     fireEvent.click(within(sheet).getByRole("button", { name: "Миссии места" }));
     const view = screen.getByRole("region", { name: "Миссии" });

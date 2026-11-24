@@ -2,6 +2,7 @@ import { xpDoneLabel, xpPromiseLabel, type MapNodeId, type MapNodeState } from "
 import { useEffect } from "react";
 import type { Goal } from "./api";
 import { placeIconUrl } from "./map/placeIcons";
+import { REPEAT_NOTE } from "./map/missions";
 import { ACTION_LABEL, placeSheet, segments, type SheetAction } from "./map/placeSheet";
 import { artSrc } from "./theme/motion";
 import { MISSION_OPEN_URL, REWARD_ICON_URL, hexFrameUrl } from "./theme/uiArt";
@@ -124,7 +125,7 @@ export function PlaceSheet({
             {sheet.missionsHidden ? <span>Скрыты до открытия</span> : null}
           </p>
           {sheet.missions.length === 0 ? <p className="empty">Миссий пока нет.</p> : null}
-          {state === "done" ? <p className="ps-note">Пройденные миссии повторно XP не дают.</p> : null}
+          {state === "done" ? <p className="ps-note">{REPEAT_NOTE}</p> : null}
           <ul className="ps-missions">
             {sheet.missions.map((mission) =>
               sheet.missionsHidden ? (

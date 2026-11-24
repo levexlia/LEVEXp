@@ -2,7 +2,7 @@ import { ACTIVE_OWN_MISSIONS_MAX, MAP_NODES, XP_REWARD_STANDARD, dailyLedger, xp
 import { useState, type FormEvent } from "react";
 import type { Goal, TodayAwards } from "./api";
 import { activityAid } from "./daily/activity";
-import { ANYWHERE, MISSION_STATUS, missionBoard, ownBoard, placelessBoard, rowWhere, todayBoard, type MissionFilter, type MissionRow, type PlanChip } from "./map/missions";
+import { ANYWHERE, MISSION_STATUS, REPEAT_NOTE, missionBoard, ownBoard, placelessBoard, rowWhere, todayBoard, type MissionFilter, type MissionRow, type PlanChip } from "./map/missions";
 import { KitIcon, SPHERE_ICON, kitIconUrl } from "./map/KitIcon";
 import { uiIconUrl } from "./theme/uiArt";
 
@@ -274,7 +274,7 @@ function DoneHistory({ rows, recent, goals, actions, reducedMotion }: { rows: Mi
   return (
     <section className="done-history" aria-labelledby="done-title" data-done-total={rows.length}>
       <h3 id="done-title">Выполнены</h3>
-      <p className="missions-note">{shown <= recent ? "Сегодня и вчера. " : ""}Повторить дело можно кнопкой «Повторить завтра» после выполнения.</p>
+      <p className="missions-note">{shown <= recent ? "Сегодня и вчера. " : ""}{REPEAT_NOTE}</p>
       {visible.length > 0 ? (
         <List rows={visible} goals={goals} actions={actions} reducedMotion={reducedMotion} />
       ) : (
