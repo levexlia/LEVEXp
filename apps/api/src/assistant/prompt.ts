@@ -23,6 +23,7 @@ export function contextBlock(ctx: PlayerContext): string {
     missions,
     "Места на карте:",
     places,
+    "Без места на карте (вкладка «Миссии», с 1 уровня, +10 XP, раз в день за каждое дело): Карьера, Финансы, Отношения.",
   ].join("\n");
 }
 

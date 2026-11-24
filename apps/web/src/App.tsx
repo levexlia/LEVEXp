@@ -466,6 +466,7 @@ export function App() {
             place={missionPlace}
             onPlace={setMissionPlace}
             onCreate={addMission}
+            onTemplate={(templateId) => void addFromPlan({ key: templateId, title: "", place: null, templateId })}
             actions={{ ...actions, onDelete: (goal) => void removeGoal(goal.id, `Миссия «${goal.title}» удалена`) }}
             reducedMotion={reducedMotion}
           />

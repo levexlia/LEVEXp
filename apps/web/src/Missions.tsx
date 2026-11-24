@@ -3,7 +3,8 @@ import { useState, type FormEvent } from "react";
 import type { Goal, TodayAwards } from "./api";
 import { activityAid } from "./daily/activity";
 import { placeIconUrl } from "./map/placeIcons";
-import { MISSION_STATUS, missionBoard, todayBoard, type MissionRow, type PlanChip } from "./map/missions";
+import { MISSION_STATUS, missionBoard, placelessBoard, todayBoard, type MissionRow, type PlanChip } from "./map/missions";
+import { KitIcon, SPHERE_ICON, kitIconUrl } from "./map/KitIcon";
 import { artSrc } from "./theme/motion";
 import { uiIconUrl } from "./theme/uiArt";
 
@@ -28,7 +29,7 @@ export interface MissionActions {
 export function MissionItem({ row, goal, actions, reducedMotion }: { row: MissionRow; goal: Goal; actions: MissionActions; reducedMotion: boolean }) {
   const status = row.done ? MISSION_STATUS.done : MISSION_STATUS.open;
   const locked = row.done ? null : actions.lockedText?.(row) ?? null;
-  const startable = !row.done && !row.proof && !locked && actions.onStart && activityAid(row.title).kind !== "stopwatch";
+  const startable = !row.done && !row.proof && !locked && actions.onStart && activityAid(row.title, goal.templateId).kind !== "stopwatch";
   const [confirming, setConfirming] = useState(false);
   return (
     <li
@@ -39,7 +40,7 @@ export function MissionItem({ row, goal, actions, reducedMotion }: { row: Missio
     >
       <img
         className="mission__icon"
-        src={row.done ? CHECK_URL : row.place ? artSrc(placeIconUrl(row.place), reducedMotion) : "/art/scene14/badges/mission_open.svg"}
+        src={row.done ? CHECK_URL : row.place ? artSrc(placeIconUrl(row.place), reducedMotion) : row.sphere && SPHERE_ICON[row.sphere] ? kitIconUrl(SPHERE_ICON[row.sphere]!) : "/art/scene14/badges/mission_open.svg"}
         width={24}
         height={24}
         alt=""
@@ -116,6 +117,7 @@ export function MissionsView({
   place,
   onPlace,
   onCreate,
+  onTemplate,
   actions,
   reducedMotion,
 }: {
@@ -124,6 +126,8 @@ export function MissionsView({
   place: MapNodeId | null;
   onPlace: (place: MapNodeId | null) => void;
   onCreate: (title: string, sphere: LifeSphereId) => Promise<boolean>;
+  /** Add a placeless sphere template (Карьера, Финансы, Отношения) for today. */
+  onTemplate?: (templateId: string) => void;
   actions: MissionActions;
   reducedMotion: boolean;
 }) {
@@ -171,6 +175,8 @@ export function MissionsView({
         </>
       ) : null}
 
+      {place === null && onTemplate ? <Placeless goals={goals} busy={actions.busy} onTemplate={onTemplate} /> : null}
+
       {board.done.length > 0 ? (
         <>
           <h3>Выполнены</h3>
@@ -180,6 +186,47 @@ export function MissionsView({
       ) : null}
 
       <NewMission key={place ?? "all"} states={states} place={place} busy={actions.busy} onCreate={onCreate} full={activeOwnCount(goals) >= ACTIVE_OWN_MISSIONS_MAX} />
+    </section>
+  );
+}
+
+/**
+ * «Без места на карте»: Карьера, Финансы, Отношения have no map place yet, so their missions are added
+ * here, from level 1. Each gives +10 XP under the same daily rules (one award per template a day).
+ */
+function Placeless({ goals, busy, onTemplate }: { goals: readonly Goal[]; busy: boolean; onTemplate: (templateId: string) => void }) {
+  const groups = placelessBoard(goals);
+  return (
+    <section className="placeless" aria-labelledby="placeless-title">
+      <h3 id="placeless-title">Без места на карте</h3>
+      <p className="missions-note">Короткие дела на 5–25 минут, доступны с первого уровня. +10 XP, один раз в день за каждое.</p>
+      {groups.map((group) => (
+        <div key={group.sphere} className="placeless__group" data-sphere={group.sphere}>
+          <h4 className="placeless__name">
+            {SPHERE_ICON[group.sphere] ? <KitIcon name={SPHERE_ICON[group.sphere]!} size={18} /> : null}
+            {group.name}
+          </h4>
+          <ul className="placeless__list">
+            {group.rows.map(({ template, state }) => (
+              <li key={template.id}>
+                <button
+                  type="button"
+                  className="placeless__add"
+                  disabled={busy || state === "open"}
+                  onClick={() => onTemplate(template.id)}
+                  data-template={template.id}
+                  aria-label={state === "open" ? `${template.title}: уже в списке` : `Добавить: ${template.title}`}
+                >
+                  <span className="placeless__ttl">{state === "open" ? "✓" : "+"} {template.title}</span>
+                  <span className="placeless__meta">
+                    ~{template.minutes} мин · {state === "open" ? "уже в списке" : state === "awarded" ? "без XP сегодня" : "+10 XP"}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </section>
   );
 }

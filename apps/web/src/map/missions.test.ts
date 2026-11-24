@@ -14,7 +14,8 @@ describe("missions model", () => {
   it("maps a goal to its place, status and Proof action", () => {
     expect(missionRow(goals[1]!)).toMatchObject({ place: "study", placeName: "Учебный центр", done: false, proof: false, xp: 10 });
     expect(missionRow(goals[2]!)).toMatchObject({ place: "workshop", done: true, proof: true, xp: 15 });
-    expect(missionRow(goals[3]!)).toMatchObject({ place: null, placeName: "Без места" });
+    expect(missionRow(goals[3]!)).toMatchObject({ place: null, placeName: "Финансы", sphere: "finance" });
+    expect(missionRow({ id: "e", title: "Что-то", xpReward: 10, status: "open" })).toMatchObject({ place: null, placeName: "Без места", sphere: null });
   });
 
   it("splits open and done (newest first) and filters by place", () => {

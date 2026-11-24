@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { getLifeSphere } from "@levex/domain";
 import type { Goal } from "../api";
 import { placeForSphere, placeName } from "../map/missions";
 import { activityAid, clock } from "./activity";
@@ -21,7 +22,9 @@ export function ActivityScreen({
   onDone: (goalId: string) => void;
   onClose: () => void;
 }) {
-  const aid = activityAid(goal.title);
+  const aid = activityAid(goal.title, goal.templateId);
+  // Ticks live only on this screen: nothing about the steps is sent or stored.
+  const [ticked, setTicked] = useState<ReadonlySet<number>>(new Set());
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [pages, setPages] = useState(0);
@@ -64,8 +67,18 @@ export function ActivityScreen({
   const total = aid.kind === "timer" ? aid.minutes * 60 : 0;
   const left = Math.max(0, total - elapsed);
   const finishedTimer = aid.kind === "timer" && elapsed > 0 && left === 0;
-  const place = placeName(placeForSphere(goal.sphere));
-  const ratio = aid.kind === "timer" ? Math.min(1, elapsed / total) : aid.kind === "pages" ? Math.min(1, pages / aid.pages) : 0;
+  const place = placeForSphere(goal.sphere) ? placeName(placeForSphere(goal.sphere)) : getLifeSphere(goal.sphere ?? "")?.name ?? placeName(null);
+  const ratio = aid.kind === "timer" ? Math.min(1, elapsed / total)
+    : aid.kind === "pages" ? Math.min(1, pages / aid.pages)
+    : aid.kind === "steps" ? ticked.size / aid.steps.length
+    : 0;
+  function tick(index: number) {
+    setTicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index); else next.add(index);
+      return next;
+    });
+  }
 
   return (
     <div className="sheet-back" role="presentation" onClick={onClose}>
@@ -82,7 +95,21 @@ export function ActivityScreen({
           <p className="ps-meta">Занятие · {place}</p>
           <h2 id="activity-title" className="activity__title">{goal.title}</h2>
 
-          {aid.kind === "pages" ? (
+          {aid.kind === "steps" ? (
+            <div className="activity__aid activity__aid--steps">
+              <ol className="activity__steps" aria-label="Шаги">
+                {aid.steps.map((step, index) => (
+                  <li key={step}>
+                    <label>
+                      <input type="checkbox" checked={ticked.has(index)} onChange={() => tick(index)} />
+                      <span>{step}</span>
+                    </label>
+                  </li>
+                ))}
+              </ol>
+              {ticked.size === aid.steps.length ? <p className="activity__goal" role="status">Все шаги пройдены</p> : null}
+            </div>
+          ) : aid.kind === "pages" ? (
             <div className="activity__aid">
               <p className="activity__big" aria-live="polite">{pages} / {aid.pages}<small> страниц</small></p>
               {pages >= aid.pages ? <p className="activity__goal" role="status">Цель достигнута</p> : null}
@@ -116,8 +143,9 @@ export function ActivityScreen({
               {finishedTimer ? <p className="activity__note" role="status">Время вышло. Можно отметить, когда будет удобно.</p> : null}
             </div>
           )}
+          {goal.sphere === "finance" ? <p className="activity__note" data-no-amounts="true">Суммы в игре не нужны и нигде не сохраняются.</p> : null}
           <div className={reducedMotion ? "activity__bar still" : "activity__bar"} aria-hidden="true"><i style={{ width: `${Math.round(ratio * 100)}%` }} /></div>
-          <p className="activity__note">{aid.kind === "pages" ? "Счётчик" : aid.kind === "timer" ? "Таймер" : "Секундомер"} необязателен: отметить можно в любой момент.</p>
+          <p className="activity__note">{aid.kind === "steps" ? "Шаги — просто подсказка" : `${aid.kind === "pages" ? "Счётчик" : aid.kind === "timer" ? "Таймер" : "Секундомер"} необязателен`}: отметить можно в любой момент.</p>
 
           <div className="ps-actions">
             <button type="button" className="lx-btn lx-btn--secondary ps-later" onClick={onClose}>

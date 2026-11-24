@@ -2,10 +2,10 @@
 /** Usefulness v1 (spec 24.11.2026): «Повторить завтра» + empty-day plan, «Начать», micro-reflection, limit texts. */
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_AVATAR_CONFIG, noXpMessage } from "@levex/domain";
+import { DEFAULT_AVATAR_CONFIG, SPHERE_TEMPLATES, builtInTemplate, noXpMessage } from "@levex/domain";
 import { App } from "../App";
 import type { Goal } from "../api";
-import { planChips, todayBoard } from "../map/missions";
+import { placelessBoard, planChips, todayBoard } from "../map/missions";
 import { sphereHint, sphereRows } from "../map/resources";
 import { activityAid, clock } from "./activity";
 
@@ -47,8 +47,8 @@ function server(initial: Goal[], options: { level?: number; awarded?: number; ca
       const source = goals.find((goal) => goal.id === body.repeatOf);
       const goal: Goal = {
         id: `n${calls.length}`,
-        title: source?.title ?? body.title ?? (body.templateId === "seed-walk" ? "Утренняя прогулка 20 мин" : "Прочитать 10 страниц"),
-        sphere: source?.sphere ?? body.sphere ?? "health",
+        title: source?.title ?? body.title ?? builtInTemplate(body.templateId)?.title ?? "Прочитать 10 страниц",
+        sphere: source?.sphere ?? body.sphere ?? builtInTemplate(body.templateId)?.sphere ?? "health",
         xpReward: 10,
         status: "open",
         templateId: body.templateId ?? source?.templateId,
@@ -109,12 +109,16 @@ describe("empty-day plan and «Сегодня» day (spec №1, R-XP-5)", () => 
     const own: Goal = { id: "c1", title: "Зарядка", sphere: "health", xpReward: 10, status: "done", templateId: "own:o1", completedAt: "2026-11-23T09:00:00.000Z" };
     const art: Goal = { id: "a1", title: "Скетч", sphere: "creativity", xpReward: 10, status: "done", templateId: "own:a0" };
     const chips = planChips([done(WALK), done(READ), own, art], 1);
-    expect(chips.map((chip) => chip.title)).toEqual(["Утренняя прогулка 20 мин", "Прочитать 10 страниц", "Зарядка"]);
+    expect(chips.map((chip) => chip.title)).toEqual([
+      "Утренняя прогулка 20 мин", "Прочитать 10 страниц",
+      "25 минут над важной задачей", "Записать траты за день", "Написать близкому человеку",
+      "Зарядка",
+    ]);
     expect(chips[0]).toMatchObject({ repeatOf: "g1" });
     // A fresh player without seed goals gets the seed template ids.
-    expect(planChips([], 1).map((chip) => chip.templateId)).toEqual(["seed-walk", "seed-read"]);
+    expect(planChips([], 1).map((chip) => chip.templateId)).toEqual(["seed-walk", "seed-read", "career-focus", "finance-spend", "rel-write"]);
     // An open seed is not offered again.
-    expect(planChips([WALK, done(READ)], 1).map((chip) => chip.key)).toEqual(["seed-read"]);
+    expect(planChips([WALK, done(READ)], 1).map((chip) => chip.key)).toEqual(["seed-read", "career-focus", "finance-spend", "rel-write"]);
   });
 
   it("counts «Выполнено сегодня» by the Israeli day and keeps tomorrow's copies out of today", () => {
@@ -376,7 +380,7 @@ describe("App: usefulness v1", () => {
     expect(health.querySelector(".bars__hint")).toBeNull();
     const park = document.querySelector('[data-sphere="spirit"]')!;
     expect(park.querySelector(".bars__hint")?.textContent).toBe("Растёт от миссий в месте «Парк»: тишина, прогулка без телефона. Место откроется на уровне 2.");
-    expect(document.querySelector('[data-sphere="finance"] .bars__hint')?.textContent).toBe("Миссий для этой сферы пока нет: они появятся в новых местах.");
+    expect(document.querySelector('[data-sphere="finance"] .bars__hint')?.textContent).toBe("Растёт от миссий без места на карте, например «Записать траты за день». Добавить можно во вкладке «Миссии».");
   });
 
   it("sphereRows: domain order, 0 for missing, the lock note disappears once the place is open", () => {
@@ -395,5 +399,82 @@ describe("App: usefulness v1", () => {
     expect(document.querySelector('[data-empty="resources"]')?.textContent).toMatch(/в каких сферах жизни копится XP/);
     fireEvent.click(screen.getByRole("button", { name: "Профиль" }));
     expect(document.querySelector('[data-empty="gallery"]')?.textContent).toMatch(/Галерея пока пуста.*уровне 2/s);
+  });
+});
+
+describe("placeless sphere missions (Карьера, Финансы, Отношения)", () => {
+  beforeEach(() => vi.useRealTimers());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("each template brings its own aid: a timer or steps", () => {
+    expect(activityAid("25 минут над важной задачей", "career-focus")).toEqual({ kind: "timer", minutes: 25 });
+    const steps = activityAid("Записать траты за день", "finance-spend");
+    expect(steps.kind).toBe("steps");
+    for (const t of SPHERE_TEMPLATES) expect(activityAid(t.title, t.id).kind).not.toBe("stopwatch");
+  });
+
+  it("placelessBoard: open today → «open», gave XP today → «awarded», otherwise «add»", () => {
+    const now = new Date("2026-11-24T08:00:00.000Z");
+    const goals: Goal[] = [
+      { id: "a", title: "Проверить одну подписку", sphere: "finance", xpReward: 10, status: "open", templateId: "finance-sub" },
+      { id: "b", title: "Поблагодарить кого-то", sphere: "relationships", xpReward: 10, status: "done", templateId: "rel-thanks", completedAt: "2026-11-24T07:00:00.000Z", xpGranted: 10 },
+    ];
+    const board = placelessBoard(goals, now);
+    expect(board.map((group) => group.name)).toEqual(["Карьера", "Финансы", "Отношения"]);
+    const state = (id: string) => board.flatMap((group) => group.rows).find((row) => row.template.id === id)!.state;
+    expect(state("finance-sub")).toBe("open");
+    expect(state("rel-thanks")).toBe("awarded");
+    expect(state("career-focus")).toBe("add");
+  });
+
+  it("Миссии tab at level 1: 9 placeless missions; adding one sends only the template id and shows its sphere", async () => {
+    const api = server([WALK, READ], { level: 1 });
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Миссии" }));
+    const view = screen.getByRole("region", { name: "Миссии" });
+    const block = within(view).getByRole("region", { name: "Без места на карте" });
+    expect(block.querySelectorAll("[data-template]")).toHaveLength(9);
+    fireEvent.click(within(block).getByRole("button", { name: "Добавить: Записать траты за день" }));
+    await waitFor(() => expect(within(block).getByRole("button", { name: "Записать траты за день: уже в списке" })).toBeTruthy());
+    const post = api.calls.find((call) => call.method === "POST" && call.url === "/goals")!;
+    expect(post.body).toEqual({ templateId: "finance-spend" });
+    const row = view.querySelector(`[data-mission="${api.goals.at(-1)!.id}"]`)!;
+    expect(row.textContent).toContain("Финансы");
+    expect(row.querySelector("img.mission__icon")?.getAttribute("src")).toBe("/map/sp_finance.svg");
+  });
+
+  it("«Начать» on a finance mission: steps, no amounts, and «Готово — отметить» closes it with +10 XP", async () => {
+    const spend: Goal = { id: "f1", title: "Записать траты за день", sphere: "finance", xpReward: 10, status: "open", templateId: "finance-spend" };
+    const api = server([spend]);
+    await renderApp();
+    const today = screen.getByRole("complementary", { name: "Сегодня" });
+    fireEvent.click(within(today).getByRole("button", { name: "Начать: Записать траты за день" }));
+    const sheet = screen.getByRole("dialog", { name: "Записать траты за день" });
+    expect(sheet.textContent).toContain("Занятие · Финансы");
+    expect(sheet.querySelector('[data-no-amounts="true"]')?.textContent).toBe("Суммы в игре не нужны и нигде не сохраняются.");
+    expect(sheet.querySelector("input[type=number]")).toBeNull();
+    const boxes = within(sheet).getAllByRole("checkbox");
+    expect(boxes).toHaveLength(3);
+    for (const box of boxes) fireEvent.click(box);
+    expect(within(sheet).getByText("Все шаги пройдены")).toBeTruthy();
+    fireEvent.click(within(sheet).getByRole("button", { name: "Готово — отметить" }));
+    await waitFor(() => expect(document.querySelector(".after")).toBeTruthy());
+    const complete = api.calls.find((call) => call.url === "/goals/f1/complete")!;
+    expect(complete.body ?? {}).toEqual({});
+    expect(api.goals[0]).toMatchObject({ status: "done", xpGranted: 10 });
+  });
+
+  it("empty-day plan offers one mission per placeless sphere at level 1", () => {
+    const chips = planChips([], 1).filter((chip) => chip.sphere);
+    expect(chips.map((chip) => [chip.sphere, chip.templateId])).toEqual([
+      ["career", "career-focus"], ["finance", "finance-spend"], ["relationships", "rel-write"],
+    ]);
+    // Once a template gave XP today, the plan offers the next one of that sphere.
+    const now = new Date();
+    const done: Goal = { id: "x", title: "Записать траты за день", sphere: "finance", xpReward: 10, status: "done", templateId: "finance-spend", completedAt: now.toISOString(), xpGranted: 10 };
+    expect(planChips([done], 1, now).find((chip) => chip.sphere === "finance")?.templateId).toBe("finance-sub");
   });
 });

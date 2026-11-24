@@ -656,3 +656,27 @@ button { cursor: pointer; }
 .activity .ps-actions .ps-later { width: auto; flex: none; letter-spacing: 0.12em; }
 .activity .ps-actions .ps-later > .lx-btn__in, .activity .ps-actions .ps-primary > .lx-btn__in { padding: 0 12px; }
 .activity .ps-actions .ps-primary { font-size: 14px; letter-spacing: 0.14em; }
+
+/* Placeless missions (Карьера, Финансы, Отношения) in the Миссии tab. */
+.placeless { display: grid; gap: 0.6rem; margin: 0.8rem 0; }
+.placeless h3 { margin: 0; }
+.placeless .missions-note { margin: 0; }
+.placeless__group { display: grid; gap: 0.4rem; }
+.placeless__name { display: flex; align-items: center; gap: 0.4rem; margin: 0.3rem 0 0; font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lx-text-2); }
+.placeless__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.placeless__add {
+  width: 100%; min-height: 48px; display: grid; gap: 2px; justify-items: start; text-align: left;
+  padding: 0.45rem 0.8rem; border: 1px solid #2c3770; background: rgba(10, 16, 48, 0.75); color: var(--lx-text);
+  font: 500 14px var(--lx-font-text); cursor: pointer;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.placeless__add:hover:not(:disabled), .placeless__add:focus-visible { border-color: var(--lx-cyan); }
+.placeless__add:disabled { opacity: 0.55; cursor: default; }
+.placeless__meta { font-size: 12px; color: var(--lx-text-muted); }
+/* Steps on the activity screen (placeless templates). */
+.activity__aid--steps { justify-items: stretch; }
+.activity__steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.4rem; }
+.activity__steps label { display: flex; align-items: center; gap: 0.6rem; min-height: 44px; padding: 0.3rem 0.6rem; border: 1px solid #2c3770; background: rgba(10, 16, 48, 0.6); cursor: pointer; font-size: 15px; }
+.activity__steps input { width: 20px; height: 20px; flex: none; accent-color: var(--lx-cyan); }
+.activity__steps input:checked + span { color: var(--lx-text-2); text-decoration: line-through; }
+.activity__aid--steps .activity__goal { justify-self: center; }

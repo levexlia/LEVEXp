@@ -1,5 +1,11 @@
 import {
   MAP_NODES,
+  PLACELESS_SPHERES,
+  SPHERE_TEMPLATES,
+  builtInTemplate,
+  getLifeSphere,
+  type PlacelessSphere,
+  type SphereTemplate,
   REFLECTION_LABEL,
   SEED_TEMPLATES,
   dailyLedger,
@@ -24,7 +30,10 @@ export interface MissionRow {
   title: string;
   /** Map place of the goal's sphere, or null for spheres that have no place on the map. */
   place: MapNodeId | null;
+  /** Place name, or the sphere name for placeless missions (Карьера, Финансы, Отношения). */
   placeName: string;
+  /** Life sphere id of the goal (for the sphere icon of placeless missions). */
+  sphere: string | null;
   xp: number;
   done: boolean;
   /** DD.MM of the completion, done missions only. */
@@ -65,7 +74,8 @@ export function missionRow(goal: Goal, today = playerDay(new Date()), ledger?: D
     id: goal.id,
     title: goal.title,
     place,
-    placeName: placeName(place),
+    placeName: place ? placeName(place) : getLifeSphere(goal.sphere ?? "")?.name ?? placeName(null),
+    sphere: goal.sphere ?? null,
     xp: goal.xpReward,
     done: goal.status === "done",
     doneOn: goal.status === "done" ? ddmm(goal.completedAt) : null,
@@ -132,15 +142,44 @@ export interface PlanChip {
   place: MapNodeId | null;
   /** Copy this goal (a seed or a repeated mission done before)… */
   repeatOf?: string;
-  /** …or, when there is none yet, start the seed template. */
+  /** …or, when there is none yet, start the seed / placeless template. */
   templateId?: string;
+  /** Placeless template chips: the sphere (for the icon). */
+  sphere?: PlacelessSphere;
+}
+
+/** First placeless template of `sphere` that is neither open for today nor already rewarded today. */
+function nextSphereTemplate(sphere: PlacelessSphere, openKeys: ReadonlySet<string>, ledger: DailyLedger): SphereTemplate | undefined {
+  return SPHERE_TEMPLATES.find((template) => template.sphere === sphere && !openKeys.has(template.id) && !ledger.templates.has(template.id));
+}
+
+/** A placeless template in the Миссии tab: already open today, already gave XP today, or free to add. */
+export interface SphereTemplateRow {
+  template: SphereTemplate;
+  state: "add" | "open" | "awarded";
+}
+
+/** «Без места на карте» in the Миссии tab: the 3 placeless spheres with their 3 templates each. */
+export function placelessBoard(goals: readonly Goal[], now = new Date()): Array<{ sphere: PlacelessSphere; name: string; rows: SphereTemplateRow[] }> {
+  const today = playerDay(now);
+  const ledger = dailyLedger(goals, now);
+  const open = new Set(goals.filter((goal) => goal.status === "open" && availableOn(goal, today)).map(templateKeyOf).filter(Boolean) as string[]);
+  return PLACELESS_SPHERES.map((sphere) => ({
+    sphere,
+    name: getLifeSphere(sphere)?.name ?? sphere,
+    rows: SPHERE_TEMPLATES.filter((template) => template.sphere === sphere).map((template) => ({
+      template,
+      state: open.has(template.id) ? "open" : ledger.templates.has(template.id) ? "awarded" : "add",
+    })),
+  }));
 }
 
 /**
- * Plan for an empty day (spec №1): the two seeds plus every template the player has repeated, minus
+ * Plan for an empty day (spec №1): the two seeds, one placeless mission per sphere (Карьера, Финансы,
+ * Отношения) and every template the player has repeated, minus
  * the ones already open and the ones whose place is still locked (R-XP-8). Newest source goal first.
  */
-export function planChips(goals: readonly Goal[], level: number): PlanChip[] {
+export function planChips(goals: readonly Goal[], level: number, now = new Date()): PlanChip[] {
   const openKeys = new Set(goals.filter((goal) => goal.status === "open").map(templateKeyOf).filter(Boolean) as string[]);
   const latest = new Map<string, Goal>();
   for (const goal of goals) {
@@ -160,8 +199,14 @@ export function planChips(goals: readonly Goal[], level: number): PlanChip[] {
       ...(source ? { repeatOf: source.id } : { templateId: seed.id }),
     });
   }
+  // One placeless mission per sphere (Карьера, Финансы, Отношения): open from level 1.
+  const ledger = dailyLedger(goals, now);
+  for (const sphere of PLACELESS_SPHERES) {
+    const template = nextSphereTemplate(sphere, openKeys, ledger);
+    if (template) chips.push({ key: template.id, title: template.title, place: null, templateId: template.id, sphere });
+  }
   for (const [key, source] of latest) {
-    if (SEED_TEMPLATES.some((seed) => seed.id === key) || openKeys.has(key) || lockedPlaceFor(source.sphere, level)) continue;
+    if (builtInTemplate(key) || openKeys.has(key) || lockedPlaceFor(source.sphere, level)) continue;
     chips.push({ key, title: source.title, place: placeForSphere(source.sphere), repeatOf: source.id });
   }
   return chips;

@@ -1,4 +1,4 @@
-import { LIFE_SPHERES, MAP_NODES, type LifeSphereId } from "@levex/domain";
+import { LIFE_SPHERES, MAP_NODES, SPHERE_TEMPLATES, type LifeSphereId } from "@levex/domain";
 
 /** Example missions per sphere for the «Ресурсы» hint (the seeds and typical own missions). */
 const EXAMPLES: Partial<Record<LifeSphereId, string>> = {
@@ -22,7 +22,12 @@ export interface SphereRow {
 /** Где растёт сфера: место на карте (и уровень, если оно ещё закрыто) или честное «пока нет». */
 export function sphereHint(sphere: LifeSphereId, level: number): string {
   const node = MAP_NODES.find((n) => n.sphere === sphere);
-  if (!node) return "Миссий для этой сферы пока нет: они появятся в новых местах.";
+  if (!node) {
+    const example = SPHERE_TEMPLATES.find((template) => template.sphere === sphere);
+    return example
+      ? `Растёт от миссий без места на карте, например «${example.title}». Добавить можно во вкладке «Миссии».`
+      : "Растёт от своих миссий во вкладке «Миссии».";
+  }
   const examples = EXAMPLES[sphere] ? `: ${EXAMPLES[sphere]}` : "";
   const lock = level < node.unlockLevel ? ` Место откроется на уровне ${node.unlockLevel}.` : "";
   return `Растёт от миссий в месте «${node.name}»${examples}.${lock}`;
