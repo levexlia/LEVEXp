@@ -204,6 +204,14 @@ export function templateKeyOf(goal: Pick<DailyGoal, "templateId" | "repeatOf" | 
 }
 
 /** XP a done goal really gave. Old rows without `xpGranted` gave their stored reward. */
+/**
+ * scene18 «Отменить»: only a record of the current player day (Asia/Jerusalem) can be taken back.
+ * Past days stay in the journal as they are.
+ */
+export function canUndo(goal: Pick<DailyGoal, "status" | "completedAt">, now: Date): boolean {
+  return goal.status === "done" && playerDayOf(goal.completedAt) === playerDay(now);
+}
+
 export function grantedXp(goal: DailyGoal): number {
   if (goal.status !== "done") return 0;
   return goal.xpGranted ?? goal.xpReward;

@@ -38,6 +38,9 @@ import {
   deleteGoal,
   GoalLimitReached,
   GoalNotOpen,
+  GoalNotDone,
+  UndoPastDay,
+  undoGoal,
   PlaceLocked,
   saveReflection,
   setAvatarConfig,
@@ -214,6 +217,26 @@ export function buildApp(opts: {
       if (err instanceof ArtifactNotFound) return reply.code(400).send({ error: err.message });
       if (err instanceof ArtifactAlreadyLinked) return reply.code(409).send({ error: err.message });
       if (err instanceof InvalidGoalUpdate) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  // scene18 «Отменить»: today's record only (409 for an open goal or a past day). «Вернуть» is /complete.
+  app.post<{ Params: { id: string } }>("/goals/:id/undo", async (req, reply) => {
+    try {
+      const result = undoGoal(req.params.id);
+      if (!result) return reply.code(404).send({ error: "goal not found" });
+      return {
+        goal: result.goal,
+        progress: result.progress,
+        removedXp: result.removedXp,
+        awardedToday: result.today.awarded,
+        awardCap: result.today.awardCap,
+        ownAwardedToday: result.today.ownAwarded,
+        ownAwardCap: result.today.ownAwardCap,
+      };
+    } catch (err) {
+      if (err instanceof GoalNotDone || err instanceof UndoPastDay) return reply.code(409).send({ error: err.message });
       throw err;
     }
   });

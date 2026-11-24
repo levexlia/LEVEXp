@@ -180,6 +180,11 @@ export interface Goal {
   availableFrom?: string;
   /** Micro-reflection after completion. Never changes XP. */
   reflection?: Reflection;
+  /**
+   * ISO time of «Отменить» (scene18): today's record was taken back, the goal is open again and its XP
+   * removed. Cleared by the next completion («Вернуть»), which follows the usual daily rules.
+   */
+  undoneAt?: string;
   // future: playerId, description, parentGoalId, deadline, skills
 }
 
