@@ -307,7 +307,7 @@ function PraiseLine({ line, praise }: { line: ChatLine; praise: Praise }) {
         ИИ-ПОМОЩНИК · {line.at} · <span className="lx-msg__tag">ПОХВАЛА</span>
       </div>
       <div className="lx-msg__b">
-        <span className="sr-only">Помощник: </span>
+        <span className="sr-only">ИИ-помощник: </span>
         {praise.text}
         <span className="lx-rw">
           {praise.gainedXp > 0 ? (

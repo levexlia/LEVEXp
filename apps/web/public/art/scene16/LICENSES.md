@@ -17,5 +17,3 @@ puppeteer-core (Apache-2.0, установлен в `/workspace/levex_design/ren
 В ассеты ничего из этого не попадает, поэтому лицензии инструментов на результат не распространяются.
 
 Состав ассетов: `svg/robot_happy_soft`, `robot_happy_bright`, `fx_spark`, `fx_dome_hit`, `milestone_token`, `chat_avatar_frame_happy` (и копии в `svg/static/`), `svg/levex-happy.css`. Новых сторонних материалов нет.
-
-Ничего не коммитилось и не пушилось в репозиторий.

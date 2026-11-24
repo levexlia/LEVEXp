@@ -473,15 +473,70 @@ describe("C accessibility", () => {
     expect(live.textContent).toBe("");
   });
 
-  it("Esc on C closes only C, not the after-mission sheet under it", async () => {
-    server([walk(), readBook()], { xp: 90 });
+  it("«Как прошло?» waits for C: not under its dimmer; it opens once C is closed (Esc, tap or auto-close)", async () => {
+    const after = () => document.querySelector("section.after");
+    server([walk(), readBook()], { xp: 90, id: "esc" });
     await renderApp();
     await mark("Утренняя прогулка 20 мин");
-    const sheets = () => [...document.querySelectorAll("[role=dialog]")].filter((el) => el.getAttribute("aria-label") !== "Новый уровень").length;
-    const before = sheets();
-    expect(before).toBeGreaterThan(0);
+    expect(screen.getByRole("dialog", { name: "Новый уровень" })).toBeTruthy();
+    expect(after()).toBeNull();
+    // Esc closes only C (capture phase), then the sheet comes and stays open.
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Новый уровень" })).toBeNull();
-    expect(sheets()).toBe(before);
+    expect(after()).not.toBeNull();
+    cleanup();
+    server([walk(), readBook()], { xp: 90, id: "auto2" });
+    await renderApp();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    await mark("Утренняя прогулка 20 мин");
+    await act(async () => {});
+    expect(after()).toBeNull();
+    act(() => { vi.advanceTimersByTime(MILESTONE_MS + 10); });
+    expect(after()).not.toBeNull();
+  });
+
+  it("without C the sheet opens right after the mark, as before", async () => {
+    server([walk(), readBook()], { xp: 20 });
+    await renderApp();
+    await mark("Утренняя прогулка 20 мин");
+    await waitFor(() => expect(document.querySelector("section.after")).not.toBeNull());
+    expect(screen.queryByRole("dialog", { name: "Новый уровень" })).toBeNull();
+  });
+});
+
+describe("level after «Отменить» (review fix)", () => {
+  it("header and profile drop 2 → 1 from the undo answer at once, even while the reload is still on its way", async () => {
+    const api = server([walk(), readBook()], { xp: 90 });
+    await renderApp();
+    await mark("Утренняя прогулка 20 мин");
+    fireEvent.keyDown(document, { key: "Escape" }); // C
+    fireEvent.keyDown(document, { key: "Escape" }); // «Как прошло?»
+    await waitFor(() => expect(document.querySelector(".lvl-hex b")?.textContent).toBe("02"));
+    fireEvent.click(screen.getAllByRole("button", { name: /Профиль/ })[0]);
+    await screen.findByText("Уровень 2");
+    // From now on GET /player hangs: only the undo answer can bring the new level.
+    const real = globalThis.fetch as unknown as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL, init?: RequestInit) => (String(input) === "/player" ? new Promise<Response>(() => {}) : real(input, init))));
+    fireEvent.click(await screen.findByRole("button", { name: "Отменить запись: Утренняя прогулка 20 мин" }));
+    await waitFor(() => expect(document.querySelector(".lvl-hex b")?.textContent).toBe("01"));
+    expect(screen.getByText("Уровень 1")).toBeTruthy();
+    expect(document.body.textContent).toContain("Proof открывается вместе с Мастерской на уровне 2.");
+    expect(api.xp()).toBe(90);
+  });
+});
+
+describe("hint bubble → chat (review fix)", () => {
+  it("«Открыть чат» in the bubble opens the chat; the bubble text itself is not a button", async () => {
+    server([doneOld("old")], { xp: 10 });
+    await renderApp();
+    const bubble = await waitFor(() => {
+      const el = document.querySelector(".map-hint");
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    const buttons = [...bubble.querySelectorAll("button")].map((button) => button.getAttribute("aria-label") ?? button.textContent);
+    expect([...buttons].sort()).toEqual(["Открыть чат", "Скрыть до завтра"]);
+    fireEvent.click(within(bubble).getByRole("button", { name: "Открыть чат" }));
+    expect(screen.getByRole("heading", { name: "ИИ-помощник" })).toBeTruthy();
   });
 });

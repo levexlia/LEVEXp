@@ -441,17 +441,25 @@ button { cursor: pointer; }
   left: 50%;
   bottom: 0;
   width: min(480px, 100%);
-  height: min(672px, 86vh);
+  /* Hugs the conversation (no empty band), grows up to the old height, then the log scrolls. */
+  display: flex;
+  flex-direction: column;
+  min-height: min(420px, 70vh);
+  max-height: min(672px, 86vh);
   transform: translateX(-50%);
   animation: lx-chat-up 0.22s ease-out;
 }
+.lx-chat > .lx-chat__in { flex: 1 1 auto; height: auto; min-height: 0; }
 .lx-chat__ava .cr > .lx-chat__robot { left: -19px; top: -5px; width: 96px; height: 144px; }
 .lx-chat__close { padding: 0; border: 0; background: none; }
 .lx-chat__close img, .lx-chat__send img { display: block; }
 .lx-chat__close:focus-visible, .lx-chat__send:focus-visible { outline: 2px solid #22e1ff; outline-offset: 2px; }
 .lx-chat__ttl { font-size: 20px; }
-.lx-chat__log { overflow-y: auto; justify-content: flex-start; }
-.lx-chat__log > :first-child { margin-top: auto; }
+/* Messages flow from the top and the log scrolls (the newest is scrolled into view); no empty band on top.
+   min-height: 0 lets the flex child scroll instead of growing; the fade stays inside the top padding. */
+.lx-chat__log { min-height: 0; overflow-y: auto; overscroll-behavior: contain; justify-content: flex-start;
+  -webkit-mask-image: linear-gradient(transparent, #000 12px); mask-image: linear-gradient(transparent, #000 12px); }
+.lx-chat__log > * { flex: none; }
 .lx-msg__b { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .lx-msg.is-offline .lx-msg__b { border-style: dashed; color: #c7d2fe; }
 .lx-typing { align-self: flex-start; }
@@ -769,9 +777,21 @@ button { cursor: pointer; }
 .map-hint { --tail: 150px; position: absolute; z-index: 5; width: var(--lx-hint-w); left: calc(75% + 8px - var(--tail)); bottom: 74px; }
 .map-hint[data-hint="own_cap"] { --tail: 226px; }
 .map-hint .lx-hint { position: relative; }
-/* The bubble never blocks the map: taps pass through to chips and domes under it; only × is a real button. */
+/* The bubble never blocks the map: taps pass through to chips and domes under it; only × and «Открыть чат» are real buttons. */
 .map-hint, .map-hint * { pointer-events: none; }
 .map-hint .lx-hint__x { pointer-events: auto; }
+/* «Открыть чат»: the drawn chip (24 px, right-aligned, last line of the bubble) and the real button, a
+   120×44 zone in the bubble wrapper (the bubble is clipped, the wrapper is not). The zone starts 11 px into
+   the chip (its centre is in) and reaches 26 px below the bubble towards the robot: never up into the «Учебный центр» chip the
+   bubble covers (elementFromPoint, 360–1440 px wide; at 320 px it touches that chip by ~7 px). */
+.map-hint .lx-hint__chat { pointer-events: auto; }
+.lx-hint__chat { position: absolute; z-index: 1; right: 9px; bottom: -26px; width: 120px; height: 44px; padding: 0; border: 0; background: none;
+  cursor: pointer; font-size: 0; color: transparent; }
+.map-hint:has(.lx-hint__chat:hover) .lx-hint__chat-in { background: rgba(34, 225, 255, 0.2); }
+.lx-hint__chat:focus-visible { outline: 2px solid var(--lx-cyan-soft); outline-offset: -2px; }
+.lx-hint__chat-in { display: flex; justify-content: center; width: 112px; white-space: nowrap; margin: 6px 0 -6px auto; align-items: center; height: 24px; padding: 0 10px; border: 1px solid var(--lx-cyan, #22e1ff);
+  background: rgba(34, 225, 255, 0.1); font: 600 10px Tektur, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; color: #dff8ff;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
 /* × sits top-left on the map: its 44×44 zone then lands on empty map at 390/360/1280, never on the
    «Учебный центр» badge/chip that the top-right corner would cover (checked with elementFromPoint). */
 .map-hint .lx-hint__x { left: 0; right: auto; }

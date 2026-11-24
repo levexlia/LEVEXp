@@ -98,7 +98,7 @@
 .lxC-robot { width: auto; height: min(180px, 19vh); }
 .lxC-map { width: min(320px, 100%); }
 .lxC-timerbar { width: min(300px, 80%); height: 2px; background: rgba(255, 210, 61, .15); }
-.lxC-timerbar i { display: block; height: 100%; background: #ffd23d; box-shadow: 0 0 6px #ffd23d; transform-origin: left; animation: lxC-timer 2s linear both; }
+.lxC-timerbar .lxC-timer { display: block; height: 100%; background: #ffd23d; box-shadow: 0 0 6px #ffd23d; transform-origin: left; animation: lxC-timer 2s linear both; }
 @keyframes lxC-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 .lxC-live { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 

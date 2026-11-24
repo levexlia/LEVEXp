@@ -96,12 +96,12 @@ export function Milestone({
         {proofOpens ? (
           <p className="lxC-rw"><span className="in"><img src={uiIconUrl("camera")} width={18} height={18} alt="" />Proof теперь доступен</span></p>
         ) : null}
-        <p className="lxC-say"><b>Помощник:</b> «{milestoneLine(level)}»</p>
+        <p className="lxC-say"><b>ИИ-помощник:</b> «{milestoneLine(level)}»</p>
         <img className="lxC-robot" src={happyRobotSrc("bright", reducedMotion)} width={120} height={180} alt="" />
         <button type="button" className="lx-btn lx-focus-ring lxC-map" onClick={(event) => { event.stopPropagation(); onMap(); }}>
           <span className="lx-btn__in"><img src={tabIconUrl("map", true)} width={18} height={18} alt="" />На карту</span>
         </button>
-        {reducedMotion ? null : <div className="lxC-timerbar" aria-hidden="true"><i className="C-timer" /></div>}
+        {reducedMotion ? null : <div className="lxC-timerbar" aria-hidden="true"><i className="lxC-timer" /></div>}
       </div>
     </div>
   );
