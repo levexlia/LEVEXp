@@ -1,0 +1,86 @@
+/* LEVEX · scene18 (X «Неон-кибер») — журнал недели, кнопка «Отменить», метка «где угодно».
+   Подключать после levex-x.css (токены --lx-*). Ассеты: /art/scene18/*.svg. Внедрено: B2 «где угодно» (PR-A); журнал недели и «Отменить» — PR-B. Варианты A и B («.lx-anywhere», «.is-anywhere») — история, не внедрены. */
+:root{
+  --lx18-hex: polygon(50% 0,93.3% 25%,93.3% 75%,50% 100%,6.7% 75%,6.7% 25%);
+  --lx18-rail: linear-gradient(180deg,var(--lx-violet,#b47bff),var(--lx-cyan,#22e1ff));
+  --lx18-calm: #2f3a6e;          /* пустой день: спокойный, не красный */
+  --lx18-calm-text: #7f8cc0;
+}
+
+/* ================= журнал недели ================= */
+.lx-week__nav{display:flex;align-items:center;justify-content:space-between;font:600 11px var(--lx-font-mono,monospace);letter-spacing:.14em;color:#8fa0d8}
+.lx-week__nav button{width:30px;height:26px;border:1px solid #26305e;background:rgba(10,16,48,.7);color:#8fa0d8;
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+/* строка дня */
+.lx-day{display:grid;grid-template-columns:56px minmax(0,1fr);align-items:center;gap:8px;height:41px;padding:0 10px 0 12px;
+  border:1px solid #1f2a5c;border-left:2px solid #3b4aa0;background:rgba(10,16,48,.75);
+  clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)}
+.lx-day__d{display:flex;flex-direction:column;line-height:1.05}
+.lx-day__d b{font:700 12.5px var(--lx-font-display,sans-serif);letter-spacing:.12em;color:#dfe6ff}
+.lx-day__d small{font:600 9.5px var(--lx-font-mono,monospace);letter-spacing:.1em;color:#7f8cc0}
+.lx-day__marks{display:flex;gap:5px;align-items:center;min-width:0}
+.lx-day.is-today{border-color:#1c3f66;border-left:2px solid var(--lx-cyan,#22e1ff);background:linear-gradient(90deg,rgba(34,225,255,.09),rgba(10,16,48,.75) 60%)}
+.lx-day.is-today .lx-day__d b{color:#bff6ff}
+/* пустой день — нейтрально: пунктир, приглушённый текст, без красного и без «провала» */
+.lx-day.is-empty{border-style:dashed;border-color:var(--lx18-calm);border-left:2px dashed var(--lx18-calm);background:rgba(8,12,34,.45)}
+.lx-day.is-empty .lx-day__d b{color:#9aa6d6}
+.lx-day__rest{display:flex;align-items:center;gap:8px;font:500 12px var(--lx-font-display,sans-serif);color:var(--lx18-calm-text);letter-spacing:.02em}
+
+/* значок сферы в шестиугольнике (иконки /map/sp_*.svg; у «Отношений» — два кольца) */
+.lx-sp{--s:28px;position:relative;width:var(--s);height:var(--s);flex:none;display:grid;place-items:center;
+  background:linear-gradient(135deg,rgba(180,123,255,.75),rgba(34,225,255,.75));clip-path:var(--lx18-hex)}
+.lx-sp:before{content:"";position:absolute;inset:1px;background:#0a1030;clip-path:var(--lx18-hex)}
+.lx-sp img{position:relative;width:calc(var(--s) * .66);height:calc(var(--s) * .66)}
+.lx-sp__n{position:relative;margin-left:-9px;margin-right:2px;align-self:flex-end;font:700 9px var(--lx-font-mono,monospace);color:#bff6ff;
+  background:#0a1c46;padding:0 3px;border:1px solid #2a4c8a}
+
+/* итог недели по сферам: просто счёт отметок, без процентов и без «из N» */
+.lx-week__sum{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px}
+.lx-week__sum div{display:flex;align-items:center;gap:8px;font:500 12px var(--lx-font-display,sans-serif);color:#c9d2f5}
+.lx-week__sum div em{margin-left:auto;font:600 11px var(--lx-font-mono,monospace);font-style:normal;color:#7fdcff}
+.lx-week__sum .lx-sp{--s:22px}
+
+/* ================= кнопка «Отменить» (маленькая, не красная) =================
+   <button class="lx-undo"><span class="lx-undo__in"><img src="/art/scene18/ic_undo.svg" alt="">Отменить</span></button>
+   hover — :hover/.is-hover; нажатие — :active/.is-pressed; неактивная — :disabled/[aria-disabled=true] (иконка ic_undo_disabled.svg) */
+.lx-undo{--c:7px;display:inline-block;height:28px;padding:1px;border:0;cursor:pointer;background:#4a56a6;
+  clip-path:polygon(var(--c) 0,100% 0,100% calc(100% - var(--c)),calc(100% - var(--c)) 100%,0 100%,0 var(--c));
+  font:600 10px/1 var(--lx-font-display,sans-serif);letter-spacing:.16em;text-transform:uppercase;color:#cfd7ff;
+  transition:filter .15s ease,transform .1s ease}
+.lx-undo>.lx-undo__in{height:100%;display:flex;align-items:center;gap:6px;padding:0 10px 0 8px;background:linear-gradient(90deg,#141c4c,#0d1438);
+  clip-path:polygon(calc(var(--c) - .5px) 0,100% 0,100% calc(100% - var(--c) + .5px),calc(100% - var(--c) + .5px) 100%,0 100%,0 calc(var(--c) - .5px))}
+.lx-undo img{width:14px;height:14px;display:block}
+.lx-undo:hover,.lx-undo.is-hover{background:linear-gradient(90deg,var(--lx-violet,#b47bff),var(--lx-cyan,#22e1ff));filter:drop-shadow(0 0 6px rgba(130,120,255,.55));color:#fff}
+.lx-undo:hover>.lx-undo__in,.lx-undo.is-hover>.lx-undo__in{background:linear-gradient(90deg,#1c2560,#10204a)}
+.lx-undo:active,.lx-undo.is-pressed{transform:translateY(1px);background:linear-gradient(90deg,var(--lx-violet,#b47bff),var(--lx-cyan,#22e1ff));filter:drop-shadow(0 0 10px rgba(34,225,255,.6));color:#fff}
+.lx-undo:active>.lx-undo__in,.lx-undo.is-pressed>.lx-undo__in{background:linear-gradient(90deg,rgba(180,123,255,.45),rgba(34,225,255,.35));text-shadow:0 0 6px #fff}
+.lx-undo:focus-visible{outline:2px solid var(--lx-cyan-soft,#7ff3ff);outline-offset:2px}
+.lx-undo:disabled,.lx-undo[aria-disabled="true"]{cursor:default;background:#2a3158;filter:none;transform:none;color:var(--lx-text-disabled,#646d94)}
+.lx-undo:disabled>.lx-undo__in,.lx-undo[aria-disabled="true"]>.lx-undo__in{background:repeating-linear-gradient(135deg,#070a1a 0 6px,#0b0f25 6px 12px);text-shadow:none}
+/* после отмены: строка приглушена, рядом «Вернуть» — тот же стиль */
+.lx-entry{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;min-height:54px;padding:6px 8px 6px 10px;
+  border:1px solid #1f2a5c;border-left:2px solid var(--place,var(--lx-cyan,#22e1ff));background:rgba(10,16,48,.75);
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+.lx-entry__ttl{font:600 13.5px var(--lx-font-display,sans-serif);color:#e6f0ff}
+.lx-entry__meta{font:500 10.5px var(--lx-font-mono,monospace);letter-spacing:.04em;color:#7f8cc0;margin-top:2px}
+.lx-entry.is-undone{border-style:dashed;border-color:#26305e;border-left:2px dashed #3a4680;background:rgba(8,12,34,.45)}
+.lx-entry.is-undone .lx-entry__ttl{color:#8a94c4}
+.lx-entry.is-past .lx-entry__ttl{color:#bfc8ee}
+
+/* ================= «где угодно» (миссия без места на карте) ================= */
+/* ПРИНЯТ: вариант B2 — слева иконка сферы (.lx-sp), мета «Сфера · где угодно · ДОСТУПНА», карточка без места — .is-anywhere-b.
+   Раскладка B2: название и кнопка в первой строке, мета во второй на всю ширину (длинная мета не налезает на кнопку). */
+.mission.is-b2{column-gap:.6rem;row-gap:4px;grid-template-rows:auto auto;padding-top:.5rem;padding-bottom:.5rem}
+.mission.is-b2>.lx-sp{--s:24px;grid-row:1/3}
+.mission.is-b2>.mission__body{display:contents}
+.mission.is-b2 .mission__ttl{grid-column:2;grid-row:1;align-self:center}
+.mission.is-b2 .mission__meta{grid-column:2/4;grid-row:2;white-space:nowrap}
+.mission.is-b2>.mission__act{grid-column:3;grid-row:1}
+/* Вариант B — стиль карточки (рейка + угол; в B2 используется вместе с .is-b2): рельс фиолетовый→голубой вместо цвета места, свечение угла, иконка ic_anywhere_b.svg */
+.mission.is-anywhere-b{position:relative;border-left:0;padding-left:calc(.8rem + 2px);
+  background:radial-gradient(120px 60px at 100% 0,rgba(34,225,255,.10),transparent 70%),rgba(10,16,48,.75)}
+.mission.is-anywhere-b:before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--lx18-rail);box-shadow:0 0 8px rgba(34,225,255,.6)}
+.mission.is-anywhere-b:after{content:"";position:absolute;right:0;top:0;width:22px;height:22px;
+  background:linear-gradient(225deg,rgba(34,225,255,.55) 0 2px,transparent 2px),linear-gradient(90deg,transparent 60%,rgba(180,123,255,.7) 60% 100%) top/100% 1px no-repeat,
+  linear-gradient(0deg,transparent 60%,rgba(34,225,255,.7) 60% 100%) right/1px 100% no-repeat}
+@media (prefers-reduced-motion:reduce){.lx-undo{transition:none}}

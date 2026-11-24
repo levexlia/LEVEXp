@@ -648,7 +648,6 @@ button { cursor: pointer; }
 }
 .mission__del:hover, .mission__del:focus-visible { border-color: var(--lx-violet); color: #fff; }
 .mission__del:disabled { opacity: 0.5; cursor: default; }
-.mission__del.is-danger { border-color: #ff5c8a; color: #ffd6e2; background: rgba(90, 20, 50, 0.6); }
 .mission__confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
 .mission__confirm .mission__del { margin-top: 0; }
 .mission__ask { font-size: 13px; color: var(--lx-text); }
@@ -710,3 +709,81 @@ button { cursor: pointer; }
 .after .ps-actions .ps-later { width: auto; flex: none; letter-spacing: 0.12em; }
 .after .ps-actions .ps-later > .lx-btn__in { padding: 0 14px; }
 .plan-chip__noxp { font-size: 0.85em; opacity: 0.75; text-transform: none; letter-spacing: 0.02em; }
+
+/* ---------- scene17/18 (PR-A): B2 mission rows, «Где угодно», «Свои миссии», empty states, hint */
+/* B2 (scene18 §3): sphere icon left; title + action in line 1; «Сфера · место · ДОСТУПНА · XP» in line 2. */
+.mission.is-b2 { grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; }
+.mission.is-b2 > .mission__icon { grid-column: 1; grid-row: 1 / 3; align-self: center; }
+.mission.is-b2 .mission__meta { white-space: normal; }
+.mission.is-b2 .mission__body > :not(.mission__ttl):not(.mission__meta) { grid-column: 2 / 4; }
+.mission.is-b2 .mission__xp { font-size: 10.5px; }
+.mission.is-b2 > .mission__check { grid-row: 1 / 3; }
+.mission.is-anywhere-b { --place: var(--lx-cyan); }
+/* «Сегодня» is narrow: the buttons get their own line under the meta. */
+.stage-side .mission.is-b2 { grid-template-columns: 24px minmax(0, 1fr) auto; row-gap: 4px; }
+.stage-side .mission.is-b2 > .mission__act { grid-column: 2 / 4; grid-row: 3; display: flex; justify-content: flex-end; }
+/* «Где угодно» filter chip: violet→cyan frame, the globe 13 px (the only place with the globe). */
+.filter-chip.is-anywhere-chip { --place: linear-gradient(90deg, #b47bff, #22e1ff); }
+.filter-chip.is-anywhere-chip > .lx-chip__in img { width: 13px; height: 13px; margin-left: 1px; }
+.filter-chip.is-anywhere-chip[aria-pressed="true"] { filter: drop-shadow(0 0 6px rgba(120, 140, 255, 0.6)); }
+.filter-chip.is-anywhere-chip[aria-pressed="true"] > .lx-chip__in { background: linear-gradient(90deg, rgba(110, 70, 200, 0.45), rgba(4, 7, 22, 0.97)); }
+
+/* «Свои миссии» (scene17 §4). */
+.own-missions { margin-top: 1.1rem; }
+.own-missions__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 0.5rem; }
+.own-missions__head h3 { margin: 0; }
+.own-missions__count { padding: 3px 8px; border: 1px solid #2c3770; background: rgba(10, 16, 48, 0.75); font: 600 10.5px var(--lx-font-mono); letter-spacing: 0.12em; color: #c9d2f5; text-transform: uppercase; }
+.mission.is-own { grid-template-columns: 20px minmax(0, 1fr) auto; min-height: 56px; }
+.mission.is-own > .mission__hex, .mission.is-own > .mission__check { grid-column: 1; grid-row: 1 / 3; align-self: center; }
+.mission.is-own .mission__ttl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mission.is-own .mission__meta { grid-column: 2; }
+.mission.is-own > .mission__act { grid-column: 3; grid-row: 1 / 3; }
+.mission.is-own .mission__st { text-transform: none; letter-spacing: 0.04em; font-weight: 500; color: var(--lx-text-muted); }
+.mission__hex { width: 20px; height: 20px; position: relative; background: var(--place); clip-path: polygon(50% 0, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%); }
+.mission__hex::before { content: ""; position: absolute; inset: 2px; background: #0a1030; clip-path: inherit; }
+.mission.is-confirming { border-color: #5b4bd6; background: linear-gradient(90deg, rgba(124, 58, 237, 0.12), rgba(10, 16, 48, 0.8)); }
+/* Trash: 44×44 zone, 32×32 plate with a 6 px cut, Lucide icon; hover — violet frame. Only on open rows. */
+.mission__trash { width: 44px; height: 44px; padding: 0; border: 0; background: none; display: grid; place-items: center; cursor: pointer; }
+.mission__trash-in { --c: 6px; width: 32px; height: 32px; display: grid; place-items: center; background: #2c3770; position: relative;
+  clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c)); }
+.mission__trash-in::before { content: ""; position: absolute; inset: 1px; background: rgba(10, 16, 48, 0.95);
+  clip-path: polygon(calc(var(--c) - .5px) 0, 100% 0, 100% calc(100% - var(--c) + .5px), calc(100% - var(--c) + .5px) 100%, 0 100%, 0 calc(var(--c) - .5px)); }
+.mission__trash-in img { position: relative; }
+.mission__trash:hover .mission__trash-in, .mission__trash:focus-visible .mission__trash-in { background: #b47bff; }
+.mission__trash:focus-visible { outline: 2px solid var(--lx-cyan-soft); outline-offset: -2px; }
+.mission__trash:disabled { opacity: 0.5; cursor: default; }
+/* Confirm in the row: «Да, удалить» is violet, not red (scene17). */
+.mission__del.is-confirm { border-color: #b47bff; background: rgba(124, 58, 237, 0.18); color: #fff; }
+.mission__confirm .mission__del:not(.is-confirm) { border-color: #3a4590; }
+
+/* Empty states (scene17 §3): one calm line, the art above. */
+.lx-empty { margin: 0.2rem 0 0.6rem; }
+.lx-empty { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.lx-empty__line { margin: 0; width: 100%; }
+.today-plan { min-width: 0; }
+.stage-side .lx-empty__art { width: 168px; height: 126px; }
+/* Beside the map (300 px) the line may take two lines instead of an ellipsis that would cut «свободен». */
+.stage-side .lx-empty__line { font-size: 13.5px; white-space: normal; overflow: visible; }
+
+/* Assistant hint on the map (scene17 §2): the tail points at the palm of robot_hint_left (box left − 3 px, 41 px below its top). */
+.map-hint { --tail: 150px; position: absolute; z-index: 5; width: var(--lx-hint-w); left: calc(75% + 8px - var(--tail)); bottom: 74px; }
+.map-hint[data-hint="own_cap"] { --tail: 226px; }
+.map-hint .lx-hint { position: relative; }
+/* The bubble never blocks the map: taps pass through to chips and domes under it; only × is a real button. */
+.map-hint, .map-hint * { pointer-events: none; }
+.map-hint .lx-hint__x { pointer-events: auto; }
+/* × sits top-left on the map: its 44×44 zone then lands on empty map at 390/360/1280, never on the
+   «Учебный центр» badge/chip that the top-right corner would cover (checked with elementFromPoint). */
+.map-hint .lx-hint__x { left: 0; right: auto; }
+.map-hint .lx-hint__x::before, .map-hint .lx-hint__x::after { left: 11px; right: auto; }
+.map-hint .lx-hint__meta { padding-right: 0; padding-left: 24px; }
+.map-hint .lx-hint__tail { left: var(--tail); bottom: -9px; }
+/* × is 20×20 to the eye, 44×44 to the finger. */
+.lx-hint__x { right: 0; top: 0; width: 44px; height: 44px; padding: 0; border: 0; background: none; cursor: pointer; }
+.lx-hint__x::before, .lx-hint__x::after { right: 11px; top: 15.3px; }
+.lx-hint__x:hover, .lx-hint__x:focus-visible { color: #cfe9ff; }
+.lx-hint__x:focus-visible { outline: 2px solid var(--lx-cyan-soft); outline-offset: -6px; }
+/* The confirm fits one line at 390 px, as in the mock: «Удалить миссию?» · «Да, удалить» · «Отмена». */
+.mission.is-own .mission__confirm { gap: 6px; margin-top: 6px; }
+.mission.is-own .mission__confirm .mission__del { padding: 0 10px; font-size: 12.5px; }
+.mission.is-own .mission__ask { font-size: 12.5px; }

@@ -8,6 +8,7 @@ import {
   type SphereTemplate,
   REFLECTION_LABEL,
   SEED_TEMPLATES,
+  OWN_TEMPLATE_PREFIX,
   dailyLedger,
   noXpTodayReason,
   templateNoXpReason,
@@ -33,8 +34,10 @@ export interface MissionRow {
   place: MapNodeId | null;
   /** Place name, or the sphere name for placeless missions (Карьера, Финансы, Отношения). */
   placeName: string;
-  /** Life sphere id of the goal (for the sphere icon of placeless missions). */
+  /** Life sphere id of the goal (for the sphere icon, scene18 B2). */
   sphere: string | null;
+  /** Sphere name for the B2 meta line «Сфера · место · ДОСТУПНА» (scene18). */
+  sphereName: string;
   xp: number;
   done: boolean;
   /** DD.MM of the completion, done missions only. */
@@ -77,6 +80,7 @@ export function missionRow(goal: Goal, today = playerDay(new Date()), ledger?: D
     place,
     placeName: place ? placeName(place) : getLifeSphere(goal.sphere ?? "")?.name ?? placeName(null),
     sphere: goal.sphere ?? null,
+    sphereName: getLifeSphere(goal.sphere ?? "")?.name ?? "",
     xp: goal.xpReward,
     done: goal.status === "done",
     doneOn: goal.status === "done" ? ddmm(goal.completedAt) : null,
@@ -103,13 +107,23 @@ export interface MissionBoard {
   total: { open: number; done: number };
 }
 
-/** Open missions first (in API order), then done ones, newest first. `place` filters by map place. */
-export function missionBoard(goals: readonly Goal[], place: MapNodeId | null = null, now = new Date()): MissionBoard {
+/** Filter of the Missions tab: all, one map place, or «Где угодно» (missions without a map place, scene18 B2). */
+export type MissionFilter = MapNodeId | typeof ANYWHERE | null;
+export const ANYWHERE = "anywhere" as const;
+
+/** Meta of a row in the scene18 B2 layout: «Сфера · место» or «Сфера · где угодно». */
+export function rowWhere(row: Pick<MissionRow, "place" | "placeName" | "sphereName">): string {
+  const where = row.place ? row.placeName : "где угодно";
+  return row.sphereName ? `${row.sphereName} · ${where}` : where;
+}
+
+/** Open missions first (in API order), then done ones, newest first. `place` filters by map place or «Где угодно». */
+export function missionBoard(goals: readonly Goal[], place: MissionFilter = null, now = new Date()): MissionBoard {
   const today = playerDay(now);
   // Same rules as the server (domain daily.ts), so «+10 XP» is not promised when it would be 0.
   const ledger = dailyLedger(goals, now);
   const rows = goals.map((goal) => missionRow(goal, today, ledger));
-  const shown = place ? rows.filter((row) => row.place === place) : rows;
+  const shown = place === ANYWHERE ? rows.filter((row) => row.place === null) : place ? rows.filter((row) => row.place === place) : rows;
   const completedAt = new Map(goals.map((goal) => [goal.id, goal.completedAt ?? ""]));
   return {
     open: shown.filter((row) => !row.done && row.from === null),
@@ -134,6 +148,30 @@ export function todayBoard(
   const board = missionBoard(goals, null, now);
   const doneToday = goals.filter((goal) => goal.status === "done" && playerDayOf(goal.completedAt) === today).length;
   return { open: board.open.slice(0, limit), openTotal: board.open.length, doneToday, later: board.later };
+}
+
+/**
+ * A mission the player created: no built-in template (a «Повторить завтра» copy of an own mission keeps
+ * `own:<id>`), and not a copy of a catalog / seed mission by title + sphere (such a goal can only come from
+ * the API, e.g. a preview seed, never from the «Новая миссия» form).
+ */
+export function isOwnMission(goal: Goal): boolean {
+  if (goal.templateId && !goal.templateId.startsWith(OWN_TEMPLATE_PREFIX)) return false;
+  if (!goal.templateId && templateKeyOf(goal) !== null) return false;
+  return ![...SEED_TEMPLATES, ...SPHERE_TEMPLATES].some((template) => template.title === goal.title && template.sphere === goal.sphere);
+}
+
+/**
+ * «Свои миссии» (scene17): only missions the player created — open ones and those finished today.
+ * `count` is the «N из 20» counter: open own missions without a template, as the 20 limit counts them.
+ */
+export function ownBoard(goals: readonly Goal[], now = new Date()): { rows: MissionRow[]; count: number } {
+  const today = playerDay(now);
+  const ledger = dailyLedger(goals, now);
+  const own = goals.filter(isOwnMission);
+  const open = own.filter((goal) => goal.status === "open");
+  const doneToday = own.filter((goal) => goal.status === "done" && playerDayOf(goal.completedAt) === today);
+  return { rows: [...open, ...doneToday].map((goal) => missionRow(goal, today, ledger)), count: open.filter((goal) => templateKeyOf(goal) === null).length };
 }
 
 /** A chip of the empty-day plan: «Можно снова:» (done before) or «Можно взять:» (new). */

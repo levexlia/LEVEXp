@@ -3,6 +3,7 @@ import {
   MAP_NODES,
   NICKNAME_MAX_LENGTH,
   XP_PER_LEVEL,
+  dailyLedger,
   lockedPlaceFor,
   placeLockedMessage,
   playerDay,
@@ -39,13 +40,15 @@ import { AvatarBuilder } from "./AvatarBuilder";
 import { AssistantChat } from "./assistant/AssistantChat";
 import { ASSISTANT_ROBOT_SIZE, ROBOT_STATES, robotSrc, type RobotState } from "./assistant/art";
 import { rememberChatOpened, shouldShowTapMarker, tapMarkerSrc } from "./assistant/tapMarker";
+import { HINT_TEXT, useAssistantHint } from "./assistant/hints";
+import { HintBubble, hintRobotSrc } from "./assistant/HintBubble";
 import { Check, PhotoPick, Toast } from "./Controls";
 import { HomeMap, mapStates } from "./HomeMap";
-import { MissionsView, TodayPanel, type MissionActions } from "./Missions";
+import { EmptyState, MissionsView, TodayPanel, type MissionActions } from "./Missions";
 import { PlaceSheet } from "./PlaceSheet";
 import { ActivityScreen } from "./daily/ActivityScreen";
 import { AfterMission, type AfterMissionInfo } from "./daily/AfterMission";
-import { availableOn, planChips, placeName, placeForSphere, xpHint, type PlanChip } from "./map/missions";
+import { availableOn, planChips, placeName, placeForSphere, todayBoard, xpHint, type MissionFilter, type PlanChip } from "./map/missions";
 import { segments } from "./map/placeSheet";
 import { sphereRows } from "./map/resources";
 import { HEX_LEVEL_URL, tabIconUrl, uiIconUrl, type HeaderIcon, type TabIcon } from "./theme/uiArt";
@@ -65,7 +68,7 @@ export function App() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [tab, setTab] = useState<Tab>("map");
-  const [missionPlace, setMissionPlace] = useState<MapNodeId | null>(null);
+  const [missionPlace, setMissionPlace] = useState<MissionFilter>(null);
   const [building, setBuilding] = useState(false);
   const [draft, setDraft] = useState<AvatarConfig>(DEFAULT_AVATAR_CONFIG);
   const [nodeId, setNodeId] = useState<MapNodeId | null>(null);
@@ -115,6 +118,20 @@ export function App() {
   const energy = player?.energy ?? { current: 50, max: 50 };
   const reducedMotion = useReducedMotion();
   const states = mapStates(level, goals);
+  const now = new Date();
+  const plan = planChips(goals, level, now, player?.progress.xpBySphere ?? {});
+  const ledger = dailyLedger(goals, now);
+  // Assistant hints (scene17): only once the room is loaded, so an empty first render does not count.
+  const { hint, dismiss: dismissHint } = useAssistantHint(
+    {
+      own_cap: player !== null && ledger.ownAwarded >= ledger.ownAwardCap,
+      empty_day: player !== null && plan.length > 0 && todayBoard(goals, now).open.length === 0,
+    },
+    now,
+  );
+  const hintText = hint === "own_cap" ? HINT_TEXT.ownCap : plan.some((chip) => chip.kind === "repeat") ? HINT_TEXT.emptyDayRepeat : HINT_TEXT.emptyDayNew;
+  // The bubble belongs to the map robot: not while the chat is open.
+  const mapHint = hint && !chat ? hint : null;
 
   // Preload the robot states so switching does not flash (scene15 INTEGRATION.md).
   useEffect(() => {
@@ -421,13 +438,14 @@ export function App() {
                   aria-expanded={chat}
                 >
                   <img
-                    src={robotSrc(chat ? robotState : "idle", reducedMotion)}
+                    src={mapHint ? hintRobotSrc(reducedMotion) : robotSrc(chat ? robotState : "idle", reducedMotion)}
                     alt=""
                     width={ASSISTANT_ROBOT_SIZE.width}
                     height={ASSISTANT_ROBOT_SIZE.height}
-                    data-state={chat ? robotState : "idle"}
+                    data-state={mapHint ? "hint" : chat ? robotState : "idle"}
                   />
-                  {tapMarker ? (
+                  {/* scene17: the «нажми» marker hides while the bubble is visible. */}
+                  {tapMarker && !mapHint ? (
                     <img
                       className="map-robot__marker"
                       src={tapMarkerSrc(reducedMotion)}
@@ -437,6 +455,7 @@ export function App() {
                     />
                   ) : null}
                 </button>
+                {mapHint ? <HintBubble key={mapHint} id={mapHint} text={hintText} onDismiss={dismissHint} /> : null}
               </div>
 
               <div className="proof-row">
@@ -453,7 +472,7 @@ export function App() {
               actions={actions}
               reducedMotion={reducedMotion}
               onAll={() => openMissions(null)}
-              plan={planChips(goals, level, new Date(), player?.progress.xpBySphere ?? {})}
+              plan={plan}
               today={player?.today}
               onPlan={addFromPlan}
             />
@@ -471,7 +490,7 @@ export function App() {
             reducedMotion={reducedMotion}
           />
         ) : null}
-        {!building && tab === "resources" ? <Resources player={player} /> : null}
+        {!building && tab === "resources" ? <Resources player={player} reducedMotion={reducedMotion} /> : null}
         {!building && tab === "profile" ? (
           <Profile
             player={player}
@@ -608,20 +627,14 @@ function pad2(value: number): string {
   return String(Math.max(0, value)).padStart(2, "0");
 }
 
-function Resources({ player }: { player: Player | null }) {
+function Resources({ player, reducedMotion }: { player: Player | null; reducedMotion: boolean }) {
   const rows = sphereRows(player?.progress.xpBySphere ?? {}, player?.progress.level ?? 1);
   const empty = rows.every((row) => row.zero);
   return (
     <section className="panel">
       <h2>Ресурсы</h2>
-      {empty ? (
-        <div className="empty-state" data-empty="resources">
-          <p>Здесь будет видно, в каких сферах жизни копится XP: здоровье, разум, творчество и другие.</p>
-          <p className="empty">Пока пусто. Выполни любую миссию из «Сегодня», и первая полоса заполнится.</p>
-        </div>
-      ) : (
-        <p className="empty">XP по сферам: за каждую выполненную миссию с начислением.</p>
-      )}
+      {empty ? <EmptyState kind="resources" art="empty_resources" line="Сферы заполнятся после первой миссии." reducedMotion={reducedMotion} /> : null}
+      <p className="empty">XP по сферам: за каждую выполненную миссию с начислением.</p>
       <ul className="bars">
         {rows.map((row) => (
           <li key={row.id} className={row.zero ? "is-zero" : undefined} data-sphere={row.id}>

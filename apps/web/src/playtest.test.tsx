@@ -92,10 +92,12 @@ describe("playtest fixes", () => {
     const view = screen.getByRole("region", { name: "Миссии" });
     expect(within(view).getByRole("heading", { name: "Миссии" })).toBeTruthy();
     const row = view.querySelector('[data-mission="g1"]')!;
-    expect(row.textContent).toContain("Доступна");
+    // scene18 B2: «Сфера · место · ДОСТУПНА» (upper case is CSS), the sphere icon on the left.
+    expect(row.querySelector(".mission__meta")?.textContent).toMatch(/^Здоровье · Дом · доступна · \+10 XP$/);
+    expect(row.querySelector(".lx-sp img")?.getAttribute("src")).toBe("/map/sp_sport.svg");
     fireEvent.click(within(view).getByRole("button", { name: "Выполнить: Утренняя прогулка 20 мин" }));
     await waitFor(() => expect(view.querySelector('[data-mission="g1"]')?.getAttribute("data-status")).toBe("done"));
-    expect(view.querySelector('[data-mission="g1"]')!.textContent).toContain("Выполнена");
+    expect(view.querySelector('[data-mission="g1"]')!.textContent).toContain("выполнена");
     expect(api.calls.some((call) => call.method === "POST" && call.url === "/goals/g1/complete")).toBe(true);
     expect(within(view).getByText("Выполненная миссия повторно XP не даёт.")).toBeTruthy();
     // No dead end: the done mission has no action, the open one still does.
@@ -184,7 +186,7 @@ describe("playtest fixes", () => {
     fireEvent.click(within(today).getByRole("button", { name: "Выполнить: Прочитать 10 страниц" }));
     // Spec №1: an empty day shows a plan instead of only the form: «Можно снова:» first, max 3 buttons.
     // Both seeds already gave XP today: new missions come first and fill the 3 buttons, so no «Можно снова» block.
-    await waitFor(() => expect(today.querySelector('[data-empty="today"]')?.textContent).toMatch(/^На сегодня дел нет\.Можно взять:/));
+    await waitFor(() => expect(today.querySelector('[data-empty="today"]')?.textContent).toMatch(/^На сегодня дел нет — день свободен\.Можно взять:/));
     expect(today.querySelectorAll("[data-plan]")).toHaveLength(3);
     expect(today.querySelector('[data-plan-block="repeat"]')).toBeNull();
   });
