@@ -794,7 +794,19 @@ button { cursor: pointer; }
 .journal-note { margin: 0 0 0.6rem; font-size: 12.5px; color: var(--lx-text-2); }
 .journal-label { margin: 0.6rem 0 0.4rem; font: 600 10.5px var(--lx-font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: #8fa0d8; }
 .journal-list, .lx-week__days { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.lx-entry .lx-undo { justify-self: end; }
+/* ≥44×44 tap zone around the 28 px scene18 button; states of the zone drive the drawn button. */
+.lx-undo-hit { justify-self: end; display: inline-flex; align-items: center; justify-content: flex-end; min-width: 44px; min-height: 44px;
+  margin: -3px 0; padding: 0 0 0 8px; border: 0; background: none; cursor: pointer; font: inherit; color: inherit; }
+.lx-undo-hit > .lx-undo { pointer-events: none; }
+.lx-undo-hit:hover > .lx-undo { background: linear-gradient(90deg, var(--lx-violet, #b47bff), var(--lx-cyan, #22e1ff)); filter: drop-shadow(0 0 6px rgba(130, 120, 255, .55)); color: #fff; }
+.lx-undo-hit:hover > .lx-undo > .lx-undo__in { background: linear-gradient(90deg, #1c2560, #10204a); }
+.lx-undo-hit:active > .lx-undo { transform: translateY(1px); background: linear-gradient(90deg, var(--lx-violet, #b47bff), var(--lx-cyan, #22e1ff)); filter: drop-shadow(0 0 10px rgba(34, 225, 255, .6)); color: #fff; }
+.lx-undo-hit:active > .lx-undo > .lx-undo__in { background: linear-gradient(90deg, rgba(180, 123, 255, .45), rgba(34, 225, 255, .35)); text-shadow: 0 0 6px #fff; }
+.lx-undo-hit:focus-visible { outline: none; }
+.lx-undo-hit:focus-visible > .lx-undo { outline: 2px solid var(--lx-cyan-soft, #7ff3ff); outline-offset: 2px; }
+.lx-undo-hit:disabled { cursor: default; }
+.lx-undo-hit:disabled > .lx-undo { background: #2a3158; filter: none; transform: none; color: var(--lx-text-disabled, #646d94); }
+.lx-undo-hit:disabled > .lx-undo > .lx-undo__in { background: repeating-linear-gradient(135deg, #070a1a 0 6px, #0b0f25 6px 12px); text-shadow: none; }
 .lx-week__nav { margin-bottom: 8px; }
 .lx-week__nav button { cursor: pointer; min-width: 30px; }
 .lx-week__nav button:disabled { opacity: 0.35; cursor: default; }

@@ -30,17 +30,22 @@ function Entry({ item, past, pending, busy, onUndo, onRedo }: { item: JournalEnt
         </div>
       </div>
       {past ? null : item.undone ? (
-        <button type="button" className="lx-undo" disabled={busy} onClick={onRedo} aria-label={`Вернуть запись: ${item.title}`}>
-          <span className="lx-undo__in"><img src={pending ? UNDO_ICON_OFF : UNDO_ICON} alt="" />Вернуть</span>
+        <button type="button" className="lx-undo-hit" disabled={busy} onClick={onRedo} aria-label={`Вернуть запись: ${item.title}`}>
+          <span className="lx-undo"><span className="lx-undo__in"><img src={pending ? UNDO_ICON_OFF : UNDO_ICON} alt="" />Вернуть</span></span>
         </button>
       ) : item.undoable ? (
-        <button type="button" className="lx-undo" disabled={busy} onClick={onUndo} aria-label={`Отменить запись: ${item.title}`}>
-          <span className="lx-undo__in"><img src={pending ? UNDO_ICON_OFF : UNDO_ICON} alt="" />Отменить</span>
+        <button type="button" className="lx-undo-hit" disabled={busy} onClick={onUndo} aria-label={`Отменить запись: ${item.title}`}>
+          <span className="lx-undo"><span className="lx-undo__in"><img src={pending ? UNDO_ICON_OFF : UNDO_ICON} alt="" />Отменить</span></span>
         </button>
       ) : null}
     </li>
   );
 }
+
+/*
+ * «Отменить» / «Вернуть»: the real <button> (.lx-undo-hit) is a transparent ≥44×44 zone; inside it the
+ * 28 px scene18 button (.lx-undo) is only drawn. Its clip-path would clip a bigger hit area, hence the wrapper.
+ */
 
 /**
  * «Сегодня · ВТ 24»: today's records with «Отменить» (no confirm dialog; «Вернуть» right in the row),

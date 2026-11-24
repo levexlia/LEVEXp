@@ -122,6 +122,10 @@ describe("Профиль: «Отменить» / «Вернуть» and «Жур
     const past = today.querySelector('[data-entry="y"]')!;
     expect(past.className).toContain("is-past");
     expect(past.querySelector("button")).toBeNull();
+    // The real button is the ≥44 px zone (.lx-undo-hit); the 28 px scene18 button inside it is only drawn.
+    const undoButton = within(row as HTMLElement).getByRole("button", { name: "Отменить запись: Прогулка без телефона" });
+    expect(undoButton.className).toBe("lx-undo-hit");
+    expect(undoButton.querySelector(":scope > .lx-undo > .lx-undo__in")?.textContent).toBe("Отменить");
     fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "Отменить запись: Прогулка без телефона" }));
     await waitFor(() => expect(today.querySelector('[data-entry="t"]')?.className).toContain("is-undone"));
     expect(screen.queryByRole("dialog")).toBeNull();
