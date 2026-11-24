@@ -34,6 +34,17 @@ export interface Goal {
   /** Player day from which «Сегодня» shows it (a «Повторить завтра» copy). */
   availableFrom?: string;
   reflection?: Reflection;
+  /** «Отменить» (scene18): today's record was taken back at this time; the goal is open again. */
+  undoneAt?: string;
+}
+
+export interface UndoAnswer {
+  goal: Goal;
+  progress: Player["progress"];
+  /** XP taken back: exactly what the record granted (0 for a record without XP). */
+  removedXp: number;
+  awardedToday: number;
+  awardCap: number;
 }
 
 export interface TodayAwards {
@@ -193,6 +204,11 @@ export function createArtifact(input: { title: string; imageUrl: string; goalId:
 
 export function completeGoal(id: string): Promise<CompleteAnswer> {
   return sendJson(`/goals/${id}/complete`);
+}
+
+/** scene18 «Отменить»: takes back today's record (its XP, cap slot and template mark). */
+export function undoGoal(id: string): Promise<UndoAnswer> {
+  return sendJson(`/goals/${id}/undo`);
 }
 
 export function loadAvatar(): Promise<AvatarStatus> {

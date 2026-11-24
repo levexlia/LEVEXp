@@ -6,7 +6,9 @@ import {
   activeOwnLimitMessage,
   ACTIVE_OWN_MISSIONS_MAX,
   awardDecision,
+  canUndo,
   dailyLedger,
+  grantedXp,
   getLifeSphere,
   builtInTemplate,
   lockedPlaceFor,
@@ -113,6 +115,52 @@ export function deleteGoal(id: string): boolean {
   }
   commitState(next);
   return true;
+}
+
+export class GoalNotDone extends Error {
+  constructor() {
+    super("only a done mission can be undone");
+    this.name = "GoalNotDone";
+  }
+}
+
+export class UndoPastDay extends Error {
+  constructor() {
+    super("only today's record can be undone");
+    this.name = "UndoPastDay";
+  }
+}
+
+export interface UndoResult {
+  goal: Goal;
+  progress: PlayerProgress;
+  /** XP taken back: exactly what this record granted (0 for a record without XP). */
+  removedXp: number;
+  today: ReturnType<typeof todayAwards>;
+}
+
+/**
+ * scene18 «Отменить»: takes back today's record of a goal. The goal is open again (`undoneAt`), the XP it
+ * granted leaves totalXp / xpBySphere / level, and — since the daily ledger and energy are derived from
+ * today's done goals — its cap slot (5 a day, own 3), its template-once-a-day mark and its energy come back.
+ * «Вернуть» is a plain new completion (POST /goals/:id/complete) under R-XP-5…10. Photos stay linked.
+ */
+export function undoGoal(id: string): UndoResult | undefined {
+  const goal = goals.get(id);
+  if (!goal) return undefined;
+  if (goal.status !== "done") throw new GoalNotDone();
+  if (!canUndo(goal, clock())) throw new UndoPastDay();
+  const removedXp = grantedXp(goal);
+  const next = cloneState();
+  const nextGoal = next.goals.get(id)!;
+  nextGoal.status = "open";
+  delete nextGoal.completedAt;
+  delete nextGoal.xpGranted;
+  delete nextGoal.noXpReason;
+  nextGoal.undoneAt = clock().toISOString();
+  if (removedXp > 0) next.player = playerWithXp(next.player, -removedXp, nextGoal.sphere);
+  commitState(next);
+  return { goal: goals.get(id)!, progress: getProgress(), removedXp, today: todayAwards() };
 }
 
 /** R-XP-8: the goal's map place is still locked. The message is the Russian text the UI shows. */
@@ -582,6 +630,7 @@ export function completeGoal(id: string, artifactId?: string): CompleteResult | 
     const decision = awardDecision(nextGoal, dailyLedger([...next.goals.values()], clock()));
     nextGoal.status = "done";
     nextGoal.completedAt = clock().toISOString();
+    delete nextGoal.undoneAt;
     if (decision.award) {
       const photoLinked = willLink || hasLinkedPhoto(next.artifacts, id);
       const amount = xpGrantedForGoal({
@@ -755,9 +804,10 @@ function hasLinkedPhoto(artifactMap: Map<string, Artifact>, goalId: string): boo
 }
 
 function playerWithXp(current: Player, amount: number, sphere?: LifeSphereId): Player {
+  // A negative amount is «Отменить» taking back exactly what one record gave; never below zero.
   const xpBySphere = { ...current.progression.xpBySphere };
-  if (sphere) xpBySphere[sphere] = (xpBySphere[sphere] ?? 0) + amount;
-  const totalXp = current.progression.totalXp + amount;
+  if (sphere) xpBySphere[sphere] = Math.max(0, (xpBySphere[sphere] ?? 0) + amount);
+  const totalXp = Math.max(0, current.progression.totalXp + amount);
   return {
     ...current,
     progression: { totalXp, level: levelForXp(totalXp), xpBySphere },
@@ -1034,7 +1084,7 @@ function parseGoal(file: string, value: unknown, index: number): Goal {
     goal.sphere = raw.sphere as LifeSphereId;
   }
   // Fields of the daily rules (24.11.2026). Older files omit them; nothing is recalculated.
-  for (const key of ["templateId", "repeatOf", "availableFrom"] as const) {
+  for (const key of ["templateId", "repeatOf", "availableFrom", "undoneAt"] as const) {
     if (raw[key] === undefined) continue;
     if (typeof raw[key] !== "string" || (raw[key] as string).length === 0) throw storeError(file, `goal ${index} has invalid ${key}`);
     goal[key] = raw[key] as string;

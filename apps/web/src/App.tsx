@@ -29,6 +29,7 @@ import {
   repeatGoal,
   saveAvatar,
   saveReflection,
+  undoGoal,
   updateNickname,
   uploadImage,
   type Goal,
@@ -55,6 +56,7 @@ import { HEX_LEVEL_URL, tabIconUrl, uiIconUrl, type HeaderIcon, type TabIcon } f
 import { useReducedMotion } from "./theme/useReducedMotion";
 import { KitIcon, SPHERE_ICON } from "./map/KitIcon";
 import { Logo } from "./Logo";
+import { TodayRecords, WeekJournal } from "./journal/Journal";
 
 type Tab = "map" | "missions" | "resources" | "profile";
 
@@ -223,6 +225,45 @@ export function App() {
     } catch (err) {
       setError(errorMessage(err));
     } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * «Отменить» today's record (scene18): the server takes back exactly the XP it granted and frees its
+   * cap slot / template mark; energy follows (it counts today's records with XP). No confirm dialog.
+   */
+  const [pendingUndo, setPendingUndo] = useState<string | null>(null);
+  async function undoRecord(goal: Goal) {
+    setBusy(true);
+    setPendingUndo(goal.id);
+    setError(null);
+    try {
+      const answer = await undoGoal(goal.id);
+      await refresh();
+      say(answer.removedXp > 0 ? `Запись «${goal.title}» отменена. XP за неё снят: ${answer.removedXp}.` : `Запись «${goal.title}» отменена.`);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setPendingUndo(null);
+      setBusy(false);
+    }
+  }
+
+  /** «Вернуть»: a new completion under the usual daily rules (may be recorded without XP). */
+  async function redoRecord(goal: Goal) {
+    setBusy(true);
+    setPendingUndo(goal.id);
+    setError(null);
+    try {
+      const before = player?.progress.xp ?? 0;
+      const done = await completeGoal(goal.id);
+      await refresh();
+      gained(before, done.progress.xp, done.goal.title, done.message);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setPendingUndo(null);
       setBusy(false);
     }
   }
@@ -498,6 +539,12 @@ export function App() {
             cheer={cheer && !reducedMotion}
             placements={placements}
             busy={busy}
+            journal={
+              <>
+                <TodayRecords goals={goals} now={new Date()} busy={busy} pendingId={pendingUndo} onUndo={(goal) => void undoRecord(goal)} onRedo={(goal) => void redoRecord(goal)} />
+                <WeekJournal goals={goals} now={new Date()} />
+              </>
+            }
             onEdit={() => { setDraft(config); setBuilding(true); }}
             onRename={async (nickname) => {
               setBusy(true);
@@ -658,6 +705,7 @@ function Profile({
   cheer,
   placements,
   busy,
+  journal,
   onEdit,
   onRename,
 }: {
@@ -666,6 +714,8 @@ function Profile({
   cheer: boolean;
   placements: Placement[];
   busy: boolean;
+  /** scene18: today's records («Отменить» / «Вернуть») and «Журнал недели». */
+  journal?: ReactNode;
   onEdit: () => void;
   onRename: (nickname: string) => Promise<boolean>;
 }) {
@@ -698,6 +748,7 @@ function Profile({
           <button type="button" className="lx-btn" onClick={onEdit}><span className="lx-btn__in">Собрать персонажа</span></button>
         </div>
       </div>
+      {journal ? <div className="journal">{journal}</div> : null}
       <h3>Галерея</h3>
       {placements.length === 0 ? (
         <div className="empty-state" data-empty="gallery">
