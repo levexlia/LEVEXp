@@ -260,12 +260,12 @@ export function MissionsView({
 
 const ANYWHERE_GLYPH = "/art/scene18/ic_anywhere_a_glyph.svg";
 
-/** «Показать ещё» in «Выполнены» adds this many older records (cycle2 P-C2). */
+/** «Показать более ранние (N)» in «Выполнены» adds this many older records (cycle2 P-C2); N = still hidden. */
 export const DONE_MORE_STEP = 20;
 
 /**
  * «Выполнены» (cycle2 P-C2), under «Свои миссии» and the form: today's and yesterday's records, older ones
- * behind «Показать ещё». Nothing is deleted; the full history stays in the data and the week journal.
+ * behind «Показать более ранние (N)». Nothing is deleted; the full history stays in the data and the week journal.
  */
 function DoneHistory({ rows, recent, goals, actions, reducedMotion }: { rows: MissionRow[]; recent: number; goals: readonly Goal[]; actions: MissionActions; reducedMotion: boolean }) {
   const [shown, setShown] = useState(recent);
@@ -274,7 +274,7 @@ function DoneHistory({ rows, recent, goals, actions, reducedMotion }: { rows: Mi
   return (
     <section className="done-history" aria-labelledby="done-title" data-done-total={rows.length}>
       <h3 id="done-title">Выполнены</h3>
-      <p className="missions-note">{shown <= recent ? "Сегодня и вчера. " : ""}{REPEAT_NOTE}</p>
+      <p className="missions-note">{shown <= recent ? "Сегодня и вчера." : "Сегодня, вчера и раньше."} {REPEAT_NOTE}</p>
       {visible.length > 0 ? (
         <List rows={visible} goals={goals} actions={actions} reducedMotion={reducedMotion} />
       ) : (
@@ -282,7 +282,7 @@ function DoneHistory({ rows, recent, goals, actions, reducedMotion }: { rows: Mi
       )}
       {rest > 0 ? (
         <button type="button" className="quiet done-more" onClick={() => setShown(visible.length + DONE_MORE_STEP)}>
-          Показать ещё <span className="done-more__n">({Math.min(rest, DONE_MORE_STEP)} из {rest})</span>
+          Показать более ранние ({rest})
         </button>
       ) : null}
     </section>
@@ -472,6 +472,28 @@ function PlanBlocks({ plan, busy, onPlan }: { plan: readonly PlanChip[]; busy: b
   );
 }
 
+/** «Сегодня записано: N» with the plan folded under «Ещё идеи» (cycle2 P-C5). Folded on every mount. */
+function TodayDone({ count, plan, busy, onPlan }: { count: number; plan: readonly PlanChip[]; busy: boolean; onPlan?: (chip: PlanChip) => void }) {
+  const [ideasOpen, setIdeasOpen] = useState(false);
+  return (
+    <div className="today-done" data-empty="today-done">
+      <p className="today-done__line" role="status">Сегодня записано: {count}. Можно на этом остановиться.</p>
+      {plan.length > 0 && onPlan ? (
+        <>
+          <button type="button" className="quiet today-ideas" aria-expanded={ideasOpen} aria-controls="today-ideas" onClick={() => setIdeasOpen((value) => !value)}>
+            Ещё идеи
+          </button>
+          {ideasOpen ? (
+            <div className="today-plan" id="today-ideas">
+              <PlanBlocks plan={plan} busy={busy} onPlan={onPlan} />
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function TodayPanel({
   goals,
   streak,
@@ -498,7 +520,6 @@ export function TodayPanel({
   onPlan?: (chip: PlanChip) => void;
 }) {
   const today = todayBoard(goals, now);
-  const [ideasOpen, setIdeasOpen] = useState(false);
   const capped = awards ? awards.awarded >= awards.awardCap : false;
   return (
     <aside className="stage-side" aria-labelledby="today-title">
@@ -520,21 +541,9 @@ export function TodayPanel({
         </>
       ) : today.doneToday > 0 ? (
         // cycle2 P-C5: everything for today is done — acknowledge it; more ideas only on request.
-        <div className="today-done" data-empty="today-done">
-          <p className="today-done__line" role="status">Сегодня записано: {today.doneToday}. Можно на этом остановиться.</p>
-          {plan.length > 0 && onPlan ? (
-            <>
-              <button type="button" className="quiet today-ideas" aria-expanded={ideasOpen} aria-controls="today-ideas" onClick={() => setIdeasOpen((value) => !value)}>
-                Ещё идеи
-              </button>
-              {ideasOpen ? (
-                <div className="today-plan" id="today-ideas">
-                  <PlanBlocks plan={plan} busy={actions.busy} onPlan={onPlan} />
-                </div>
-              ) : null}
-            </>
-          ) : null}
-        </div>
+        // Own state, remounted per record count: «Ещё идеи» starts folded every time this state is reached
+        // (e.g. ideas opened → a plan chip taken → done again), not left open from an earlier visit.
+        <TodayDone key={`done-${today.doneToday}`} count={today.doneToday} plan={plan} busy={actions.busy} onPlan={onPlan} />
       ) : plan.length > 0 && onPlan ? (
         <div className="today-plan" data-empty="today">
           <EmptyState art="empty_day" line="На сегодня дел нет — день свободен." reducedMotion={reducedMotion} />

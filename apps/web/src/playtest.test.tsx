@@ -229,9 +229,9 @@ describe("playtest fixes", () => {
     fireEvent.click(within(sheet).getByRole("button", { name: "Миссии места" }));
     const view = screen.getByRole("region", { name: "Миссии" });
     expect(within(view).getByRole("button", { name: "Дом" }).getAttribute("aria-pressed")).toBe("true");
-    // cycle2 P-C2: a record older than yesterday waits behind «Показать ещё»; nothing is lost.
+    // cycle2 P-C2: a record older than yesterday waits behind «Показать более ранние»; nothing is lost.
     expect(view.querySelectorAll(".mission")).toHaveLength(0);
-    fireEvent.click(within(view).getByRole("button", { name: /Показать ещё/ }));
+    fireEvent.click(within(view).getByRole("button", { name: /Показать более ранние/ }));
     expect(view.querySelectorAll(".mission")).toHaveLength(1);
   });
 

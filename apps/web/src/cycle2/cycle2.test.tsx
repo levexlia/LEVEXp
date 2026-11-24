@@ -35,6 +35,13 @@ function server(initial: Goal[]) {
     if (url === "/player") return json(player);
     if (url === "/room") return json({ placements: [] });
     if (url === "/goals" && method === "GET") return json(goals);
+    if (url === "/goals" && method === "POST") {
+      const body = JSON.parse(String(init?.body ?? "{}")) as { templateId?: string; repeatOf?: string };
+      const source = goals.find((goal) => goal.id === body.repeatOf);
+      const goal: Goal = { id: `n${calls.length}`, title: source?.title ?? "Записать траты за день", sphere: source?.sphere ?? "finance", xpReward: 10, status: "open", templateId: body.templateId ?? source?.templateId, repeatOf: body.repeatOf };
+      goals.push(goal);
+      return json(goal, 201);
+    }
     const done = url.match(/^\/goals\/(.+)\/complete$/);
     if (done) {
       const goal = goals.find((item) => item.id === done[1])!;
@@ -243,11 +250,17 @@ describe("P-C2: folded history (Аня, 42 records)", () => {
     const heading = within(history).getByRole("heading", { name: "Выполнены" });
     expect(form.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(own.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    fireEvent.click(within(history).getByRole("button", { name: /Показать ещё/ }));
+    // a) the label counts what is still hidden; b) the caption names the shown range.
+    expect(history.querySelector(".missions-note")?.textContent).toMatch(/^Сегодня и вчера\. /);
+    expect(within(history).getByRole("button", { name: "Показать более ранние (36)" })).toBeTruthy();
+    fireEvent.click(within(history).getByRole("button", { name: /Показать более ранние/ }));
     expect(history.querySelectorAll("[data-mission]")).toHaveLength(26);
-    fireEvent.click(within(history).getByRole("button", { name: /Показать ещё/ }));
+    expect(history.querySelector(".missions-note")?.textContent).toMatch(/^Сегодня, вчера и раньше\. Повторить дело/);
+    expect(within(history).getByRole("button", { name: "Показать более ранние (16)" })).toBeTruthy();
+    fireEvent.click(within(history).getByRole("button", { name: /Показать более ранние/ }));
     expect(history.querySelectorAll("[data-mission]")).toHaveLength(42);
-    expect(within(history).queryByRole("button", { name: /Показать ещё/ })).toBeNull();
+    expect(within(history).queryByRole("button", { name: /Показать более ранние/ })).toBeNull();
+    expect(history.querySelector(".missions-note")?.textContent).toMatch(/^Сегодня, вчера и раньше\. /);
     // Nothing was deleted or changed: only GETs went out, and all 45 goals are still there.
     expect(calls.every((call) => call.method === "GET")).toBe(true);
     expect(goals).toHaveLength(45);
@@ -304,5 +317,39 @@ describe("P-C5: «всё сделано» is not «пустой день»", () 
     expect(more.textContent).toBe("Ещё 1 — во вкладке «Миссии»");
     expect(panel.textContent).not.toMatch(/просроч/i);
     expect(panel.querySelector('[data-mission="stretch4"]')).toBe(panel.querySelector("[data-mission]"));
+  });
+
+  it("«Ещё идеи» is folded on load and folds again after a plan chip is taken and done (not left open)", async () => {
+    server(anya(playerDay(new Date()), 1));
+    await renderApp();
+    const panel = screen.getByRole("complementary", { name: "Сегодня" });
+    expect(within(panel).getByRole("button", { name: "Ещё идеи" }).getAttribute("aria-expanded")).toBe("false");
+    expect(panel.querySelector("#today-ideas")).toBeNull();
+    expect(panel.querySelectorAll("[data-plan]")).toHaveLength(0);
+    fireEvent.click(within(panel).getByRole("button", { name: "Ещё идеи" }));
+    const chip = panel.querySelector<HTMLButtonElement>("[data-plan]")!;
+    fireEvent.click(chip);
+    // The taken idea is an open mission now; finishing it brings the «всё сделано» state back — folded.
+    const finish = await within(panel).findByRole("button", { name: /^Выполнить: / });
+    fireEvent.click(finish);
+    await waitFor(() => expect(within(panel).getByText("Сегодня записано: 4. Можно на этом остановиться.")).toBeTruthy());
+    expect(within(panel).getByRole("button", { name: "Ещё идеи" }).getAttribute("aria-expanded")).toBe("false");
+    expect(panel.querySelectorAll("[data-plan]")).toHaveLength(0);
+  });
+});
+
+describe("P-C2: Вика's folded «Выполнены» (no records today or yesterday)", () => {
+  it("«За сегодня и вчера записей нет.» and «Показать более ранние (6)», then the caption «Сегодня, вчера и раньше.»", async () => {
+    server(vika(playerDay(new Date())));
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Миссии" }));
+    const history = within(screen.getByRole("region", { name: "Миссии" })).getByRole("region", { name: "Выполнены" });
+    expect(within(history).getByText("За сегодня и вчера записей нет.")).toBeTruthy();
+    expect(history.textContent).not.toMatch(/Показать ещё|из 6/);
+    fireEvent.click(within(history).getByRole("button", { name: "Показать более ранние (6)" }));
+    expect(history.querySelectorAll("[data-mission]")).toHaveLength(6);
+    expect(within(history).queryByText("За сегодня и вчера записей нет.")).toBeNull();
+    expect(history.querySelector(".missions-note")?.textContent).toMatch(/^Сегодня, вчера и раньше\. Повторить дело/);
+    expect(within(history).queryByRole("button", { name: /Показать более ранние/ })).toBeNull();
   });
 });
