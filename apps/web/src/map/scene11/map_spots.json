@@ -1,0 +1,102 @@
+{
+  "id": "scene11",
+  "title": "Scene 10 no-road zigzag; progress reads from badge states, no path",
+  "viewBox": [
+    0,
+    0,
+    720,
+    1280
+  ],
+  "units": "viewBox pixels, origin top-left, same as the SVG",
+  "svg": "svg/map.svg",
+  "render": "render/map.png",
+  "render_scale": 2,
+  "bytes": 44434,
+  "badge_diameter_css_px_at_390": 64,
+  "landmarks_order": "bottom to top zigzag L/R: Дом → Учебный центр → Парк → Мастерская → Центр LEVEX (centered, larger)",
+  "landmarks": [
+    {
+      "id": "home",
+      "label": "Дом",
+      "state": "done",
+      "plaza": [
+        92.0,
+        1104
+      ],
+      "building": [
+        210,
+        1096
+      ]
+    },
+    {
+      "id": "school",
+      "label": "Учебный центр",
+      "state": "done",
+      "plaza": [
+        648.0,
+        930
+      ],
+      "building": [
+        530,
+        922
+      ]
+    },
+    {
+      "id": "park",
+      "label": "Парк",
+      "state": "current",
+      "plaza": [
+        92.0,
+        756
+      ],
+      "building": [
+        210,
+        748
+      ]
+    },
+    {
+      "id": "workshop",
+      "label": "Мастерская",
+      "state": "open",
+      "plaza": [
+        648.0,
+        582
+      ],
+      "building": [
+        530,
+        574
+      ]
+    },
+    {
+      "id": "levex",
+      "label": "Центр LEVEX",
+      "state": "locked",
+      "plaza": [
+        360,
+        388.5
+      ],
+      "building": [
+        360,
+        272
+      ]
+    }
+  ],
+  "path_polyline": [],
+  "road": "none",
+  "states": {
+    "done": "cyan check badge; subtle cyan glow on the dome (Дом, Учебный центр)",
+    "current": "violet star badge + avatar + soft glow on the dome (Парк)",
+    "open": "violet outline hex; slightly dimmer dome (Мастерская)",
+    "locked": "grey dome + lock badge (Центр LEVEX)"
+  },
+  "layout": {
+    "left_x": 210,
+    "right_x": 530,
+    "center_x": 360,
+    "regular_step": 174,
+    "regular_dome_equator": 236,
+    "hero_dome_equator": 286,
+    "badge": "outer side of each regular island at foot height; LEVEX in front of its island"
+  },
+  "note": "Heroes are the scene 9 shaded domes, laid out as scene 10 variant B (no road). No light-bridges or dotted path. Four regular places share one visual size; Центр LEVEX is larger and centered at the top. Badges sit on the outer side of each regular island; the hero badge sits in front. Labels sit under the badge."
+}

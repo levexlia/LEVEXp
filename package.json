@@ -7,8 +7,9 @@
   "scripts": {
     "dev:api": "npm run dev -w @levex/api",
     "start:api": "npm run start -w @levex/api",
+    "dev:web": "npm run dev -w @levex/web",
     "test": "vitest run",
-    "typecheck": "tsc -p apps/api && tsc -p packages/domain"
+    "typecheck": "tsc -p apps/api && tsc -p packages/domain && tsc -p apps/web"
   },
   "devDependencies": { "typescript": "^5.6.0", "tsx": "^4.19.0", "vitest": "^2.1.0", "@types/node": "^22.0.0" },
   "overrides": {

@@ -1,9 +1,17 @@
+import { createReadStream } from "node:fs";
+import multipart from "@fastify/multipart";
 import Fastify from "fastify";
 import {
   ARTIFACT_IMAGE_URL_MAX_LENGTH,
   ARTIFACT_KINDS,
   ARTIFACT_TITLE_MAX_LENGTH,
+  ACCESSORIES,
   AVATAR_URL_MAX_LENGTH,
+  EXPRESSIONS,
+  HAIR_COLORS,
+  HAIR_STYLES,
+  OUTFITS,
+  SKIN_TONES,
   getLifeSphere,
   LIFE_SPHERE_IDS,
   listLifeSpheres,
@@ -20,21 +28,88 @@ import {
   getProgress,
   getRoom,
   InvalidArtifact,
+  InvalidAvatarConfig,
   InvalidGoalUpdate,
   InvalidPlayerUpdate,
   listArtifacts,
   listGoals,
+  setAvatarConfig,
   updatePlayer,
   type ArtifactInput,
 } from "./store.js";
+import {
+  defaultUploadsDir,
+  InvalidUpload,
+  resolveUpload,
+  saveImageUpload,
+  UPLOAD_MAX_BYTES,
+} from "./uploads.js";
+import { playerView } from "./playerView.js";
+import { registerAvatarRoutes } from "./avatar/routes.js";
+import type { AvatarGenerator } from "./avatar/generator.js";
+import { registerAssistantRoutes, type AssistantOptions } from "./assistant/routes.js";
 
-export function buildApp(opts: { logger?: boolean } = {}) {
+export function buildApp(opts: {
+  logger?: boolean;
+  uploadsDir?: string;
+  maxUploadBytes?: number;
+  avatarGenerator?: AvatarGenerator;
+  avatarDailyLimit?: number;
+  avatarCandidateCount?: number;
+  assistant?: AssistantOptions;
+} = {}) {
   const app = Fastify({
     logger: opts.logger ?? true,
     // Default Ajv removes unknown fields. Reject them so additionalProperties: false means 400.
     ajv: { customOptions: { removeAdditional: false } },
   });
+  const maxUploadBytes = opts.maxUploadBytes ?? UPLOAD_MAX_BYTES;
+  // fastify-plugin: the multipart parser is visible to the routes on this instance.
+  app.register(multipart, {
+    limits: { fileSize: maxUploadBytes, files: 1 },
+  });
+
+  const uploadsDir = (): string => opts.uploadsDir ?? defaultUploadsDir();
+
+  registerAvatarRoutes(app, {
+    uploadsDir,
+    maxUploadBytes,
+    generator: opts.avatarGenerator,
+    dailyLimit: opts.avatarDailyLimit,
+    candidateCount: opts.avatarCandidateCount,
+  });
+
+  registerAssistantRoutes(app, opts.assistant);
+
   app.get("/health", async () => ({ status: "ok", service: "levex-api" }));
+
+  app.post("/uploads", async (req, reply) => {
+    try {
+      const part = await req.file();
+      if (!part) return reply.code(400).send({ error: "file is required" });
+      const bytes = await part.toBuffer();
+      if (part.file.truncated || bytes.length > maxUploadBytes) {
+        return reply.code(400).send({ error: "file is too large" });
+      }
+      const saved = saveImageUpload(uploadsDir(), bytes);
+      return reply.code(201).send({ url: saved.url });
+    } catch (err) {
+      const message = uploadError(err);
+      if (message) return reply.code(400).send({ error: message });
+      throw err;
+    }
+  });
+
+  app.get<{ Params: { name: string } }>("/uploads/:name", async (req, reply) => {
+    const found = resolveUpload(uploadsDir(), req.params.name);
+    if (found === "bad-name") return reply.code(400).send({ error: "invalid upload name" });
+    if (found === "missing") return reply.code(404).send({ error: "upload not found" });
+    return reply
+      .header("x-content-type-options", "nosniff")
+      .header("cache-control", "public, max-age=31536000, immutable")
+      .type(found.mediaType)
+      .send(createReadStream(found.filePath));
+  });
 
   app.get("/spheres", async () => listLifeSpheres());
 
@@ -116,7 +191,32 @@ export function buildApp(opts: { logger?: boolean } = {}) {
 
   app.get("/progress", async () => getProgress());
 
-  app.get("/player", async () => getPlayer());
+  app.get("/player", async () => playerView(getPlayer()));
+
+  app.put("/player/avatar", {
+    schema: {
+      body: {
+        type: "object",
+        additionalProperties: false,
+        required: ["hairStyle", "hairColor", "skinTone", "outfit", "expression", "accessory"],
+        properties: {
+          hairStyle: { type: "string", enum: [...HAIR_STYLES] },
+          hairColor: { type: "string", enum: [...HAIR_COLORS] },
+          skinTone: { type: "string", enum: [...SKIN_TONES] },
+          outfit: { type: "string", enum: [...OUTFITS] },
+          expression: { type: "string", enum: [...EXPRESSIONS] },
+          accessory: { type: "string", enum: [...ACCESSORIES] },
+        },
+      },
+    },
+  }, async (req, reply) => {
+    try {
+      return playerView(setAvatarConfig(req.body));
+    } catch (err) {
+      if (err instanceof InvalidAvatarConfig) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
+  });
 
   app.patch("/player", {
     schema: {
@@ -143,7 +243,7 @@ export function buildApp(opts: { logger?: boolean } = {}) {
     },
   }, async (req, reply) => {
     try {
-      return updatePlayer(req.body as Parameters<typeof updatePlayer>[0]);
+      return playerView(updatePlayer(req.body as Parameters<typeof updatePlayer>[0]));
     } catch (err) {
       if (err instanceof InvalidPlayerUpdate) return reply.code(400).send({ error: err.message });
       throw err;
@@ -151,6 +251,17 @@ export function buildApp(opts: { logger?: boolean } = {}) {
   });
 
   return app;
+}
+
+function uploadError(err: unknown): string | null {
+  if (err instanceof InvalidUpload) return err.message;
+  if (!err || typeof err !== "object" || !("code" in err)) return null;
+  const code = String((err as { code: unknown }).code);
+  if (code === "FST_REQ_FILE_TOO_LARGE") return "file is too large";
+  if (code === "FST_INVALID_MULTIPART_CONTENT_TYPE" || code === "FST_INVALID_MULTIPART_CONTENT_LENGTH") {
+    return "expected multipart file";
+  }
+  return null;
 }
 
 function bodyHasXpReward(body: unknown): boolean {

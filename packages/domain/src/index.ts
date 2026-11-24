@@ -1,5 +1,7 @@
 // Доменные типы + чистые функции прогрессии.
 
+import type { AvatarConfig } from "./avatarConfig.js";
+
 export type LifeSphereId =
   | "health" | "mind" | "career" | "finance" | "relationships"
   | "creativity" | "spirit" | "community";
@@ -101,6 +103,32 @@ export function xpGrantedForGoal(input: GoalXpInput & { xpReward: number }): num
 
 export const ARTIFACT_TITLE_MAX_LENGTH = 200;
 export const ARTIFACT_IMAGE_URL_MAX_LENGTH = 2048;
+
+/**
+ * Names produced by `POST /uploads`. Other paths are not treated as images:
+ * a stored file name is a uuid plus png, jpg, gif, or webp.
+ */
+const STORED_UPLOAD_URL = /^\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|gif|webp)$/i;
+
+/**
+ * Whether a photo address may be stored and used as an image source.
+ * Allows http(s) URLs without embedded credentials, and `/uploads/<uuid>.<ext>`.
+ * Rejects `javascript:`, `data:`, protocol-relative URLs, and other schemes.
+ */
+export function isDisplayableImageUrl(value: string): boolean {
+  const text = value.trim();
+  if (STORED_UPLOAD_URL.test(text)) return true;
+  let url: URL;
+  try {
+    url = new URL(text);
+  } catch {
+    return false;
+  }
+  if (url.username !== "" || url.password !== "") return false;
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  return url.hostname !== "";
+}
+
 /** Kinds a room can hold in v0. Only photos for now. */
 export const ARTIFACT_KINDS = ["photo"] as const;
 export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];
@@ -115,6 +143,8 @@ export interface Player {
   title?: string;
   /** Optional avatar URL. Omitted when unset. */
   avatarUrl?: string;
+  /** Vector avatar parts. Omitted until the player saves a look. */
+  avatarConfig?: AvatarConfig;
   /** Stored progress. `totalXp` is the `xp` returned by the progress API. */
   progression: Progression;
 }
@@ -125,6 +155,8 @@ export interface Goal {
   id: string;
   title: string;
   sphere?: LifeSphereId;
+  /** ISO time of the first completion. Omitted for goals finished before streaks existed. */
+  completedAt?: string;
   /**
    * Activity XP granted once on the first completion. The server sets it
    * ({@link xpForGoal}); the client does not. Not a mastery score.
@@ -187,3 +219,40 @@ export function progressFromProgression(progression: Progression): PlayerProgres
     xpBySphere: { ...progression.xpBySphere },
   };
 }
+
+export {
+  AVATAR_CANDIDATE_COUNT,
+  AVATAR_CANDIDATE_MAX,
+  AVATAR_CANDIDATE_MIN,
+  AVATAR_DAILY_LIMIT_DEFAULT,
+  AVATAR_STYLE_PROMPT,
+  clampAvatarCount,
+} from "./avatar.js";
+
+export {
+  ACCESSORIES,
+  DEFAULT_AVATAR_CONFIG,
+  EXPRESSIONS,
+  HAIR_COLORS,
+  HAIR_STYLES,
+  OUTFITS,
+  SKIN_TONES,
+  lookFromPhoto,
+  looksFromPhoto,
+  normalizeAvatarConfig,
+  parseAvatarConfig,
+} from "./avatarConfig.js";
+export type {
+  Accessory,
+  AvatarConfig,
+  Expression,
+  HairColor,
+  HairStyle,
+  Outfit,
+  SkinTone,
+} from "./avatarConfig.js";
+
+export { ENERGY_MAX, ENERGY_PER_COMPLETION, energyForDay, streakDays, utcDay } from "./streak.js";
+export { MAP_NODES, mapNodeStates } from "./map.js";
+export type { MapNode, MapNodeId, MapNodeState } from "./map.js";
+export * from "./assistant.js";
