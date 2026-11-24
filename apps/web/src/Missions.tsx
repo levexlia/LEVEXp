@@ -200,6 +200,7 @@ function Placeless({ goals, busy, onTemplate }: { goals: readonly Goal[]; busy: 
     <section className="placeless" aria-labelledby="placeless-title">
       <h3 id="placeless-title">Без места на карте</h3>
       <p className="missions-note">Короткие дела на 5–25 минут, доступны с первого уровня. +10 XP, один раз в день за каждое.</p>
+      <div className="placeless__groups">
       {groups.map((group) => (
         <div key={group.sphere} className="placeless__group" data-sphere={group.sphere}>
           <h4 className="placeless__name">
@@ -227,6 +228,7 @@ function Placeless({ goals, busy, onTemplate }: { goals: readonly Goal[]; busy: 
           </ul>
         </div>
       ))}
+      </div>
     </section>
   );
 }
@@ -328,22 +330,32 @@ export function TodayPanel({
         <List rows={today.open} goals={goals} actions={actions} reducedMotion={reducedMotion} />
       ) : plan.length > 0 && onPlan ? (
         <div className="today-plan" data-empty="today">
-          <p className="empty">На сегодня дел нет. Можно снова:</p>
-          <div className="place-filter">
-            {plan.map((chip) => (
-              <button
-                key={chip.key}
-                type="button"
-                className="lx-chip filter-chip plan-chip"
-                style={{ ["--place" as string]: chip.place ? `var(--lx-place-${chip.place})` : "var(--lx-cyan)" }}
-                disabled={actions.busy}
-                onClick={() => onPlan(chip)}
-                data-plan={chip.key}
-              >
-                <span className="lx-chip__in">+ {chip.title}</span>
-              </button>
-            ))}
-          </div>
+          <p className="empty">На сегодня дел нет.</p>
+          {(["repeat", "new"] as const).map((kind) => {
+            const chips = plan.filter((chip) => chip.kind === kind);
+            if (chips.length === 0) return null;
+            const label = kind === "repeat" ? "Можно снова:" : "Можно взять:";
+            return (
+              <div key={kind} className="today-plan__block" data-plan-block={kind}>
+                <p className="today-plan__label">{label}</p>
+                <div className="place-filter" role="group" aria-label={label}>
+                  {chips.map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      className="lx-chip filter-chip plan-chip"
+                      style={{ ["--place" as string]: chip.place ? `var(--lx-place-${chip.place})` : "var(--lx-cyan)" }}
+                      disabled={actions.busy}
+                      onClick={() => onPlan(chip)}
+                      data-plan={chip.key}
+                    >
+                      <span className="lx-chip__in">+ {chip.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
           <p className="field-hint">Отдых тоже нормален.</p>
         </div>
       ) : (

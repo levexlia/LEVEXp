@@ -8,6 +8,7 @@ import type { Goal } from "../api";
 import { placelessBoard, planChips, todayBoard } from "../map/missions";
 import { sphereHint, sphereRows } from "../map/resources";
 import { activityAid, clock } from "./activity";
+import { notePlaceholder } from "./AfterMission";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -109,16 +110,14 @@ describe("empty-day plan and «Сегодня» day (spec №1, R-XP-5)", () => 
     const own: Goal = { id: "c1", title: "Зарядка", sphere: "health", xpReward: 10, status: "done", templateId: "own:o1", completedAt: "2026-11-23T09:00:00.000Z" };
     const art: Goal = { id: "a1", title: "Скетч", sphere: "creativity", xpReward: 10, status: "done", templateId: "own:a0" };
     const chips = planChips([done(WALK), done(READ), own, art], 1);
-    expect(chips.map((chip) => chip.title)).toEqual([
-      "Утренняя прогулка 20 мин", "Прочитать 10 страниц",
-      "25 минут над важной задачей", "Записать траты за день", "Написать близкому человеку",
-      "Зарядка",
-    ]);
-    expect(chips[0]).toMatchObject({ repeatOf: "g1" });
+    // Only done-before templates, newest first; max 3; the locked Мастерская copy is skipped.
+    expect(chips.map((chip) => chip.title)).toEqual(["Зарядка", "Утренняя прогулка 20 мин", "Прочитать 10 страниц"]);
+    expect(chips.every((chip) => chip.kind === "repeat")).toBe(true);
+    expect(chips[1]).toMatchObject({ repeatOf: "g1" });
     // A fresh player without seed goals gets the seed template ids.
-    expect(planChips([], 1).map((chip) => chip.templateId)).toEqual(["seed-walk", "seed-read", "career-focus", "finance-spend", "rel-write"]);
+    expect(planChips([], 1).map((chip) => [chip.kind, chip.templateId])).toEqual([["new", "seed-walk"], ["new", "seed-read"], ["new", "career-focus"]]);
     // An open seed is not offered again.
-    expect(planChips([WALK, done(READ)], 1).map((chip) => chip.key)).toEqual(["seed-read", "career-focus", "finance-spend", "rel-write"]);
+    expect(planChips([WALK, done(READ)], 1).map((chip) => chip.key)).toEqual(["seed-read", "career-focus", "finance-spend"]);
   });
 
   it("counts «Выполнено сегодня» by the Israeli day and keeps tomorrow's copies out of today", () => {
@@ -197,7 +196,11 @@ describe("App: usefulness v1", () => {
     const api = server([{ ...WALK, status: "done", completedAt: "2026-11-20T08:00:00.000Z" }]);
     await renderApp();
     const today = screen.getByRole("complementary", { name: "Сегодня" });
-    expect(today.textContent).toContain("На сегодня дел нет. Можно снова:");
+    expect(today.textContent).toContain("На сегодня дел нет.");
+    expect(today.querySelector('[data-plan-block="repeat"]')?.textContent).toBe("Можно снова:+ Утренняя прогулка 20 мин");
+    expect(today.querySelector('[data-plan-block="new"]')?.textContent).toContain("Можно взять:");
+    expect(today.textContent).toContain("Отдых тоже нормален.");
+    expect(within(today).getByRole("button", { name: "Все миссии" })).toBeTruthy();
     expect(within(today).getByRole("button", { name: "+ Прочитать 10 страниц" })).toBeTruthy();
     fireEvent.click(within(today).getByRole("button", { name: "+ Утренняя прогулка 20 мин" }));
     await waitFor(() => expect(within(today).getByRole("button", { name: "Выполнить: Утренняя прогулка 20 мин" })).toBeTruthy());
@@ -467,14 +470,47 @@ describe("placeless sphere missions (Карьера, Финансы, Отнош�
     expect(api.goals[0]).toMatchObject({ status: "done", xpGranted: 10 });
   });
 
-  it("empty-day plan offers one mission per placeless sphere at level 1", () => {
-    const chips = planChips([], 1).filter((chip) => chip.sphere);
-    expect(chips.map((chip) => [chip.sphere, chip.templateId])).toEqual([
-      ["career", "career-focus"], ["finance", "finance-spend"], ["relationships", "rel-write"],
-    ]);
-    // Once a template gave XP today, the plan offers the next one of that sphere.
-    const now = new Date();
-    const done: Goal = { id: "x", title: "Записать траты за день", sphere: "finance", xpReward: 10, status: "done", templateId: "finance-spend", completedAt: now.toISOString(), xpGranted: 10 };
-    expect(planChips([done], 1, now).find((chip) => chip.sphere === "finance")?.templateId).toBe("finance-sub");
+  it("plan: new missions come from the spheres with the least XP, one per sphere, max 3", () => {
+    const now = new Date("2026-11-24T08:00:00.000Z");
+    const chips = planChips([], 1, now, { health: 20, mind: 10, career: 30 });
+    expect(chips.map((chip) => chip.templateId)).toEqual(["finance-spend", "rel-write", "seed-read"]);
+    expect(chips.every((chip) => chip.kind === "new")).toBe(true);
+    // A bigger limit cycles the spheres again in the same order.
+    expect(planChips([], 1, now, { health: 20, mind: 10, career: 30 }, 6).map((chip) => chip.templateId))
+      .toEqual(["finance-spend", "rel-write", "seed-read", "seed-walk", "career-focus", "finance-sub"]);
+  });
+
+  it("plan: repeats first (those that can still give XP today ahead), then new ones; never more than 3", () => {
+    const now = new Date("2026-11-24T08:00:00.000Z");
+    const g = (id: string, templateId: string, title: string, sphere: string, completedAt: string): Goal =>
+      ({ id, title, sphere, xpReward: 10, status: "done", templateId, completedAt, xpGranted: 10 });
+    const todaySpend = g("t", "finance-spend", "Записать траты за день", "finance", "2026-11-24T07:00:00.000Z");
+    const oldCall = g("c", "rel-call", "Позвонить родным или другу", "relationships", "2026-11-20T07:00:00.000Z");
+    const chips = planChips([todaySpend, oldCall], 1, now, {});
+    expect(chips.map((chip) => [chip.kind, chip.key])).toEqual([["repeat", "rel-call"], ["repeat", "finance-spend"], ["new", "seed-walk"]]);
+    // Placeless repeats go by templateId (no copy of an old goal needed).
+    expect(chips[0]).toMatchObject({ templateId: "rel-call" });
+    expect(chips[0]!.repeatOf).toBeUndefined();
+    // Four repeats: only the first three are shown, and no «Можно взять» at all.
+    const four = ["career-focus", "career-plan", "rel-thanks", "finance-sub"].map((id, i) =>
+      g(`r${i}`, id, id, "career", `2026-11-2${i}T07:00:00.000Z`));
+    const top = planChips(four, 1, now, {});
+    expect(top).toHaveLength(3);
+    expect(top.every((chip) => chip.kind === "repeat")).toBe(true);
+    expect(top.map((chip) => chip.key)).toEqual(["finance-sub", "rel-thanks", "career-plan"]);
+  });
+
+  it("App: an empty day hides an empty block («Можно взять» only for a fresh plan)", async () => {
+    server([]);
+    await renderApp();
+    const today = screen.getByRole("complementary", { name: "Сегодня" });
+    expect(today.querySelector('[data-plan-block="repeat"]')).toBeNull();
+    expect(today.querySelectorAll('[data-plan-block="new"] [data-plan]')).toHaveLength(3);
+  });
+
+  it("finance note placeholder does not invite amounts; others stay neutral", () => {
+    expect(notePlaceholder("finance")).toBe("Что запомнилось? (без сумм)");
+    expect(notePlaceholder("career")).toBe("Что запомнилось?");
+    expect(notePlaceholder(undefined)).toBe("Что запомнилось?");
   });
 });

@@ -2,6 +2,11 @@ import { REFLECTION_FEELINGS, REFLECTION_LABEL, REFLECTION_NOTE_MAX, type Reflec
 import { useEffect, useState } from "react";
 import type { Goal } from "../api";
 
+/** Notes are not filtered; for Финансы the hint just does not invite writing amounts. */
+export function notePlaceholder(sphere: string | undefined): string {
+  return sphere === "finance" ? "Что запомнилось? (без сумм)" : "Что запомнилось?";
+}
+
 export interface AfterMissionInfo {
   goal: Goal;
   awarded: boolean;
@@ -126,7 +131,7 @@ export function AfterMission({
             </div>
             <label className="lx-field">
               <span>Заметка (необязательно)</span>
-              <textarea value={note} rows={2} maxLength={REFLECTION_NOTE_MAX} placeholder="Что запомнилось?" onChange={(event) => setNote(event.target.value)} />
+              <textarea value={note} rows={2} maxLength={REFLECTION_NOTE_MAX} placeholder={notePlaceholder(info.goal.sphere)} onChange={(event) => setNote(event.target.value)} />
             </label>
             <p className="field-hint">{note.length}/{REFLECTION_NOTE_MAX} · на XP не влияет</p>
             <div className="ps-actions">

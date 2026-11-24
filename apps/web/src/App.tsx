@@ -453,7 +453,7 @@ export function App() {
               actions={actions}
               reducedMotion={reducedMotion}
               onAll={() => openMissions(null)}
-              plan={planChips(goals, level)}
+              plan={planChips(goals, level, new Date(), player?.progress.xpBySphere ?? {})}
               today={player?.today}
               onPlan={addFromPlan}
             />
@@ -466,7 +466,7 @@ export function App() {
             place={missionPlace}
             onPlace={setMissionPlace}
             onCreate={addMission}
-            onTemplate={(templateId) => void addFromPlan({ key: templateId, title: "", place: null, templateId })}
+            onTemplate={(templateId) => void addFromPlan({ key: templateId, title: "", place: null, kind: "new", templateId })}
             actions={{ ...actions, onDelete: (goal) => void removeGoal(goal.id, `Миссия «${goal.title}» удалена`) }}
             reducedMotion={reducedMotion}
           />

@@ -135,23 +135,23 @@ export function todayBoard(
   return { open: board.open.slice(0, limit), openTotal: board.open.length, doneToday, later: board.later };
 }
 
-/** A chip of the empty-day plan: «Можно снова: …». */
+/** A chip of the empty-day plan: «Можно снова:» (done before) or «Можно взять:» (new). */
 export interface PlanChip {
   key: string;
   title: string;
   place: MapNodeId | null;
-  /** Copy this goal (a seed or a repeated mission done before)… */
+  /** «repeat»: the player has done this template before; «new»: never done yet. */
+  kind: "repeat" | "new";
+  /** Copy this goal (a seed or a repeated own mission done before)… */
   repeatOf?: string;
-  /** …or, when there is none yet, start the seed / placeless template. */
+  /** …or start the seed / placeless template. */
   templateId?: string;
-  /** Placeless template chips: the sphere (for the icon). */
-  sphere?: PlacelessSphere;
+  /** Life sphere of the chip (icon; «new» chips are ordered by its XP). */
+  sphere?: string;
 }
 
-/** First placeless template of `sphere` that is neither open for today nor already rewarded today. */
-function nextSphereTemplate(sphere: PlacelessSphere, openKeys: ReadonlySet<string>, ledger: DailyLedger): SphereTemplate | undefined {
-  return SPHERE_TEMPLATES.find((template) => template.sphere === sphere && !openKeys.has(template.id) && !ledger.templates.has(template.id));
-}
+/** At most this many plan buttons in total (Игрок, 24.11): repeats first, then new ones. */
+export const PLAN_MAX = 3;
 
 /** A placeless template in the Миссии tab: already open today, already gave XP today, or free to add. */
 export interface SphereTemplateRow {
@@ -175,41 +175,70 @@ export function placelessBoard(goals: readonly Goal[], now = new Date()): Array<
 }
 
 /**
- * Plan for an empty day (spec №1): the two seeds, one placeless mission per sphere (Карьера, Финансы,
- * Отношения) and every template the player has repeated, minus
- * the ones already open and the ones whose place is still locked (R-XP-8). Newest source goal first.
+ * Plan for an empty day: at most {@link PLAN_MAX} buttons.
+ * 1. «Можно снова:» templates the player has finished before (seeds, placeless, repeated own):
+ *    those that can still give XP today first, then newest first.
+ * 2. «Можно взять:» templates never done yet (seeds and placeless), one per sphere, from the spheres
+ *    with the least XP (`xpBySphere`); ties keep the domain order.
+ * Skips templates already open and places that are still locked (R-XP-8).
  */
-export function planChips(goals: readonly Goal[], level: number, now = new Date()): PlanChip[] {
+export function planChips(
+  goals: readonly Goal[],
+  level: number,
+  now = new Date(),
+  xpBySphere: Partial<Record<string, number>> = {},
+  max = PLAN_MAX,
+): PlanChip[] {
   const openKeys = new Set(goals.filter((goal) => goal.status === "open").map(templateKeyOf).filter(Boolean) as string[]);
-  const latest = new Map<string, Goal>();
+  const ledger = dailyLedger(goals, now);
+  // Newest done goal per template: the «done before» source.
+  const lastDone = new Map<string, Goal>();
   for (const goal of goals) {
     const key = templateKeyOf(goal);
-    if (!key) continue;
-    const seen = latest.get(key);
-    if (!seen || (goal.completedAt ?? "") > (seen.completedAt ?? "")) latest.set(key, goal);
+    if (!key || goal.status !== "done") continue;
+    const seen = lastDone.get(key);
+    if (!seen || (goal.completedAt ?? "") > (seen.completedAt ?? "")) lastDone.set(key, goal);
   }
-  const chips: PlanChip[] = [];
-  for (const seed of SEED_TEMPLATES) {
-    if (openKeys.has(seed.id) || lockedPlaceFor(seed.sphere, level)) continue;
-    const source = latest.get(seed.id);
-    chips.push({
-      key: seed.id,
-      title: seed.title,
-      place: placeForSphere(seed.sphere),
-      ...(source ? { repeatOf: source.id } : { templateId: seed.id }),
+  const usable = (key: string, sphere: string | undefined) => !openKeys.has(key) && !lockedPlaceFor(sphere, level);
+
+  const repeats: Array<PlanChip & { at: string; rewarded: boolean }> = [];
+  for (const [key, source] of lastDone) {
+    if (!usable(key, source.sphere)) continue;
+    const builtIn = builtInTemplate(key);
+    const isSeed = SEED_TEMPLATES.some((seed) => seed.id === key);
+    repeats.push({
+      key,
+      title: builtIn?.title ?? source.title,
+      place: placeForSphere(source.sphere),
+      kind: "repeat",
+      sphere: source.sphere,
+      ...(builtIn && !isSeed ? { templateId: key } : { repeatOf: source.id }),
+      at: source.completedAt ?? "",
+      rewarded: ledger.templates.has(key),
     });
   }
-  // One placeless mission per sphere (Карьера, Финансы, Отношения): open from level 1.
-  const ledger = dailyLedger(goals, now);
-  for (const sphere of PLACELESS_SPHERES) {
-    const template = nextSphereTemplate(sphere, openKeys, ledger);
-    if (template) chips.push({ key: template.id, title: template.title, place: null, templateId: template.id, sphere });
+  repeats.sort((a, b) => Number(a.rewarded) - Number(b.rewarded) || b.at.localeCompare(a.at));
+
+  // Never-done templates, grouped by sphere; spheres with the least XP first, one chip per sphere per round.
+  const candidates: Array<{ id: string; title: string; sphere: string }> = [...SEED_TEMPLATES, ...SPHERE_TEMPLATES]
+    .filter((template) => !lastDone.has(template.id) && usable(template.id, template.sphere));
+  const spheres = [...new Set(candidates.map((template) => template.sphere))]
+    .map((sphere, order) => ({ sphere, order, xp: xpBySphere[sphere] ?? 0 }))
+    .sort((a, b) => a.xp - b.xp || a.order - b.order);
+  const news: PlanChip[] = [];
+  for (let round = 0; news.length < candidates.length; round += 1) {
+    let added = false;
+    for (const { sphere } of spheres) {
+      const template = candidates.filter((item) => item.sphere === sphere)[round];
+      if (!template) continue;
+      added = true;
+      news.push({ key: template.id, title: template.title, place: placeForSphere(template.sphere), kind: "new", templateId: template.id, sphere: template.sphere });
+    }
+    if (!added) break;
   }
-  for (const [key, source] of latest) {
-    if (builtInTemplate(key) || openKeys.has(key) || lockedPlaceFor(source.sphere, level)) continue;
-    chips.push({ key, title: source.title, place: placeForSphere(source.sphere), repeatOf: source.id });
-  }
-  return chips;
+
+  const strip = ({ at: _at, rewarded: _rewarded, ...chip }: PlanChip & { at: string; rewarded: boolean }): PlanChip => chip;
+  return [...repeats.map(strip), ...news].slice(0, max);
 }
 
 /**
