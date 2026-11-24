@@ -242,7 +242,7 @@ export function AssistantChat({
                   {line.role === "user" ? "ТЫ" : "ИИ-ПОМОЩНИК"} · {line.at}
                 </div>
                 <p className="lx-msg__b">
-                  <span className="sr-only">{line.role === "user" ? "Ты: " : "Помощник: "}</span>
+                  <span className="sr-only">{line.role === "user" ? "Ты: " : "ИИ-помощник: "}</span>
                   {line.content}
                 </p>
               </div>

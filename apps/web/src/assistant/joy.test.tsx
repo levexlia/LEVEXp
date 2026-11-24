@@ -36,6 +36,7 @@ function server(initial: Goal[], opts: Opts = {}) {
     if (url === "/progress") return json(progress());
     if (url === "/room") return json({ placements: [] });
     if (url === "/goals" && method === "GET") return json(goals);
+    if (url === "/assistant/chat") return json({ reply: "Можно начать с маленького шага.", source: "offline" });
     const done = url.match(/^\/goals\/(.+)\/complete$/);
     if (done) {
       const goal = goals.find((item) => item.id === done[1])!;
@@ -304,6 +305,19 @@ describe("words and nothing else changes", () => {
     expect(document.querySelector(".meters .streak")?.textContent).toContain("Серия");
     openChat();
     expect(screen.getByRole("heading", { name: "ИИ-помощник" })).toBeTruthy();
+  });
+
+  it("10. screen readers hear «ИИ-помощник: » before an assistant reply (and «Ты: » before mine)", async () => {
+    server([walk(), readBook()], { xp: 20 });
+    await renderApp();
+    openChat();
+    const field = document.querySelector(".lx-chat__field") as HTMLTextAreaElement;
+    fireEvent.change(field, { target: { value: "Привет" } });
+    fireEvent.submit(field.closest("form")!);
+    await waitFor(() => expect(document.querySelectorAll(".lx-chat__log .lx-msg--bot .sr-only").length).toBeGreaterThan(0));
+    const prefix = (selector: string) => [...document.querySelectorAll(`.lx-chat__log ${selector} .sr-only`)].map((el) => el.textContent);
+    expect(new Set(prefix(".lx-msg--bot"))).toEqual(new Set(["ИИ-помощник: "]));
+    expect(prefix(".lx-msg--me")).toEqual(["Ты: "]);
   });
 
   it("12. XP, progress and API untouched: /progress before and after A, B and C is the same; only GETs besides the mark", async () => {
